@@ -1,0 +1,17 @@
+{
+  "name": "@platform-kit/fluent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Apache-2.0 Fluent-style CSS, Vue controls, navigation, and overlays.",
+  "license": "Apache-2.0",
+  "files": ["dist", "README.md", "NOTICE", "LICENSE"],
+  "sideEffects": ["**/*.css"],
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./vue": { "types": "./dist/vue/index.d.ts", "import": "./dist/vue/index.js" },
+    "./style.css": "./dist/style.css"
+  },
+  "scripts": { "build": "tsc -p tsconfig.build.json && node build.mjs", "typecheck": "tsc -p tsconfig.json" },
+  "peerDependencies": { "vue": "^3.5.0" }
+}

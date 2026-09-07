@@ -1,0 +1,71 @@
+.fluent-dialog {
+  box-sizing: border-box;
+  display: none;
+  flex-direction: column;
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(720px, calc(100dvh - 32px));
+  padding: 0;
+  color: var(--fluent-text);
+  background: var(--fluent-surface);
+  border: 1px solid var(--fluent-border);
+  border-radius: var(--fluent-panel-radius);
+  box-shadow: var(--fluent-shadow);
+  overflow: hidden;
+}
+.fluent-dialog[open] {
+  display: flex;
+}
+.fluent-dialog::backdrop {
+  background: rgb(0 0 0 / 32%);
+}
+.fluent-dialog__header {
+  flex: none;
+  padding: 20px 24px 0;
+}
+.fluent-dialog__content {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 24px;
+  overflow: auto;
+  outline: none;
+}
+.fluent-dialog__footer {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 24px 20px;
+  border-top: 1px solid var(--fluent-border);
+}
+.fluent-popover {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  box-sizing: border-box;
+  min-width: 0;
+  width: 360px;
+  overflow-wrap: anywhere;
+  padding: 6px;
+  overflow: auto;
+  color: var(--fluent-text);
+  background: var(--fluent-surface);
+  border: 1px solid var(--fluent-border);
+  border-radius: var(--fluent-panel-radius);
+  box-shadow: var(--fluent-shadow);
+  animation: fluent-overlay-in var(--fluent-fast) var(--fluent-ease);
+}
+@keyframes fluent-overlay-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fluent-popover {
+    animation: none;
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "@platform-kit/fluent-preview",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "vite build", "dev": "vite", "typecheck": "tsc --noEmit" },
+  "dependencies": { "@platform-kit/fluent": "workspace:*", "vue": "^3.5.42" },
+  "devDependencies": { "typescript": "^5.9.2", "vite": "^7.1.7" }
+}
