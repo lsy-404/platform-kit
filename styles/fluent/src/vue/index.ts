@@ -10,6 +10,8 @@ export {
 } from "./controls.js";
 export { FluentDialog, FluentPopover } from "./overlays.js";
 export { FluentNavigation } from "./navigation.js";
+export { FluentCheckbox, FluentProgressBar, FluentProgressRing, FluentScrollViewer } from "./feedback.js";
+export type { FluentScrollViewerHandle } from "./feedback.js";
 export type {
   FluentButtonTone,
   FluentNoticeTone,

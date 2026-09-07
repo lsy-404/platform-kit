@@ -98,7 +98,7 @@ export const FluentSwitch = defineComponent({
   inheritAttrs: false,
   props: {
     modelValue: Boolean,
-    label: { type: String, required: true },
+    label: String,
     disabled: Boolean,
   },
   emits: ["update:modelValue", "change"],
@@ -128,7 +128,7 @@ export const FluentSwitch = defineComponent({
           h("span", { class: "fluent-switch__track", "aria-hidden": "true" }, [
             h("span", { class: "fluent-switch__thumb" }),
           ]),
-          h("span", { class: "fluent-switch__label" }, props.label),
+          props.label ? h("span", { class: "fluent-switch__label" }, props.label) : null,
         ],
       );
   },
@@ -142,21 +142,21 @@ export const FluentSlider = defineComponent({
     min: { type: Number, default: 0 },
     max: { type: Number, default: 100 },
     step: { type: Number, default: 1 },
-    label: { type: String, required: true },
+    label: String,
     disabled: Boolean,
   },
   emits: ["update:modelValue", "change"],
   setup(props, { attrs, emit }) {
     return () =>
       h("label", { class: "fluent-slider" }, [
-        h("span", { class: "fluent-slider__header" }, [
+        props.label ? h("span", { class: "fluent-slider__header" }, [
           h("span", { class: "fluent-slider__label" }, props.label),
           h(
             "output",
             { class: "fluent-slider__value" },
             `${sliderPercentage(props.modelValue, props.min, props.max).toFixed(0)}%`,
           ),
-        ]),
+        ]) : null,
         h(
           "input",
           mergeProps(attrs, {
@@ -167,7 +167,7 @@ export const FluentSlider = defineComponent({
             max: props.max,
             step: props.step,
             disabled: props.disabled,
-            "aria-label": props.label,
+            "aria-label": attrs["aria-label"] ?? props.label,
             style: {
               "--fluent-slider-position": `${sliderPercentage(props.modelValue, props.min, props.max)}%`,
             },

@@ -214,3 +214,65 @@
   outline: 2px solid var(--fluent-accent);
   outline-offset: 2px;
 }
+
+.fluent-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fluent-text);
+  font: inherit;
+  cursor: pointer;
+}
+.fluent-checkbox__input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--fluent-accent);
+  cursor: inherit;
+}
+.fluent-checkbox:has(:disabled) {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.fluent-progress-bar {
+  display: block;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  accent-color: var(--fluent-accent);
+  background: var(--fluent-border);
+}
+.fluent-progress-bar::-webkit-progress-bar { background: var(--fluent-border); }
+.fluent-progress-bar::-webkit-progress-value { background: var(--fluent-accent); }
+.fluent-progress-bar::-moz-progress-bar { background: var(--fluent-accent); }
+.fluent-progress-bar:indeterminate {
+  background: linear-gradient(to right, transparent 0 30%, var(--fluent-accent) 30% 60%, transparent 60%) var(--fluent-border);
+  background-size: 200% 100%;
+  animation: fluent-progress-slide 1.5s linear infinite;
+}
+.fluent-progress-bar:indeterminate::-webkit-progress-bar { background: transparent; }
+.fluent-progress-ring { display: inline-flex; flex: none; color: var(--fluent-accent); }
+.fluent-progress-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.fluent-progress-ring circle { fill: none; stroke-width: 2; }
+.fluent-progress-ring__track { stroke: var(--fluent-border); }
+.fluent-progress-ring__value { stroke: currentColor; stroke-linecap: round; }
+.fluent-progress-ring--indeterminate svg { animation: fluent-progress-spin 1s linear infinite; }
+.fluent-scroll-viewer {
+  min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--fluent-muted) transparent;
+}
+.fluent-scroll-viewer--horizontal { overflow-x: auto; }
+@keyframes fluent-progress-spin { to { transform: rotate(270deg); } }
+@keyframes fluent-progress-slide { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .fluent-progress-ring--indeterminate svg,
+  .fluent-progress-bar:indeterminate { animation: none; }
+}
