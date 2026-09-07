@@ -1,0 +1,13 @@
+node_modules/
+dist/
+release/
+.pnpm-store/
+.DS_Store
+.env*
+.dev.vars*
+.npmrc
+.wrangler/
+/agents/
+/test/artifacts/
+/kits/
+/inventory/
