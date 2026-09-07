@@ -1,0 +1,10 @@
+{
+  "name": "@platform-kit/ui-tokens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Apache-2.0 semantic CSS theme tokens.",
+  "license": "Apache-2.0",
+  "files": ["src/tokens.css", "README.md", "NOTICE", "LICENSE"],
+  "sideEffects": ["**/*.css"],
+  "exports": { "./tokens.css": "./src/tokens.css" }
+}
