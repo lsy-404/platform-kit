@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>model-auth standalone</title></head>
+<body style="font:15px system-ui;padding:48px">
+<h1>Standalone Custom Element</h1><p>无宿主 Vue，直接加载构建产物。此页只使用演示数据。</p>
+<button id="open">打开连接</button>
+<button id="unstyled">切换默认外观</button>
+<button id="brand">覆盖主题</button>
+<model-auth-dialog></model-auth-dialog>
+<script type="module">
+import { registerModelAuthElement } from "./dist/model-auth-element.js";
+registerModelAuthElement();
+const dialog = document.querySelector("model-auth-dialog");
+dialog.theme = "dark";
+dialog.catalogStatus = { state: "ready", source: "models.dev" };
+dialog.providers = [{ id: "example", name: "Example Provider", description: "由宿主提供运行时", available: true, authMethods: ["oauth", "api-key"], models: ["model-standard"], oauthCredentials: [{ id: "one", label: "演示账号", enabled: true, healthy: true, weight: 1 }], apiKeyCredentials: [] }];
+document.querySelector("#open").onclick = () => { dialog.open = true; };
+document.querySelector("#unstyled").onclick = () => { dialog.styled = dialog.styled === false; dialog.open = true; };
+document.querySelector("#brand").onclick = () => { dialog.style.setProperty("--model-auth-accent", "#da7aff"); dialog.open = true; };
+dialog.addEventListener("close", () => { dialog.open = false; });
+</script>
+</body></html>

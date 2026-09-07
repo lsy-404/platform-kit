@@ -1,0 +1,23 @@
+{
+  "name": "@model-auth/providers",
+  "version": "0.2.7",
+  "description": "Host-side browser authorization and official CLI provider sessions.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "typesVersions": { "*": { "workbuddy": ["dist/workbuddy.d.ts"], "trae": ["dist/trae.d.ts"] } },
+  "license": "Apache-2.0",
+  "engines": { "node": ">=20.19" },
+  "files": ["dist", "LICENSE", "README.md", "THIRD-PARTY.md"],
+  "sideEffects": false,
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./workbuddy": { "types": "./dist/workbuddy.d.ts", "import": "./dist/workbuddy.js" },
+    "./trae": { "types": "./dist/trae.d.ts", "import": "./dist/trae.js" }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": { "tough-cookie": "6.0.2" }
+}
