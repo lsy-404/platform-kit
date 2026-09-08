@@ -185,7 +185,7 @@ function handleProviderKeydown(event: KeyboardEvent) {
 function handleDialogKeydown(event: KeyboardEvent) {
   if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); return; }
   if (event.key !== "Tab" || !dialog.value) return;
-  const focusable = [...dialog.value.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]), [tabindex='0'], a[href]")]
+  const focusable = [...dialog.value.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]), [tabindex='0'], a[href], summary")]
     .filter(element => element.tabIndex >= 0 && !element.closest("[hidden]"));
   const first = focusable[0], last = focusable.at(-1), active = activeElement();
   if (!first || !last) { event.preventDefault(); dialog.value.focus(); return; }
@@ -378,7 +378,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
             <p v-if="!credentials.length" class="model-auth-empty">{{ connectionMode ? text.noConnections : text.noCredentials }}</p>
           </section>
           <section v-if="connectionMode" class="model-auth-credential-section" data-part="connection-policy">
-            <details class="model-auth-connection-models"><summary>{{ text.models }} ({{ connectionModels.length }})</summary><ul v-if="connectionModels.length"><li v-for="name in connectionModels" :key="name">{{ name }}</li></ul><p v-else>{{ text.emptyModels }}</p></details>
+            <details class="model-auth-connection-models"><summary>{{ text.models }} ({{ connectionModels.length }})</summary><ul v-if="connectionModels.length" tabindex="0" :aria-label="text.models"><li v-for="name in connectionModels" :key="name">{{ name }}</li></ul><p v-else>{{ text.emptyModels }}</p></details>
             <div class="model-auth-section-heading"><div><strong>{{ text.current }}</strong><small>{{ currentModel }}</small></div><StrategyPicker :model-value="currentStrategy" :options="strategyOptions" :label="text.strategy" :disabled="busy" @update:model-value="updateStrategy" /></div>
           </section>
 

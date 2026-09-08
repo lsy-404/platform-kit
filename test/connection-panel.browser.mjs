@@ -66,6 +66,11 @@ try {
   const models = page.locator("fixture-dialog").locator(".model-auth-connection-models");
   await models.click();
   assert.ok((await models.locator("li").count()) >= 30);
+  await models.locator('summary').focus();
+  await page.keyboard.press('Tab');
+  assert.equal(await page.locator('fixture-dialog').evaluate(el => el.shadowRoot.activeElement?.getAttribute('aria-label')), '可用模型', 'the scrollable model list must be keyboard accessible');
+  await page.keyboard.press('Tab');
+  assert.equal(await page.locator('fixture-dialog').evaluate(el => el.shadowRoot.activeElement?.getAttribute('aria-label')), '负载策略', 'Tab must reach the policy control after the model list');
   const dialogSize = await page.locator("fixture-dialog").evaluate(element => { const root = element.shadowRoot.querySelector('[data-part="connection-info"]'); return { width: root.clientWidth, scroll: root.scrollWidth }; });
   assert.ok(dialogSize.scroll <= dialogSize.width, `long models overflow: ${dialogSize.scroll}/${dialogSize.width}`);
   await page.screenshot({ path: join(artifact, "connection-panel-detail-models.png"), fullPage: true });
