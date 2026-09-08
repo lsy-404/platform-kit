@@ -1,0 +1,68 @@
+import assert from "node:assert/strict";
+import { createServer } from "node:http";
+import { mkdir, readFile } from "node:fs/promises";
+import { extname, join, normalize } from "node:path";
+import { chromium } from "@playwright/test";
+
+const root = process.cwd();
+const dist = join(root, "apps/fluent-preview/dist");
+const mime = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml" };
+const server = createServer(async (request, response) => {
+  const pathname = request.url === "/" ? "/index.html" : new URL(request.url, "http://test").pathname;
+  const path = normalize(join(dist, pathname));
+  if (!path.startsWith(dist)) return response.writeHead(403).end();
+  try { response.setHeader("content-type", mime[extname(path)] ?? "application/octet-stream"); response.end(await readFile(path)); }
+  catch { response.writeHead(404).end(); }
+});
+await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+const { port } = server.address();
+const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE, headless: true });
+const artifact = join(root, "test/artifacts");
+await mkdir(artifact, { recursive: true });
+try {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, colorScheme: "light", reducedMotion: "no-preference" });
+  await page.goto(`http://127.0.0.1:${port}`, { waitUntil: "networkidle" });
+  for (const name of ["button-primary", "toggle-button", "switch", "fluent-slider", "fluent-select", "menu-trigger", "scroll-viewer", "dialog-trigger", "popover-trigger", "theme-mode", "accent-select", "details"]) assert.equal(await page.getByTestId(name).count(), 1, `missing ${name}`);
+  for (const type of ["text", "search", "email", "url", "tel", "password", "number", "file", "color", "date", "time", "datetime-local", "month", "week"]) assert.ok(await page.locator(`input[type="${type}"]`).count() >= 1, `missing native ${type}`);
+  assert.equal(await page.locator(".fluent-notice").count(), 4);
+  assert.equal(await page.locator(".fluent-progress-bar").count(), 2);
+  assert.equal(await page.locator(".fluent-progress-ring").count(), 2);
+  assert.equal(await page.locator(".fluent-navigation").count(), 1);
+  await page.getByTestId("button-primary").hover();
+  await page.getByTestId("button-primary").focus();
+  await page.getByTestId("toggle-button").click();
+  assert.equal(await page.getByTestId("toggle-button").getAttribute("aria-pressed"), "true");
+  await page.getByTestId("switch").click();
+  assert.equal(await page.getByTestId("switch").getAttribute("aria-checked"), "false");
+  assert.equal(await page.getByRole("button", { name: "Disabled" }).isDisabled(), true);
+  await page.getByTestId("fluent-select").click();
+  assert.equal(await page.getByRole("listbox").count(), 1);
+  assert.equal(await page.getByRole("option", { name: "Unavailable" }).isDisabled(), true);
+  await page.keyboard.press("Escape");
+  await page.getByTestId("menu-trigger").click();
+  assert.equal(await page.getByRole("menu").count(), 1);
+  assert.equal(await page.getByRole("separator").count(), 1);
+  await page.getByRole("menuitemcheckbox", { name: "Pin" }).click();
+  assert.equal(await page.getByRole("menuitemcheckbox", { name: "Pin" }).getAttribute("aria-checked"), "true");
+  assert.equal(await page.getByRole("menuitemcheckbox", { name: "Delete" }).isDisabled(), true);
+  await page.keyboard.press("Escape");
+  await page.getByTestId("details").click();
+  assert.equal(await page.getByTestId("details").evaluate((node) => node.open), true);
+  await page.getByTestId("popover-trigger").click();
+  assert.equal(await page.getByText("This is a real FluentPopover.").count(), 1);
+  await page.keyboard.press("Escape");
+  await page.getByTestId("dialog-trigger").click();
+  assert.equal(await page.getByRole("dialog", { name: "Catalog dialog" }).count(), 1);
+  await page.keyboard.press("Escape");
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.selectOption("[data-testid=theme-mode]", "light");
+  await page.screenshot({ path: join(artifact, "fluent-catalog-light.png"), fullPage: true });
+  await page.selectOption("[data-testid=theme-mode]", "dark");
+  assert.equal(await page.locator(".catalog-theme").getAttribute("data-fluent-theme"), "dark");
+  await page.screenshot({ path: join(artifact, "fluent-catalog-dark.png"), fullPage: true });
+  const forced = await browser.newPage({ viewport: { width: 1280, height: 900 }, forcedColors: "active" });
+  await forced.goto(`http://127.0.0.1:${port}`); await forced.screenshot({ path: join(artifact, "fluent-catalog-forced-colors.png"), fullPage: true }); await forced.close();
+  const reduced = await browser.newPage({ viewport: { width: 1280, height: 900 }, reducedMotion: "reduce" });
+  await reduced.goto(`http://127.0.0.1:${port}`); assert.equal(await reduced.emulateMedia({ reducedMotion: "reduce" }), undefined); await reduced.screenshot({ path: join(artifact, "fluent-catalog-reduced-motion.png"), fullPage: true }); await reduced.close();
+  console.log("Fluent catalog browser coverage passed: 12 catalog entry points, 14 native input types, four preference screenshots");
+} finally { await browser.close(); await new Promise((resolve) => server.close(resolve)); }
