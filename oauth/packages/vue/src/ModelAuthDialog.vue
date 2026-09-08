@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from "vue";
 import { defaultMessages, type ModelAuthMessages } from "./messages";
 import StrategyPicker from "./StrategyPicker.vue";
+import ModelPicker from "./ModelPicker.vue";
 import type {
   AddApiKeyPayload, AuthMethod, CredentialUpdatePayload, CatalogStatus, LoadStrategy,
   ModelAuthProvider, ModelAuthSelection, ModelConnectionTarget, ProviderUpdatePayload, StrategyUpdatePayload, Theme, OAuthCredential,
@@ -83,10 +84,15 @@ const credentials = computed<OAuthCredential[]>(() => {
   const provider = selectedProvider.value;
   return (method.value === "oauth" ? provider?.oauthCredentials : provider?.apiKeyCredentials) ?? [];
 });
-const connectionModels = computed(() => [...new Set(credentials.value.flatMap(credential => credential.models || []))]);
+const connectionModels = computed(() => [...new Set(credentials.value.flatMap(credential => credential.models || []).filter(model => model.trim()))]);
 const canUseMethod = computed(() => Boolean(selectedProvider.value?.available
+  && selectedProvider.value.authMethods.includes(method.value)
   && (method.value !== "oauth" || selectedProvider.value.oauthEnabled !== false)));
-const authReady = computed(() => canUseMethod.value && credentials.value.some(credential => credential.enabled && credential.healthy));
+const eligibleCredentials = computed(() => canUseMethod.value ? credentials.value.filter(credential => credential.enabled && credential.healthy
+  && Number.isInteger(credential.weight) && credential.weight > 0 && credential.weight <= 100
+  && (!credential.cooldownUntilUtc || Date.parse(credential.cooldownUntilUtc) <= Date.now())) : []);
+const availableModels = computed(() => [...new Set(eligibleCredentials.value.flatMap(credential => credential.models || []).filter(model => model.trim()))]);
+const authReady = computed(() => eligibleCredentials.value.length > 0);
 const strategyOptions = computed(() => [
   { value: "round-robin" as const, label: text.value.roundRobin },
   { value: "weighted-round-robin" as const, label: text.value.weightedRoundRobin },
@@ -186,7 +192,8 @@ function handleDialogKeydown(event: KeyboardEvent) {
   if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); return; }
   if (event.key !== "Tab" || !dialog.value) return;
   const focusable = [...dialog.value.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]), [tabindex='0'], a[href], summary")]
-    .filter(element => element.tabIndex >= 0 && !element.closest("[hidden]"));
+    .filter(element => element.tabIndex >= 0 && !element.closest("[hidden]")
+      && (!element.closest("details:not([open])") || element.matches("summary")));
   const first = focusable[0], last = focusable.at(-1), active = activeElement();
   if (!first || !last) { event.preventDefault(); dialog.value.focus(); return; }
   if (event.shiftKey && (active === first || !focusable.includes(active as HTMLElement))) {
@@ -228,6 +235,11 @@ function startNewConnection() {
   transitionName.value = "model-auth-step-forward";
   step.value = "method"; selectedProviderId.value = ""; search.value = "";
   pendingRemoval.value = ""; localError.value = ""; clearSecret(); void focusHeading();
+}
+function selectModel(model: string) {
+  const provider = selectedProvider.value;
+  if (!provider || props.busy || !availableModels.value.includes(model)) return;
+  emit("select-model", { providerId: provider.id, model });
 }
 function updateStrategy(value: LoadStrategy) {
   const provider = selectedProvider.value;
@@ -378,7 +390,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
             <p v-if="!credentials.length" class="model-auth-empty">{{ connectionMode ? text.noConnections : text.noCredentials }}</p>
           </section>
           <section v-if="connectionMode" class="model-auth-credential-section" data-part="connection-policy">
-            <details class="model-auth-connection-models"><summary>{{ text.models }} ({{ connectionModels.length }})</summary><ul v-if="connectionModels.length" tabindex="0" :aria-label="text.models"><li v-for="name in connectionModels" :key="name">{{ name }}</li></ul><p v-else>{{ text.emptyModels }}</p></details>
+            <details class="model-auth-connection-models" open><summary>{{ text.models }} ({{ connectionModels.length }})</summary><ModelPicker :models="connectionModels" :available-models="availableModels" :selected="currentModel" :disabled="busy" :messages="text" @select="selectModel" /></details>
             <div class="model-auth-section-heading"><div><strong>{{ text.current }}</strong><small>{{ currentModel }}</small></div><StrategyPicker :model-value="currentStrategy" :options="strategyOptions" :label="text.strategy" :disabled="busy" @update:model-value="updateStrategy" /></div>
           </section>
 
@@ -389,6 +401,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
             <p>{{ text.authorizationComplete }}</p>
             <p>{{ method === 'oauth' ? text.oauth : text.apiKey }} · {{ text.verified }}</p>
           </section>
+          <ModelPicker v-if="connectionModels.length" :models="connectionModels" :available-models="availableModels" :selected="currentModel" :disabled="busy" :messages="text" @select="selectModel" />
         </div>
         <footer v-if="!connectionMode && step === 'detail' && authReady" class="model-auth-actions">
           <button type="button" class="model-auth-primary" data-part="continue-confirmation" :disabled="busy" @click="advanceToConfirmation">{{ text.continue }}</button>

@@ -1,4 +1,4 @@
-import { computed, ref, shallowRef, watch } from "vue";
+import { computed, ref, shallowRef } from "vue";
 import type {
   AddApiKeyPayload, CatalogStatus, CredentialUpdatePayload, ModelAuthProvider,
   ModelAuthSelection, ProviderUpdatePayload, StrategyUpdatePayload,
@@ -31,8 +31,6 @@ export function useModelAuth(host: ModelAuthHost, options: { errorMessage?: stri
   const state = shallowRef<ModelAuthState>({ providers: [], model: null, catalogStatus: { state: "loading" } });
   let pending: Promise<boolean> | null = null;
   let authorization: AbortController | null = null;
-  let session = 0;
-  watch(open, () => { session++; }, { flush: "sync" });
 
   function run(action?: ModelAuthAction): Promise<boolean> {
     if (pending) return action ? Promise.resolve(false) : pending;
@@ -60,12 +58,7 @@ export function useModelAuth(host: ModelAuthHost, options: { errorMessage?: stri
     "remove-api-key": (providerId: string, credentialId: string) => run({ type: "remove-credential", providerId, credentialId, authMethod: "api-key" }),
     "update-credential": (payload: CredentialUpdatePayload) => run({ type: "update-credential", payload }),
     "update-provider": (payload: ProviderUpdatePayload) => run({ type: "update-provider", payload }),
-    "select-model": async (payload: ModelAuthSelection) => {
-      const currentSession = session;
-      const succeeded = await run({ type: "select-model", payload });
-      if (succeeded && currentSession === session) open.value = false;
-      return succeeded;
-    },
+    "select-model": (payload: ModelAuthSelection) => run({ type: "select-model", payload }),
     "update-provider-strategy": (payload: StrategyUpdatePayload) => run({ type: "update-strategy", payload }),
     "refresh-catalog": () => run({ type: "refresh-catalog" }),
   };

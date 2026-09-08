@@ -21,6 +21,7 @@
 .model-auth-method-card { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 12px; min-height: 144px; text-align: left; }
 .model-auth-method-card strong, .model-auth-method-card small, .model-auth-section-heading strong, .model-auth-section-heading small, .model-auth-row-main strong, .model-auth-row-main small, .model-auth-api-form strong, .model-auth-api-form small { display: block; }
 .model-auth-provider-step, .model-auth-detail { min-height: 0; padding: 0 24px 24px; display: grid; gap: 16px; align-content: start; }
+.model-auth-detail { overflow: auto; }
 .model-auth-provider-step { grid-template-rows: auto auto minmax(0, 1fr); overflow: hidden; padding-top: 4px; }
 .model-auth-provider-list, .model-auth-provider-group, .model-auth-credentials, .model-auth-models, .model-auth-credential-section, .model-auth-model-section { display: grid; gap: 8px; min-width: 0; }
 .model-auth-provider-list { min-height: 0; overflow: auto; padding: 2px; margin: -2px; }
@@ -187,7 +188,10 @@
 .model-auth-connection-detail small { overflow-wrap: anywhere; }
 .model-auth-connection-models { min-width: 0; }
 .model-auth-connection-models summary { padding: 8px 0; cursor: pointer; }
-.model-auth-connection-models ul { max-height: 180px; overflow: auto; padding-inline-start: 24px; overflow-wrap: anywhere; }
+.model-auth-models { max-height: 240px; overflow: auto; padding: 2px; margin: -2px; }
+.model-auth-model-row > span { min-width: 0; }
+.model-auth-model-row > small { flex-shrink: 0; }
+.model-auth-styled .model-auth-model-row[aria-pressed="true"] { border-color: var(--ma-accent); background: var(--ma-subtle); }
 .model-auth-connection-models summary:focus-visible { outline: 2px solid var(--ma-accent); outline-offset: 2px; }
 
 .model-auth-connections.model-auth-styled { padding: 16px; border: 1px solid var(--ma-line); border-radius: 8px; background: var(--ma-surface); }

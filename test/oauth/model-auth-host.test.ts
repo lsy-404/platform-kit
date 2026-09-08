@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { useModelAuth } from "../../oauth/packages/vue/src/useModelAuth";
 import type { ModelAuthAction, ModelAuthState } from "../../oauth/packages/vue/src/useModelAuth";
 
-it("closes confirmation only after the host saves and refreshes successfully", async () => {
+it("keeps model selection open after the host saves and refreshes successfully", async () => {
   let fail = true;
   const binding = useModelAuth({
     async getState() { return { providers: [], model: null, catalogStatus: { state: "ready" } }; },
@@ -13,7 +13,7 @@ it("closes confirmation only after the host saves and refreshes successfully", a
   expect(binding.open.value).toBe(true);
   fail = false;
   expect(await binding.listeners["select-model"]({ providerId: "sample", model: "sample" })).toBe(true);
-  expect(binding.open.value).toBe(false);
+  expect(binding.open.value).toBe(true);
 });
 
 it("a late confirmation cannot close a newly opened dialog", async () => {
