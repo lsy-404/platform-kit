@@ -123,6 +123,8 @@ export const FluentPopover = defineComponent({
     label: { type: String, required: true },
     anchor: { type: Object as PropType<HTMLElement | null>, default: null },
     portal: { type: Object as PropType<HTMLElement | null>, default: null },
+    role: { type: String, default: "dialog" },
+    focusOnOpen: { type: Boolean, default: true },
   },
   emits: ["update:open", "close"],
   setup(props, { emit, slots }) {
@@ -193,7 +195,7 @@ export const FluentPopover = defineComponent({
         reposition();
         await nextTick();
         if (!props.open || !panel.value) return;
-        panel.value.focus({ preventScroll: true });
+        if (props.focusOnOpen) panel.value.focus({ preventScroll: true });
         if (typeof ResizeObserver !== "undefined") {
           observer = new ResizeObserver(reposition);
           observer.observe(panel.value);
@@ -237,7 +239,7 @@ export const FluentPopover = defineComponent({
           ref: panel,
           popover: "manual",
           class: "fluent-popover",
-          role: "dialog",
+          role: props.role,
           tabindex: -1,
           "aria-label": props.label,
           "data-side": position.value.side,

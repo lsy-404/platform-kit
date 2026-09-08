@@ -4,7 +4,6 @@ import {
   FluentButton,
   FluentField,
   FluentNotice,
-  FluentSelect,
   FluentSlider,
   FluentSwitch,
   sliderPercentage,
@@ -99,33 +98,6 @@ describe("Fluent controls", () => {
     expect(sliderPercentage(Number.NaN, 0, 100)).toBe(0);
     expect(sliderPercentage(50, Number.NEGATIVE_INFINITY, 100)).toBe(0);
     expect(sliderPercentage(50, 100, 0)).toBe(0);
-  });
-
-  it("uses a native select and retains unavailable options", () => {
-    const emit = vi.fn();
-    const onChange = vi.fn();
-    const node = render(
-      FluentSelect,
-      {
-        modelValue: "light",
-        label: "Theme",
-        disabled: false,
-        options: [
-          { value: "light", label: "Light" },
-          { value: "dark", label: "Dark", disabled: true },
-        ],
-      },
-      emit,
-      { onChange },
-    );
-    const control = node.children[1];
-    expect(control.type).toBe("select");
-    expect(control.children[1].props.disabled).toBe(true);
-    trigger(control.props.onChange, {
-      target: { value: "dark" },
-    } as unknown as Event);
-    expect(emit).toHaveBeenCalledWith("update:modelValue", "dark");
-    expect(onChange).toHaveBeenCalledOnce();
   });
 
   it("keeps caller input listeners while updating a field model", () => {

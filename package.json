@@ -1,6 +1,6 @@
 {
   "name": "platform-kit",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "license": "Apache-2.0",
   "packageManager": "pnpm@10.17.1",
@@ -15,6 +15,7 @@
     "pack:release": "node scripts/pack-release.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4",
     "vue": "^3.5.42"

@@ -165,7 +165,7 @@ export const FluentNumberField = defineComponent({
   name: "FluentNumberField",
   inheritAttrs: false,
   props: {
-    modelValue: { type: Number, default: 0 },
+    modelValue: { type: Number as PropType<number | null>, default: null },
     label: { type: String, required: true },
     disabled: Boolean,
     readonly: Boolean,
@@ -177,7 +177,8 @@ export const FluentNumberField = defineComponent({
     return () => h(FluentField as any, mergeProps(attrs, {
       ...props,
       type: "number",
-      "onUpdate:modelValue": (value: string) => emit("update:modelValue", Number(value)),
+      modelValue: props.modelValue === null ? "" : String(props.modelValue),
+      "onUpdate:modelValue": (value: string) => emit("update:modelValue", value === "" ? null : Number(value)),
     }));
   },
 });
@@ -265,47 +266,6 @@ export const FluentSlider = defineComponent({
             onChange: (event: Event) =>
               emit("change", numericInputValue(event)),
           }),
-        ),
-      ]);
-  },
-});
-
-export const FluentSelect = defineComponent({
-  name: "FluentSelect",
-  inheritAttrs: false,
-  props: {
-    modelValue: { type: String, default: "" },
-    label: { type: String, required: true },
-    options: {
-      type: Array as PropType<readonly FluentSelectOption[]>,
-      default: () => [],
-    },
-    disabled: Boolean,
-  },
-  emits: ["update:modelValue", "change"],
-  setup(props, { attrs, emit }) {
-    return () =>
-      h("label", { class: "fluent-select" }, [
-        h("span", { class: "fluent-select__label" }, props.label),
-        h(
-          "select",
-          mergeProps(attrs, {
-            class: ["fluent-select__control", attrs.class],
-            value: props.modelValue,
-            disabled: props.disabled,
-            onChange: (event: Event) => {
-              const nextValue = inputValue(event);
-              emit("update:modelValue", nextValue);
-              emit("change", nextValue);
-            },
-          }),
-          props.options.map((option) =>
-            h(
-              "option",
-              { value: option.value, disabled: option.disabled },
-              option.label,
-            ),
-          ),
         ),
       ]);
   },

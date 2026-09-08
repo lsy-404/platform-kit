@@ -38,10 +38,10 @@
   border-radius: var(--fluent-radius);
   cursor: pointer;
 }
-.fluent-navigation__item:hover {
+.fluent-navigation__item:hover:not(:disabled) {
   background: var(--fluent-control-hover);
 }
-.fluent-navigation__item:active {
+.fluent-navigation__item:active:not(:disabled) {
   background: var(--fluent-control-pressed);
 }
 .fluent-navigation__item:focus-visible {

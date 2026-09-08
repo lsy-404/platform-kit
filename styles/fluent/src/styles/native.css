@@ -1,0 +1,78 @@
+:where(.fluent-theme, [data-fluent-theme]) :where(button:not([class*="fluent-"]), input[type="button"], input[type="submit"], input[type="reset"]) {
+  min-height: 32px;
+  padding: 5px 12px;
+  border: 1px solid var(--fluent-border);
+  border-radius: var(--fluent-radius);
+  color: var(--fluent-text);
+  background: var(--fluent-control);
+  box-shadow: 0 1px 1px rgb(0 0 0 / 5%);
+  font: inherit;
+  cursor: pointer;
+  transition: background var(--fluent-fast) var(--fluent-ease), border-color var(--fluent-fast) var(--fluent-ease);
+}
+:where(.fluent-theme, [data-fluent-theme]) :where(button:not([class*="fluent-"]), input[type="button"], input[type="submit"], input[type="reset"]):where(:hover:not(:disabled)) { background: var(--fluent-control-hover); }
+:where(.fluent-theme, [data-fluent-theme]) :where(button:not([class*="fluent-"]), input[type="button"], input[type="submit"], input[type="reset"]):where(:active:not(:disabled)) { background: var(--fluent-control-pressed); }
+:where(.fluent-theme, [data-fluent-theme]) :where(button, input, select, textarea):where(:disabled) { cursor: not-allowed; }
+:where(.fluent-theme, [data-fluent-theme]) :where(button:not([class*="fluent-"]), input[type="button"], input[type="submit"], input[type="reset"]):where(:disabled) { color: var(--fluent-muted); opacity: .5; box-shadow: none; }
+
+:where(.fluent-theme, [data-fluent-theme]) :where(input:not([type="checkbox"], [type="radio"], [type="range"], [type="button"], [type="submit"], [type="reset"], [type="hidden"]), textarea, select):not([class*="fluent-"]) {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 32px;
+  padding: 5px 10px;
+  border: 1px solid var(--fluent-border);
+  border-bottom-color: var(--fluent-muted);
+  border-radius: var(--fluent-radius);
+  color: var(--fluent-text);
+  background: var(--fluent-control);
+  font: inherit;
+  transition: background var(--fluent-fast) var(--fluent-ease), border-color var(--fluent-fast) var(--fluent-ease);
+}
+:where(.fluent-theme, [data-fluent-theme]) :where(input, textarea, select):not([class*="fluent-"]):where(:hover:not(:disabled, [readonly])) { border-color: var(--fluent-muted); }
+:where(.fluent-theme, [data-fluent-theme]) :where(input, textarea, select):not([class*="fluent-"]):where(:focus-visible) { border-color: var(--fluent-accent); }
+:where(.fluent-theme, [data-fluent-theme]) :where(input, textarea):not([class*="fluent-"]):where([readonly]) { color: var(--fluent-muted); background: var(--fluent-surface); }
+:where(.fluent-theme, [data-fluent-theme]) :where(input, textarea, select):not([class*="fluent-"]):where(:disabled) { opacity: .5; background: var(--fluent-bg); }
+:where(.fluent-theme, [data-fluent-theme]) :where(input, textarea, select):where([aria-invalid="true"], :user-invalid) { border-color: var(--fluent-danger); }
+:where(.fluent-theme, [data-fluent-theme]) :where(textarea) { resize: vertical; min-height: 80px; }
+:where(.fluent-theme, [data-fluent-theme]) :where(input[type="checkbox"], input[type="radio"], input[type="range"], progress, meter) { accent-color: var(--fluent-accent); }
+:where(.fluent-theme, [data-fluent-theme]) :where(input[type="checkbox"], input[type="radio"]):not([class*="fluent-"]) { width: 18px; height: 18px; vertical-align: middle; }
+:where(.fluent-theme, [data-fluent-theme]) :where(input[type="range"]):not([class*="fluent-"]) { min-width: 80px; cursor: pointer; }
+:where(.fluent-theme, [data-fluent-theme]) :where(input[type="file"])::file-selector-button {
+  padding: 5px 10px;
+  margin-inline-end: 10px;
+  border: 1px solid var(--fluent-border);
+  border-radius: var(--fluent-radius);
+  color: var(--fluent-text);
+  background: var(--fluent-control);
+  font: inherit;
+  cursor: pointer;
+}
+:where(.fluent-theme, [data-fluent-theme]) :where(input[type="file"]):hover::file-selector-button { background: var(--fluent-control-hover); }
+:where(.fluent-theme, [data-fluent-theme]) :where(input[type="file"]):active::file-selector-button { background: var(--fluent-control-pressed); }
+:where(.fluent-theme, [data-fluent-theme]) :where(input[type="color"]) { width: 48px; padding: 4px; cursor: pointer; }
+:where(.fluent-theme, [data-fluent-theme]) :where(input[type="color"])::-webkit-color-swatch-wrapper { padding: 0; }
+:where(.fluent-theme, [data-fluent-theme]) :where(input[type="color"])::-webkit-color-swatch { border: 0; border-radius: 2px; }
+:where(.fluent-theme, [data-fluent-theme]) :where(input[type="date"], input[type="time"], input[type="datetime-local"], input[type="month"], input[type="week"])::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .75; }
+:where(.fluent-theme, [data-fluent-theme]) :where(a[href]) { color: var(--fluent-accent); text-underline-offset: 3px; }
+:where(.fluent-theme, [data-fluent-theme]) :where(a[href]):hover { color: var(--fluent-accent-hover); }
+:where(.fluent-theme, [data-fluent-theme]) :where(a[href]):active { color: var(--fluent-accent-pressed); }
+:where(.fluent-theme, [data-fluent-theme]) :where(a[aria-disabled="true"]) { color: var(--fluent-muted); cursor: not-allowed; }
+:where(.fluent-theme, [data-fluent-theme]) :where(fieldset) { min-width: 0; border: 1px solid var(--fluent-border); border-radius: var(--fluent-panel-radius); }
+:where(.fluent-theme, [data-fluent-theme]) :where(legend) { padding-inline: 6px; color: var(--fluent-muted); }
+:where(.fluent-theme, [data-fluent-theme]) :where(details) { border: 1px solid var(--fluent-border); border-radius: var(--fluent-panel-radius); background: var(--fluent-surface); }
+:where(.fluent-theme, [data-fluent-theme]) :where(summary) { padding: 10px 12px; cursor: pointer; border-radius: inherit; }
+:where(.fluent-theme, [data-fluent-theme]) :where(summary):hover { background: var(--fluent-control-hover); }
+:where(.fluent-theme, [data-fluent-theme]) :where(summary):active { background: var(--fluent-control-pressed); }
+:where(.fluent-theme, [data-fluent-theme]) :where(details[open]) > summary { border-bottom: 1px solid var(--fluent-border); }
+:where(.fluent-theme, [data-fluent-theme]) :where([role="tab"], [role="option"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]) { border-radius: var(--fluent-radius); }
+:where(.fluent-theme, [data-fluent-theme]) :where([role="tab"], [role="option"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]):hover:not([aria-disabled="true"]) { background: var(--fluent-control-hover); }
+:where(.fluent-theme, [data-fluent-theme]) :where([role="tab"], [role="option"], [role="menuitemcheckbox"], [role="menuitemradio"]):where([aria-selected="true"], [aria-checked="true"]) { background: var(--fluent-selection); color: var(--fluent-accent); }
+:where(.fluent-theme, [data-fluent-theme]) :where([aria-disabled="true"]) { cursor: not-allowed; }
+:where(.fluent-theme, [data-fluent-theme]) :where(table) { border-collapse: collapse; color: var(--fluent-text); }
+:where(.fluent-theme, [data-fluent-theme]) :where(th, td) { border-bottom: 1px solid var(--fluent-border); padding: 8px 12px; text-align: start; }
+:where(.fluent-theme, [data-fluent-theme]) :where(tbody tr):hover { background: var(--fluent-control-hover); }
+:where(.fluent-theme, [data-fluent-theme]) :where(tr[aria-selected="true"]) { background: var(--fluent-selection); }
+:where(.fluent-theme, [data-fluent-theme]) :where(button, input, select, textarea, a[href], summary, [tabindex]):focus-visible { outline: 2px solid var(--fluent-accent); outline-offset: 2px; }
+@media (forced-colors: active) {
+  :where(.fluent-theme, [data-fluent-theme]) :where(button, input, textarea, select, progress, meter, a, summary) { forced-color-adjust: auto; }
+}

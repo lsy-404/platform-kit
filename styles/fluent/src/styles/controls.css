@@ -282,7 +282,7 @@
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.08), var(--fluent-shadow);
+  box-shadow: inset 0 1px rgb(255 255 255 / 8%), 0 1px 1px rgb(0 0 0 / 5%);
 }
 .fluent-button::after {
   position: absolute;
@@ -440,3 +440,5 @@ textarea.fluent-field__input {
   .fluent-checkbox__input,
   .fluent-radio__input { transition-duration: 0ms; }
 }
+
+.fluent-button--subtle { box-shadow: none; }
