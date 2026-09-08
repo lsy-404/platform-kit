@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from "vue";
 import { defaultMessages, type ModelAuthMessages } from "./messages";
+import StrategyPicker from "./StrategyPicker.vue";
 import type {
   AddApiKeyPayload, AuthMethod, CredentialUpdatePayload, CatalogStatus, LoadStrategy,
-  ModelAuthProvider, ModelAuthSelection, ProviderUpdatePayload, StrategyUpdatePayload, Theme, OAuthCredential,
+  ModelAuthProvider, ModelAuthSelection, ModelConnectionTarget, ProviderUpdatePayload, StrategyUpdatePayload, Theme, OAuthCredential,
 } from "./types";
 
 const props = withDefaults(defineProps<{
@@ -12,6 +13,7 @@ const props = withDefaults(defineProps<{
   styled?: boolean;
   theme?: Theme;
   initialMethod?: AuthMethod;
+  initialConnection?: ModelConnectionTarget | null;
   model?: ModelAuthSelection | null;
   loadStrategy?: LoadStrategy;
   catalogStatus?: CatalogStatus;
@@ -19,7 +21,7 @@ const props = withDefaults(defineProps<{
   busy?: boolean;
   error?: string | null;
 }>(), {
-  open: false, providers: () => [], styled: true, theme: "system", initialMethod: "oauth",
+  open: false, providers: () => [], styled: true, theme: "system", initialMethod: "oauth", initialConnection: null,
   model: null, loadStrategy: "round-robin", catalogStatus: () => ({ state: "loading" }),
   messages: () => ({}), busy: false, error: null,
 });
@@ -52,6 +54,7 @@ const apiKeyInput = ref("");
 const revealApiKey = ref(false);
 const localError = ref("");
 const pendingRemoval = ref("");
+const connectionMode = ref(false);
 let awaitingVerification = false;
 const titleId = "model-auth-" + useId();
 let restoreFocus: HTMLElement | undefined;
@@ -65,6 +68,7 @@ const text = computed(() => ({ ...defaultMessages, ...props.messages }));
 const stepIndex = computed(() => ["method", "providers", "detail", "confirmation"].indexOf(step.value));
 const pageTitles = computed(() => [text.value.addConnection, text.value.chooseProvider, text.value.completeAuthorization, text.value.confirm]);
 const selectedProvider = computed(() => props.providers.find(provider => provider.id === selectedProviderId.value));
+const connectionMissing = computed(() => connectionMode.value && !selectedProvider.value);
 const matchingProviders = computed(() => {
   const query = search.value.trim().toLocaleLowerCase();
   return props.providers.filter(provider => provider.authMethods.includes(method.value)
@@ -82,6 +86,13 @@ const credentials = computed<OAuthCredential[]>(() => {
 const canUseMethod = computed(() => Boolean(selectedProvider.value?.available
   && (method.value !== "oauth" || selectedProvider.value.oauthEnabled !== false)));
 const authReady = computed(() => canUseMethod.value && credentials.value.some(credential => credential.enabled && credential.healthy));
+const strategyOptions = computed(() => [
+  { value: "round-robin" as const, label: text.value.roundRobin },
+  { value: "weighted-round-robin" as const, label: text.value.weightedRoundRobin },
+  { value: "failover" as const, label: text.value.failover },
+]);
+const currentStrategy = computed(() => selectedProvider.value?.loadStrategy ?? props.loadStrategy);
+const currentModel = computed(() => props.model?.providerId === selectedProviderId.value ? props.model.model : "—");
 
 function activeElement(): Element | null {
   let element: Element | null = document.activeElement;
@@ -91,7 +102,10 @@ function activeElement(): Element | null {
 function clearSecret() { labelInput.value = ""; apiKeyInput.value = ""; revealApiKey.value = false; }
 function resetState() {
   awaitingVerification = false;
-  step.value = "method"; selectedProviderId.value = ""; search.value = "";
+  connectionMode.value = Boolean(props.initialConnection);
+  method.value = props.initialConnection?.method ?? props.initialMethod;
+  step.value = props.initialConnection ? "detail" : "method";
+  selectedProviderId.value = props.initialConnection?.providerId ?? ""; search.value = "";
   focusedProviderIndex.value = -1; pendingRemoval.value = ""; localError.value = ""; clearSecret();
 }
 function reducedMotion() { return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches; }
@@ -126,6 +140,7 @@ function handleModalAnimationEnd(event: AnimationEvent) {
 }
 function handleCancel(event: Event) { event.preventDefault(); close(); }
 function chooseMethod(value: AuthMethod) {
+  connectionMode.value = false;
   transitionName.value = "model-auth-step-forward"; method.value = value; step.value = "providers"; search.value = ""; selectedProviderId.value = "";
   clearSecret(); void nextTick(() => searchInput.value?.focus());
 }
@@ -134,6 +149,7 @@ function chooseProvider(provider: ModelAuthProvider) {
   pendingRemoval.value = ""; localError.value = ""; void focusHeading();
 }
 function back() {
+  if (connectionMode.value) return;
   awaitingVerification = false;
   clearSecret(); pendingRemoval.value = ""; localError.value = "";
   transitionName.value = "model-auth-step-backward";
@@ -206,13 +222,24 @@ function authorize(credentialId?: string) {
   else emit("authorize-oauth", selectedProvider.value.id);
   void nextTick(checkVerification);
 }
+function startNewConnection() {
+  connectionMode.value = false;
+  transitionName.value = "model-auth-step-forward";
+  step.value = "method"; selectedProviderId.value = ""; search.value = "";
+  pendingRemoval.value = ""; localError.value = ""; clearSecret(); void focusHeading();
+}
+function updateStrategy(value: LoadStrategy) {
+  const provider = selectedProvider.value;
+  if (!provider || props.busy) return;
+  emit("update-provider-strategy", { providerId: provider.id, strategy: value });
+}
 function advanceToConfirmation() {
   if (step.value !== "detail" || !authReady.value || props.busy) return;
   awaitingVerification = false; clearSecret(); transitionName.value = "model-auth-step-forward";
   step.value = "confirmation"; void focusHeading();
 }
 function checkVerification() {
-  if (!awaitingVerification || step.value !== "detail" || props.busy) return;
+  if (connectionMode.value || !awaitingVerification || step.value !== "detail" || props.busy) return;
   if (props.error) { awaitingVerification = false; return; }
   if (authReady.value) advanceToConfirmation();
 }
@@ -229,7 +256,7 @@ watch(() => props.open, open => {
     if (modalState.value !== "closing") restoreFocus = activeElement() instanceof HTMLElement ? activeElement() as HTMLElement : undefined;
     if (closeTimer) clearTimeout(closeTimer);
     if (openTimer) clearTimeout(openTimer);
-    resetState(); method.value = props.initialMethod; visible.value = true; modalState.value = "opening";
+    resetState(); visible.value = true; modalState.value = "opening";
     void nextTick(() => {
       openNativeDialog();
       if (reducedMotion()) { modalState.value = "open"; void focusHeading(); return; }
@@ -245,7 +272,7 @@ watch([authReady, () => props.busy, () => props.error], () => {
   checkVerification();
 });
 watch(selectedProvider, provider => {
-  if (!provider && (step.value === "detail" || step.value === "confirmation")) { awaitingVerification = false; step.value = "providers"; }
+  if (!provider && !connectionMode.value && (step.value === "detail" || step.value === "confirmation")) { awaitingVerification = false; step.value = "providers"; }
 });
 onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer); if (openTimer) clearTimeout(openTimer); if (dialog.value?.open) dialog.value.close(); if (restoreFocus?.isConnected) restoreFocus.focus(); });
 </script>
@@ -255,14 +282,14 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
     <div class="model-auth-root">
       <section class="model-auth-dialog" role="document" tabindex="-1">
         <header class="model-auth-header" part="header" data-part="navigation">
-          <button v-if="step !== 'method'" type="button" class="model-auth-back" part="back" data-part="back" :aria-label="text.back" @click="back"><span aria-hidden="true">←</span></button>
-          <h2 :id="titleId" ref="heading" class="model-auth-title" tabindex="-1">{{ pageTitles[stepIndex] }}</h2>
+          <button v-if="step !== 'method' && !connectionMode" type="button" class="model-auth-back" part="back" data-part="back" :aria-label="text.back" @click="back"><span aria-hidden="true">←</span></button>
+          <h2 :id="titleId" ref="heading" class="model-auth-title" tabindex="-1">{{ connectionMode ? text.connectionInfo : pageTitles[stepIndex] }}</h2>
           <button type="button" class="model-auth-close" part="close" data-part="close" :aria-label="text.close" @click="close">×</button>
         </header>
-        <div class="model-auth-progress" part="progress" role="progressbar" :aria-label="text.progress" :aria-valuemin="0" :aria-valuemax="3" :aria-valuenow="stepIndex" :aria-valuetext="pageTitles[stepIndex]">
+        <div v-if="!connectionMode" class="model-auth-progress" part="progress" role="progressbar" :aria-label="text.progress" :aria-valuemin="0" :aria-valuemax="3" :aria-valuenow="stepIndex" :aria-valuetext="pageTitles[stepIndex]">
           <div v-for="segment in 3" :key="segment" class="model-auth-progress-segment"><div class="model-auth-progress-fill" :style="{ width: (segment <= stepIndex ? 100 : 0) + '%' }" /></div>
         </div>
-        <p class="model-auth-step-caption">{{ text.stepOf.replace('{current}', String(stepIndex)).replace('{total}', '3') }}</p>
+        <p v-if="!connectionMode" class="model-auth-step-caption">{{ text.stepOf.replace('{current}', String(stepIndex)).replace('{total}', '3') }}</p>
         <div v-if="error || localError" class="model-auth-error" role="alert" part="error">{{ error || localError }}</div>
         <p v-if="busy" class="model-auth-busy" role="status">{{ text.working }}</p>
 
@@ -298,20 +325,25 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
           </div>
         </div>
 
-        <div v-else-if="step === 'detail' && selectedProvider" key="detail" :class="['model-auth-detail', transitionName]" part="detail" data-part="detail">
+        <div v-else-if="connectionMissing" key="missing-connection" class="model-auth-detail" part="connection-empty" data-part="connection-empty">
+          <p class="model-auth-empty" role="status">{{ text.noConnections }}</p>
+          <button type="button" class="model-auth-primary" data-part="new-connection" @click="startNewConnection">{{ text.newConnection }}</button>
+        </div>
+        <div v-else-if="step === 'detail' && selectedProvider" key="detail" :class="['model-auth-detail', transitionName, { 'model-auth-connection-detail': connectionMode }]" part="detail" :data-part="connectionMode ? 'connection-info' : 'detail'">
           <strong class="model-auth-selected-provider">{{ selectedProvider.name }}</strong>
           <p v-if="!selectedProvider.available" class="model-auth-error" role="status">{{ selectedProvider.unavailableReason || text.unavailable }}</p>
+          <button v-if="connectionMode" type="button" class="model-auth-secondary" data-part="refresh-connections" :disabled="busy" @click="emit('refresh-catalog')">{{ text.refreshConnections }}</button>
           <section v-if="method === 'oauth'" class="model-auth-credential-section" data-part="oauth-config">
             <div class="model-auth-section-heading">
-              <div><strong>{{ text.oauth }}</strong><small>{{ text.credentialHint }}</small></div>
-              <button type="button" class="model-auth-primary" :disabled="busy || !canUseMethod" @click="authorize()">{{ selectedProvider.authorizeLabel || text.authorize }}</button>
+              <div><strong>{{ connectionMode ? text.connections : text.oauth }}</strong><small>{{ text.credentialHint }}</small></div>
+              <button v-if="!connectionMode" type="button" class="model-auth-primary" :disabled="busy || !canUseMethod" @click="authorize()">{{ selectedProvider.authorizeLabel || text.authorize }}</button>
             </div>
-            <label class="model-auth-toggle model-auth-provider-toggle">
+            <label v-if="!connectionMode" class="model-auth-toggle model-auth-provider-toggle">
               <input type="checkbox" role="switch" :checked="selectedProvider.oauthEnabled !== false" :disabled="busy" :aria-label="text.oauthEnabled" @change="emit('update-provider', { providerId: selectedProvider.id, oauthEnabled: ($event.target as HTMLInputElement).checked })" />
               <span class="model-auth-switch-track" aria-hidden="true"></span>{{ text.oauthEnabled }}
             </label>
           </section>
-          <section v-else class="model-auth-credential-section" data-part="api-key-config">
+          <section v-else-if="!connectionMode" class="model-auth-credential-section" data-part="api-key-config">
             <form class="model-auth-api-form" part="api-key-form" data-part="api-key-form" @submit.prevent="addApiKey">
               <div><strong>{{ text.addApiKey }}</strong><small>{{ text.keyHint }}</small></div>
               <input v-model="labelInput" :disabled="busy || !canUseMethod" type="text" autocomplete="off" :placeholder="text.label" :aria-label="text.label" />
@@ -328,7 +360,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
               <slot name="credential-row" :credential="credential" :provider="selectedProvider" :method="method" :update="(enabled: boolean, weight: number) => updateCredential(credential, enabled, weight)" :remove="() => removeCredential(credential)">
                 <div class="model-auth-credential-summary">
                   <span class="model-auth-health" :class="{ healthy: credential.enabled && credential.healthy }" aria-hidden="true"></span>
-                  <span class="model-auth-row-main"><strong>{{ credential.label }}</strong><small>{{ credentialStatus(credential) }}</small></span>
+                  <span class="model-auth-row-main"><strong>{{ credential.label }}</strong><small>{{ connectionMode && credential.account ? text.account + ' · ' + credential.account + ' · ' : '' }}{{ credentialStatus(credential) }}</small></span>
                   <label class="model-auth-toggle">
                     <input :checked="credential.enabled" :disabled="busy" type="checkbox" role="switch" :aria-label="text.enable + ' ' + credential.label" @change="updateCredential(credential, ($event.target as HTMLInputElement).checked, credential.weight)" />
                     <span class="model-auth-switch-track" aria-hidden="true"></span>{{ text.enable }}
@@ -341,7 +373,11 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                 </div>
               </slot>
             </article>
-            <p v-if="!credentials.length" class="model-auth-empty">{{ text.noCredentials }}</p>
+            <p v-if="!credentials.length" class="model-auth-empty">{{ connectionMode ? text.noConnections : text.noCredentials }}</p>
+          </section>
+          <section v-if="connectionMode" class="model-auth-credential-section" data-part="connection-policy">
+            <div class="model-auth-section-heading"><div><strong>{{ text.models }}</strong><small>{{ credentials.flatMap(credential => credential.models || []).join(' · ') || text.emptyModels }}</small></div></div>
+            <div class="model-auth-section-heading"><div><strong>{{ text.current }}</strong><small>{{ currentModel }}</small></div><StrategyPicker :model-value="currentStrategy" :options="strategyOptions" :label="text.strategy" :disabled="busy" @update:model-value="updateStrategy" /></div>
           </section>
 
         </div>
@@ -352,10 +388,10 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
             <p>{{ method === 'oauth' ? text.oauth : text.apiKey }} · {{ text.verified }}</p>
           </section>
         </div>
-        <footer v-if="step === 'detail' && authReady" class="model-auth-actions">
+        <footer v-if="!connectionMode && step === 'detail' && authReady" class="model-auth-actions">
           <button type="button" class="model-auth-primary" data-part="continue-confirmation" :disabled="busy" @click="advanceToConfirmation">{{ text.continue }}</button>
         </footer>
-        <footer v-if="step === 'confirmation' && authReady" class="model-auth-confirmation" part="confirmation" data-part="confirmation">
+        <footer v-if="!connectionMode && step === 'confirmation' && authReady" class="model-auth-confirmation" part="confirmation" data-part="confirmation">
           <button type="button" class="model-auth-primary" data-part="confirm" :disabled="busy || !!error" @click="confirmConnection">{{ text.confirm }}</button>
         </footer>
         <slot name="footer" :step="step" :close="close"></slot>

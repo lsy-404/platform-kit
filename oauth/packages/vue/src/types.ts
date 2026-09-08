@@ -1,5 +1,6 @@
 export type AuthMethod = "oauth" | "api-key";
 export type CredentialKind = AuthMethod;
+export interface ModelConnectionTarget { providerId: string; method: AuthMethod }
 export type LoadStrategy = "round-robin" | "weighted-round-robin" | "failover";
 export type Theme = "system" | "light" | "dark";
 

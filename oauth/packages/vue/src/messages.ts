@@ -22,5 +22,6 @@ export const defaultMessages = {
   working: "正在处理…", current: "当前使用", weightInvalid: "权重必须是 1–100 的整数。",
   modelSearch: "搜索模型", select: "选择", emptyModels: "没有可用模型", enabledState: "开", disabledState: "关",
   configured: "已配置", strategyHint: "对当前提供商的所有已启用凭据生效。",
+  connections: "已接入", connectionInfo: "接入信息", viewConnection: "查看接入信息", newConnection: "新增接入", noConnections: "尚未接入账号。", account: "账号", models: "可用模型", refreshConnections: "刷新接入信息",
 };
 export type ModelAuthMessages = typeof defaultMessages;
