@@ -20,8 +20,10 @@
 .model-auth-methods { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; padding: 4px 24px 24px; }
 .model-auth-method-card { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 12px; min-height: 144px; text-align: left; }
 .model-auth-method-card strong, .model-auth-method-card small, .model-auth-section-heading strong, .model-auth-section-heading small, .model-auth-row-main strong, .model-auth-row-main small, .model-auth-api-form strong, .model-auth-api-form small { display: block; }
-.model-auth-provider-step, .model-auth-detail { min-height: 0; overflow: auto; padding: 0 24px 24px; display: grid; gap: 16px; align-content: start; }
+.model-auth-provider-step, .model-auth-detail { min-height: 0; padding: 0 24px 24px; display: grid; gap: 16px; align-content: start; }
+.model-auth-provider-step { grid-template-rows: auto auto minmax(0, 1fr); overflow: hidden; padding-top: 4px; }
 .model-auth-provider-list, .model-auth-provider-group, .model-auth-credentials, .model-auth-models, .model-auth-credential-section, .model-auth-model-section { display: grid; gap: 8px; min-width: 0; }
+.model-auth-provider-list { min-height: 0; overflow: auto; padding: 2px; margin: -2px; }
 .model-auth-section-heading { display: flex; justify-content: space-between; align-items: center; gap: 14px; }
 .model-auth-provider-search { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; }
 .model-auth-group-label { margin: 8px 0 2px; }
@@ -151,6 +153,7 @@
   .model-auth-methods { padding: 0 18px 18px; grid-template-columns: 1fr; }
   .model-auth-method-card { min-height: 112px; }
   .model-auth-provider-step, .model-auth-detail { padding: 0 18px 18px; }
+  .model-auth-provider-step { padding-top: 4px; }
   .model-auth-provider-row { grid-template-columns: auto minmax(0,1fr) auto; }
   .model-auth-provider-row > :last-child { display: none; }
   .model-auth-badge { white-space: normal; max-width: 80px; }

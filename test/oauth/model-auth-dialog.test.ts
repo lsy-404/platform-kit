@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { createApp, h, nextTick, reactive, type App } from "vue";
 import ModelAuthDialog from "../../oauth/packages/vue/src/ModelAuthDialog.vue";
 import { registerModelAuthElement } from "../../oauth/packages/vue/src/custom-element";
@@ -194,6 +196,21 @@ describe("authentication dialog", () => {
     search.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     await nextTick();
     expect(get<HTMLButtonElement>('[data-part="oauth-config"] button').disabled).toBe(true);
+  });
+
+  it("keeps the provider search focus ring inside the fixed header while only the list scrolls", async () => {
+    await mount();
+    await click('[data-part="method-oauth"]');
+    const step = get<HTMLElement>('[data-part="provider-step"]');
+    const search = get<HTMLInputElement>('[data-part="search"]');
+    const list = get<HTMLElement>('[part="provider-list"]');
+    const stylesheet = readFileSync(resolve(import.meta.dirname, "../../oauth/packages/vue/src/style.css"), "utf8");
+    expect(stylesheet).toContain(".model-auth-provider-step { grid-template-rows: auto auto minmax(0, 1fr); overflow: hidden; padding-top: 4px; }");
+    expect(stylesheet).toContain(".model-auth-provider-list { min-height: 0; overflow: auto; padding: 2px; margin: -2px; }");
+    expect(step.contains(search)).toBe(true);
+    expect(list).toBeTruthy();
+    search.focus();
+    expect(document.activeElement).toBe(search);
   });
 
   it("clears secrets on submission and navigation, blocks unavailable/busy submission, and confirms removal", async () => {
