@@ -332,8 +332,9 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
         </div>
         <div v-else-if="step === 'detail' && selectedProvider" key="detail" :class="['model-auth-detail', transitionName, { 'model-auth-connection-detail': connectionMode }]" part="detail" :data-part="connectionMode ? 'connection-info' : 'detail'">
           <strong class="model-auth-selected-provider">{{ selectedProvider.name }}</strong>
+          <p v-if="connectionMode" class="model-auth-connection-meta">{{ text.authenticationMethod }}：{{ method === 'oauth' ? text.oauth : text.apiKey }}</p>
           <p v-if="!selectedProvider.available" class="model-auth-error" role="status">{{ selectedProvider.unavailableReason || text.unavailable }}</p>
-          <button v-if="connectionMode" type="button" class="model-auth-secondary" data-part="refresh-connections" :disabled="busy" @click="emit('refresh-catalog')">{{ text.refreshConnections }}</button>
+          <button v-if="connectionMode" type="button" class="model-auth-secondary" data-part="refresh-connections" :disabled="busy" @click="emit('refresh-catalog')">{{ text.refreshCatalog }}</button>
           <section v-if="method === 'oauth'" class="model-auth-credential-section" data-part="oauth-config">
             <div class="model-auth-section-heading">
               <div><strong>{{ connectionMode ? text.connections : text.oauth }}</strong><small>{{ text.credentialHint }}</small></div>
