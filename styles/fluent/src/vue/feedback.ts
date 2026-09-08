@@ -28,6 +28,40 @@ export const FluentCheckbox = defineComponent({
   },
 });
 
+export const FluentRadio = defineComponent({
+  name: "FluentRadio",
+  inheritAttrs: false,
+  props: {
+    modelValue: { type: String, default: "" },
+    value: { type: String, required: true },
+    disabled: Boolean,
+    label: String,
+  },
+  emits: ["update:modelValue", "change"],
+  setup(props, { attrs, emit, slots }) {
+    return () => {
+      const { class: className, style, ...inputAttrs } = attrs;
+      return h("label", { class: ["fluent-radio", className], style }, [
+        h("input", mergeProps(inputAttrs, {
+          class: "fluent-radio__input",
+          type: "radio",
+          value: props.value,
+          checked: props.modelValue === props.value,
+          disabled: props.disabled,
+          onChange: (event: Event) => {
+            if (!(event.target as HTMLInputElement).checked) return;
+            emit("update:modelValue", props.value);
+            emit("change", props.value);
+          },
+        })),
+        slots.default || props.label
+          ? h("span", { class: "fluent-radio__label" }, slots.default?.() ?? props.label)
+          : null,
+      ]);
+    };
+  },
+});
+
 const progressProps = {
   value: { type: Number, default: 0 },
   max: { type: Number, default: 100 },

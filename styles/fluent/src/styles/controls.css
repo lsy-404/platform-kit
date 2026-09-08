@@ -276,3 +276,167 @@
   .fluent-progress-ring--indeterminate svg,
   .fluent-progress-bar:indeterminate { animation: none; }
 }
+
+/* State refinements are scoped to Fluent component classes. */
+.fluent-button {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.08), var(--fluent-shadow);
+}
+.fluent-button::after {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  background: currentColor;
+  opacity: 0;
+  transition: opacity var(--fluent-fast) var(--fluent-ease);
+}
+.fluent-button:hover:not(:disabled)::after { opacity: 0.04; }
+.fluent-button:active:not(:disabled)::after { opacity: 0.12; }
+.fluent-button--primary:hover:not(:disabled) { background: var(--fluent-accent-hover); }
+.fluent-button--primary:active:not(:disabled) { background: var(--fluent-accent-pressed); }
+.fluent-button--danger:hover:not(:disabled) { background: var(--fluent-danger-hover); }
+.fluent-button--danger:active:not(:disabled) { background: var(--fluent-danger-pressed); }
+.fluent-button--subtle:hover:not(:disabled) { background: var(--fluent-control-hover); }
+.fluent-button--subtle:active:not(:disabled) { background: var(--fluent-control-pressed); }
+.fluent-button[aria-pressed="true"] {
+  border-color: var(--fluent-accent);
+  color: var(--fluent-accent);
+  background: color-mix(in srgb, var(--fluent-accent) 14%, var(--fluent-control));
+}
+.fluent-button[data-icon-only] {
+  width: 32px;
+  min-width: 32px;
+  padding: 0;
+}
+.fluent-button:disabled {
+  border-color: var(--fluent-border);
+  color: var(--fluent-muted);
+  background: var(--fluent-control);
+  box-shadow: none;
+}
+
+.fluent-field__input {
+  min-height: 32px;
+  line-height: 20px;
+  box-shadow: inset 0 -1px 0 var(--fluent-border);
+}
+textarea.fluent-field__input {
+  min-height: 80px;
+  padding-block: 6px;
+  resize: vertical;
+}
+.fluent-field__input:focus-visible {
+  border-color: var(--fluent-accent);
+  box-shadow: inset 0 -1px 0 var(--fluent-accent);
+}
+.fluent-field__input[data-invalid],
+.fluent-field__input:invalid {
+  border-color: var(--fluent-input-invalid);
+  box-shadow: inset 0 -1px 0 var(--fluent-input-invalid);
+}
+.fluent-field__input[readonly] {
+  color: var(--fluent-muted);
+  background: color-mix(in srgb, var(--fluent-control) 78%, var(--fluent-bg));
+}
+.fluent-field__input:disabled {
+  color: var(--fluent-muted);
+  background: var(--fluent-bg);
+  box-shadow: none;
+}
+
+.fluent-switch:hover:not(:disabled) .fluent-switch__track {
+  border-color: color-mix(in srgb, var(--fluent-border) 55%, var(--fluent-text));
+  background: var(--fluent-control-hover);
+}
+.fluent-switch:active:not(:disabled) .fluent-switch__track { background: var(--fluent-control-pressed); }
+.fluent-switch--checked:hover:not(:disabled) .fluent-switch__track { background: var(--fluent-accent-hover); }
+.fluent-switch--checked:active:not(:disabled) .fluent-switch__track { background: var(--fluent-accent-pressed); }
+.fluent-switch:disabled .fluent-switch__track { border-color: var(--fluent-border); background: var(--fluent-bg); }
+.fluent-switch:disabled .fluent-switch__thumb { background: var(--fluent-muted); }
+
+.fluent-slider__input:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--fluent-accent); outline-offset: 3px; }
+.fluent-slider__input:hover:not(:disabled)::-webkit-slider-thumb { transform: scale(1.12); }
+.fluent-slider__input:active:not(:disabled)::-webkit-slider-thumb { transform: scale(0.94); }
+.fluent-slider__input:disabled { opacity: 0.45; cursor: not-allowed; }
+.fluent-slider__input:disabled::-webkit-slider-runnable-track {
+  background: linear-gradient(to right, var(--fluent-muted) 0 var(--fluent-slider-position), var(--fluent-border) var(--fluent-slider-position) 100%);
+}
+.fluent-slider__input:disabled::-webkit-slider-thumb { background: var(--fluent-muted); box-shadow: none; }
+
+.fluent-checkbox,
+.fluent-radio { position: relative; min-height: 20px; }
+.fluent-checkbox__input,
+.fluent-radio__input {
+  appearance: none;
+  -webkit-appearance: none;
+  display: grid;
+  place-content: center;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  border: 1px solid var(--fluent-border);
+  background: var(--fluent-control);
+  color: var(--fluent-accent-text);
+  cursor: inherit;
+  transition: background var(--fluent-fast) var(--fluent-ease), border-color var(--fluent-fast) var(--fluent-ease), transform var(--fluent-fast) var(--fluent-ease);
+}
+.fluent-checkbox__input { border-radius: 3px; }
+.fluent-radio__input { border-radius: 50%; }
+.fluent-checkbox__input::before {
+  width: 9px;
+  height: 5px;
+  content: "";
+  border: solid currentColor;
+  border-width: 0 0 2px 2px;
+  transform: rotate(-45deg) scale(0);
+  transition: transform var(--fluent-fast) var(--fluent-ease);
+}
+.fluent-radio__input::before { width: 8px; height: 8px; content: ""; border-radius: 50%; background: currentColor; transform: scale(0); transition: transform var(--fluent-fast) var(--fluent-ease); }
+.fluent-checkbox__input:checked,
+.fluent-radio__input:checked { border-color: var(--fluent-accent); background: var(--fluent-accent); }
+.fluent-checkbox__input:checked::before,
+.fluent-radio__input:checked::before { transform: rotate(-45deg) scale(1); }
+.fluent-radio__input:checked::before { transform: scale(1); }
+.fluent-checkbox:hover .fluent-checkbox__input:not(:disabled),
+.fluent-radio:hover .fluent-radio__input:not(:disabled) { border-color: var(--fluent-accent); background: var(--fluent-control-hover); }
+.fluent-checkbox:hover .fluent-checkbox__input:checked:not(:disabled),
+.fluent-radio:hover .fluent-radio__input:checked:not(:disabled) { background: var(--fluent-accent-hover); }
+.fluent-checkbox__input:active:not(:disabled),
+.fluent-radio__input:active:not(:disabled) { transform: scale(0.9); }
+.fluent-checkbox__input:focus-visible,
+.fluent-radio__input:focus-visible { outline: 2px solid var(--fluent-accent); outline-offset: 2px; }
+.fluent-checkbox:has(:disabled),
+.fluent-radio:has(:disabled) { color: var(--fluent-muted); opacity: 0.55; cursor: not-allowed; }
+
+.fluent-progress-bar:disabled { opacity: 0.45; }
+@media (forced-colors: active) {
+  .fluent-button,
+  .fluent-field__input,
+  .fluent-switch__track,
+  .fluent-checkbox__input,
+  .fluent-radio__input {
+    border-color: ButtonText;
+    forced-color-adjust: none;
+  }
+  .fluent-button { color: ButtonText; background: ButtonFace; }
+  .fluent-button--primary,
+  .fluent-button--danger,
+  .fluent-switch--checked .fluent-switch__track,
+  .fluent-checkbox__input:checked,
+  .fluent-radio__input:checked { color: HighlightText; background: Highlight; }
+  .fluent-field__input[data-invalid],
+  .fluent-field__input:invalid { outline: 2px solid Mark; outline-offset: -3px; }
+  .fluent-slider__input { forced-color-adjust: auto; }
+  .fluent-progress-bar { forced-color-adjust: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fluent-button,
+  .fluent-button::after,
+  .fluent-switch__track,
+  .fluent-switch__thumb,
+  .fluent-checkbox__input,
+  .fluent-radio__input { transition-duration: 0ms; }
+}

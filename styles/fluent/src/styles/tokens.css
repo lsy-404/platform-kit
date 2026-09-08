@@ -9,6 +9,8 @@
   --fluent-text: #1b1b1b;
   --fluent-muted: #5d5d5d;
   --fluent-accent: #0067c0;
+  --fluent-accent-hover: #005fb8;
+  --fluent-accent-pressed: #00549e;
   --fluent-accent-text: #ffffff;
   --fluent-control: #ffffff;
   --fluent-control-hover: #f6f6f6;
@@ -16,6 +18,9 @@
   --fluent-border: rgba(0, 0, 0, 0.14);
   --fluent-selection: #e6e6e6;
   --fluent-danger: #c42b1c;
+  --fluent-danger-hover: #b9271a;
+  --fluent-danger-pressed: #a52116;
+  --fluent-input-invalid: #c42b1c;
   --fluent-success: #0f7b45;
   --fluent-warning: #9d5d00;
   --fluent-radius: 4px;
@@ -37,6 +42,8 @@
   --fluent-text: #f4f4f4;
   --fluent-muted: #c4c4c4;
   --fluent-accent: #4cc2ff;
+  --fluent-accent-hover: #71ceff;
+  --fluent-accent-pressed: #35b8f6;
   --fluent-accent-text: #003544;
   --fluent-control: #373737;
   --fluent-control-hover: #414141;
@@ -44,6 +51,9 @@
   --fluent-border: rgba(255, 255, 255, 0.16);
   --fluent-selection: #3b3b3b;
   --fluent-danger: #ff99a4;
+  --fluent-danger-hover: #ffb7bf;
+  --fluent-danger-pressed: #e68b95;
+  --fluent-input-invalid: #ff99a4;
   --fluent-success: #6ccb5f;
   --fluent-warning: #fce100;
   --fluent-shadow:

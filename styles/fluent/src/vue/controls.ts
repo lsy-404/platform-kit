@@ -43,6 +43,9 @@ export const FluentButton = defineComponent({
     },
     disabled: Boolean,
     busy: Boolean,
+    toggle: Boolean,
+    pressed: Boolean,
+    iconOnly: Boolean,
   },
   emits: ["click"],
   setup(props, { attrs, emit, slots }) {
@@ -55,10 +58,42 @@ export const FluentButton = defineComponent({
           class: ["fluent-button", `fluent-button--${props.tone}`, attrs.class],
           disabled: props.disabled || props.busy,
           "aria-busy": props.busy || undefined,
+          "aria-pressed": props.toggle ? String(props.pressed) : undefined,
+          "data-icon-only": props.iconOnly || undefined,
           onClick: (event: MouseEvent) => emit("click", event),
         },
         slots.default?.(),
       );
+  },
+});
+
+export const FluentToggleButton = defineComponent({
+  name: "FluentToggleButton",
+  inheritAttrs: false,
+  props: {
+    modelValue: Boolean,
+    tone: { type: String as PropType<FluentButtonTone>, default: "secondary" },
+    disabled: Boolean,
+    iconOnly: Boolean,
+  },
+  emits: ["update:modelValue", "change", "click"],
+  setup(props, { attrs, emit, slots }) {
+    return () =>
+      h("button", {
+        ...attrs,
+        type: "button",
+        class: ["fluent-button", "fluent-toggle-button", `fluent-button--${props.tone}`, attrs.class],
+        disabled: props.disabled,
+        "aria-pressed": String(props.modelValue),
+        "data-icon-only": props.iconOnly || undefined,
+        onClick: (event: MouseEvent) => {
+          if (props.disabled) return;
+          const nextValue = !props.modelValue;
+          emit("update:modelValue", nextValue);
+          emit("change", nextValue);
+          emit("click", event);
+        },
+      }, slots.default?.());
   },
 });
 
@@ -69,6 +104,9 @@ export const FluentField = defineComponent({
     modelValue: { type: String, default: "" },
     label: { type: String, required: true },
     disabled: Boolean,
+    readonly: Boolean,
+    invalid: Boolean,
+    multiline: Boolean,
     placeholder: String,
     type: { type: String, default: "text" },
   },
@@ -78,18 +116,69 @@ export const FluentField = defineComponent({
       h("label", { class: "fluent-field" }, [
         h("span", { class: "fluent-field__label" }, props.label),
         h(
-          "input",
+          props.multiline ? "textarea" : "input",
           mergeProps(attrs, {
             class: ["fluent-field__input", attrs.class],
-            type: props.type,
+            type: props.multiline ? undefined : props.type,
             value: props.modelValue,
             disabled: props.disabled,
+            readonly: props.readonly,
             placeholder: props.placeholder,
+            "aria-invalid": props.invalid || undefined,
+            "data-invalid": props.invalid || undefined,
             onInput: (event: Event) =>
               emit("update:modelValue", inputValue(event)),
           }),
         ),
       ]);
+  },
+});
+
+function stringFieldVariant(name: string, type: "password" | "text", multiline = false) {
+  return defineComponent({
+    name,
+    inheritAttrs: false,
+    props: {
+      modelValue: { type: String, default: "" },
+      label: { type: String, required: true },
+      disabled: Boolean,
+      readonly: Boolean,
+      invalid: Boolean,
+      placeholder: String,
+    },
+    emits: ["update:modelValue"],
+    setup(props, { attrs, emit }) {
+      return () => h(FluentField as any, mergeProps(attrs, {
+        ...props,
+        type,
+        multiline,
+        "onUpdate:modelValue": (value: string) => emit("update:modelValue", value),
+      }));
+    },
+  });
+}
+
+export const FluentTextArea = stringFieldVariant("FluentTextArea", "text", true);
+export const FluentPasswordField = stringFieldVariant("FluentPasswordField", "password");
+
+export const FluentNumberField = defineComponent({
+  name: "FluentNumberField",
+  inheritAttrs: false,
+  props: {
+    modelValue: { type: Number, default: 0 },
+    label: { type: String, required: true },
+    disabled: Boolean,
+    readonly: Boolean,
+    invalid: Boolean,
+    placeholder: String,
+  },
+  emits: ["update:modelValue"],
+  setup(props, { attrs, emit }) {
+    return () => h(FluentField as any, mergeProps(attrs, {
+      ...props,
+      type: "number",
+      "onUpdate:modelValue": (value: string) => emit("update:modelValue", Number(value)),
+    }));
   },
 });
 
