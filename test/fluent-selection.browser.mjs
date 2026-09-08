@@ -10,8 +10,8 @@ import { createApp, h, ref } from "vue";
 import { FluentTheme } from "/styles/fluent/dist/theme.js";
 import { FluentSelect, FluentMenu } from "/styles/fluent/dist/vue/selection.js";
 const App = { setup() {
-  const value = ref("alpha"); const menuOpen = ref(false); const menuValues = ref(["copy"]); const menuAnchor = ref(null);
-  return () => h(FluentTheme, { mode: "light", style: "padding:40px;width:320px;--fluent-control-hover:rgb(12, 34, 56)" }, { default: () => [
+  const themeMode = ref("light"); window.setFixtureTheme = mode => themeMode.value = mode; const value = ref("alpha"); const menuOpen = ref(false); const menuValues = ref(["copy"]); const menuAnchor = ref(null);
+  return () => h(FluentTheme, { mode: themeMode.value, style: "padding:40px;width:320px;--fluent-control-hover:rgb(12, 34, 56)" }, { default: () => [
     h(FluentSelect, { modelValue: value.value, label: "Choice", options: [{value:"alpha",label:"Alpha"},{value:"beta",label:"Beta"},{value:"blocked",label:"Blocked",disabled:true},{value:"gamma",label:"Gamma"}], "onUpdate:modelValue": v => value.value=v }),
     h("button", { id:"menu-trigger", ref:menuAnchor, type:"button", onClick: () => menuOpen.value = true }, "Actions"),
     h(FluentMenu, { open:menuOpen.value, label:"Actions", anchor:menuAnchor.value, items:[{value:"copy",label:"Copy"},{separator:true},{value:"share",label:"Share"},{value:"delete",label:"Delete",disabled:true}], multiple:true, modelValue:menuValues.value, closeOnSelect:false, "onUpdate:open": v => menuOpen.value=v, "onUpdate:modelValue": v => menuValues.value=v })
@@ -37,6 +37,9 @@ try {
   await select.click();
   await assert.equal(await page.getByRole("listbox").count(), 1);
   assert.equal(await page.locator(".fluent-popover").evaluate(el => getComputedStyle(el).getPropertyValue("--fluent-control-hover").trim()), "rgb(12, 34, 56)");
+  await page.evaluate(() => window.setFixtureTheme('dark'));
+  await page.waitForTimeout(100);
+  assert.equal(await page.locator('.fluent-popover').evaluate(el => getComputedStyle(el).getPropertyValue('--fluent-bg').trim()), await page.locator('.fluent-theme').evaluate(el => getComputedStyle(el).getPropertyValue('--fluent-bg').trim()), 'an open portal must follow the current theme');
   await assert.equal(await page.getByRole("option", { name: "Alpha" }).getAttribute("aria-selected"), "true");
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");

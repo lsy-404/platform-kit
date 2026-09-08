@@ -4,6 +4,8 @@ import {
   h,
   onBeforeUnmount,
   onMounted,
+  onUpdated,
+  shallowRef,
   provide,
   ref,
   type ComputedRef,
@@ -32,6 +34,19 @@ export const FluentTheme = defineComponent({
   setup(props, { slots, attrs }) {
     const element = ref<HTMLElement | null>(null);
     const systemDark = ref(false);
+    const tokens = shallowRef<Record<string, string>>({});
+    const syncTokens = () => {
+      if (!element.value) return;
+      const style = getComputedStyle(element.value);
+      const values: Record<string, string> = {};
+      for (let index = 0; index < style.length; index++) {
+        const name = style.item(index);
+        if (name.startsWith("--fluent-")) values[name] = style.getPropertyValue(name);
+      }
+      if (Object.keys(values).length !== Object.keys(tokens.value).length
+        || Object.entries(values).some(([name, value]) => tokens.value[name] !== value)) tokens.value = values;
+    };
+    onUpdated(syncTokens);
     let media: MediaQueryList | undefined;
     const sync = () => {
       systemDark.value = media?.matches ?? false;
@@ -39,6 +54,7 @@ export const FluentTheme = defineComponent({
     onMounted(() => {
       media = window.matchMedia("(prefers-color-scheme: dark)");
       sync();
+      syncTokens();
       media.addEventListener("change", sync);
     });
     onBeforeUnmount(() => media?.removeEventListener("change", sync));
@@ -51,16 +67,7 @@ export const FluentTheme = defineComponent({
           : props.mode,
       ...(props.accent ? { accent: props.accent } : {}),
       ...(props.accentText ? { accentText: props.accentText } : {}),
-      resolveTokens: () => {
-        if (!element.value) return {};
-        const style = getComputedStyle(element.value);
-        const values: Record<string, string> = {};
-        for (let index = 0; index < style.length; index++) {
-          const name = style.item(index);
-          if (name.startsWith("--fluent-")) values[name] = style.getPropertyValue(name);
-        }
-        return values;
-      },
+      resolveTokens: () => tokens.value,
     }));
     provide(fluentThemeKey, theme);
     return () =>
