@@ -36,7 +36,7 @@ function syncListener(): void {
 }
 
 /** Adds a surface to the local topmost-overlay order and returns its release function. */
-export function registerOverlay(registration: OverlayRegistration): () => void {
+export function registerOverlay(registration: OverlayRegistration): (restoreFocus?: boolean) => void {
   const restoreFocus =
     typeof document === "undefined"
       ? null
@@ -47,14 +47,14 @@ export function registerOverlay(registration: OverlayRegistration): () => void {
   stack.push(entry);
   syncListener();
   let released = false;
-  return () => {
+  return (shouldRestoreFocus = true) => {
     if (released) return;
     released = true;
     const index = stack.findIndex((candidate) => candidate.id === entry.id);
     const wasTop = index === stack.length - 1;
     if (index >= 0) stack.splice(index, 1);
     syncListener();
-    if (wasTop && entry.restoreFocus?.isConnected)
+    if (shouldRestoreFocus && wasTop && entry.restoreFocus?.isConnected)
       entry.restoreFocus.focus({ preventScroll: true });
   };
 }

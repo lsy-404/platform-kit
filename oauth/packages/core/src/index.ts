@@ -1,4 +1,4 @@
-export const MODEL_AUTH_VERSION = "0.2.1";
+export const MODEL_AUTH_VERSION = "0.3.0";
 
 export type AuthMethod = "oauth" | "api-key";
 export type CredentialHealth = "healthy" | "cooling-down" | "permanently-failed";

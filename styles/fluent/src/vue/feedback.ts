@@ -3,8 +3,8 @@ import { defineComponent, h, mergeProps, ref } from "vue";
 export const FluentCheckbox = defineComponent({
   name: "FluentCheckbox",
   inheritAttrs: false,
-  props: { modelValue: Boolean, disabled: Boolean, label: String },
-  emits: ["update:modelValue", "change"],
+  props: { modelValue: Boolean, indeterminate: Boolean, disabled: Boolean, label: String },
+  emits: ["update:modelValue", "update:indeterminate", "change"],
   setup(props, { attrs, emit, slots }) {
     return () => {
       const { class: className, style, ...inputAttrs } = attrs;
@@ -13,9 +13,11 @@ export const FluentCheckbox = defineComponent({
           class: "fluent-checkbox__input",
           type: "checkbox",
           checked: props.modelValue,
+          indeterminate: props.indeterminate,
           disabled: props.disabled,
           onChange: (event: Event) => {
             const checked = (event.target as HTMLInputElement).checked;
+            emit("update:indeterminate", false);
             emit("update:modelValue", checked);
             emit("change", checked);
           },

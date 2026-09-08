@@ -368,6 +368,7 @@ textarea.fluent-field__input {
 
 .fluent-checkbox,
 .fluent-radio { position: relative; min-height: 20px; }
+.fluent-radio { display: inline-flex; align-items: center; gap: 8px; color: var(--fluent-text); font: inherit; cursor: pointer; }
 .fluent-checkbox__input,
 .fluent-radio__input {
   appearance: none;
@@ -400,6 +401,8 @@ textarea.fluent-field__input {
 .fluent-checkbox__input:checked::before,
 .fluent-radio__input:checked::before { transform: rotate(-45deg) scale(1); }
 .fluent-radio__input:checked::before { transform: scale(1); }
+.fluent-checkbox__input:indeterminate { border-color: var(--fluent-accent); background: var(--fluent-accent); }
+.fluent-checkbox__input:indeterminate::before { height: 0; width: 9px; border-width: 0 0 2px; transform: none; }
 .fluent-checkbox:hover .fluent-checkbox__input:not(:disabled),
 .fluent-radio:hover .fluent-radio__input:not(:disabled) { border-color: var(--fluent-accent); background: var(--fluent-control-hover); }
 .fluent-checkbox:hover .fluent-checkbox__input:checked:not(:disabled),
@@ -442,3 +445,13 @@ textarea.fluent-field__input {
 }
 
 .fluent-button--subtle { box-shadow: none; }
+.fluent-notice { box-shadow: none; }
+.fluent-switch { --fluent-switch-x: 0px; --fluent-switch-pressed-x: 1px; }
+.fluent-switch--checked { --fluent-switch-x: 14px; --fluent-switch-pressed-x: 13px; }
+.fluent-switch:hover:not(:disabled) .fluent-switch__thumb { transform: translateX(var(--fluent-switch-x)) scale(1.12); }
+.fluent-switch:active:not(:disabled) .fluent-switch__thumb { transform: translateX(var(--fluent-switch-pressed-x)) scaleX(1.25) scaleY(.88); }
+.fluent-slider__input:hover:not(:disabled)::-moz-range-thumb { transform: scale(1.12); }
+.fluent-slider__input:active:not(:disabled)::-moz-range-thumb { transform: scale(.94); }
+.fluent-slider__input:focus-visible::-moz-range-thumb { outline: 2px solid var(--fluent-accent); outline-offset: 3px; }
+.fluent-slider__input:disabled::-moz-range-thumb { background: var(--fluent-muted); box-shadow: none; }
+.fluent-slider__input:disabled::-moz-range-progress { background: var(--fluent-muted); }

@@ -7,14 +7,15 @@ import { chromium } from "@playwright/test";
 const root = process.cwd();
 const html = `<!doctype html><html><head><link rel="stylesheet" href="/styles/fluent/dist/style.css"></head><body><div id="app"></div><script type="importmap">{"imports":{"vue":"/node_modules/vue/dist/vue.esm-browser.js"}}</script><script type="module">
 import { createApp, h, ref } from "vue";
+import { FluentTheme } from "/styles/fluent/dist/theme.js";
 import { FluentSelect, FluentMenu } from "/styles/fluent/dist/vue/selection.js";
 const App = { setup() {
   const value = ref("alpha"); const menuOpen = ref(false); const menuValues = ref(["copy"]); const menuAnchor = ref(null);
-  return () => h("main", { "data-fluent-theme": "light", style: "padding:40px;width:320px" }, [
+  return () => h(FluentTheme, { mode: "light", style: "padding:40px;width:320px;--fluent-control-hover:rgb(12, 34, 56)" }, { default: () => [
     h(FluentSelect, { modelValue: value.value, label: "Choice", options: [{value:"alpha",label:"Alpha"},{value:"beta",label:"Beta"},{value:"blocked",label:"Blocked",disabled:true},{value:"gamma",label:"Gamma"}], "onUpdate:modelValue": v => value.value=v }),
     h("button", { id:"menu-trigger", ref:menuAnchor, type:"button", onClick: () => menuOpen.value = true }, "Actions"),
     h(FluentMenu, { open:menuOpen.value, label:"Actions", anchor:menuAnchor.value, items:[{value:"copy",label:"Copy"},{separator:true},{value:"share",label:"Share"},{value:"delete",label:"Delete",disabled:true}], multiple:true, modelValue:menuValues.value, closeOnSelect:false, "onUpdate:open": v => menuOpen.value=v, "onUpdate:modelValue": v => menuValues.value=v })
-  ]); } };
+  ] }); } };
 createApp(App).mount("#app");
 </script></body></html>`;
 const mime = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
@@ -32,15 +33,21 @@ const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_C
 try {
   const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
   await page.goto(`http://127.0.0.1:${address.port}`);
-  const select = page.getByRole("button", { name: "Choice" });
+  const select = page.getByRole("combobox", { name: "Choice" });
   await select.click();
   await assert.equal(await page.getByRole("listbox").count(), 1);
+  assert.equal(await page.locator(".fluent-popover").evaluate(el => getComputedStyle(el).getPropertyValue("--fluent-control-hover").trim()), "rgb(12, 34, 56)");
   await assert.equal(await page.getByRole("option", { name: "Alpha" }).getAttribute("aria-selected"), "true");
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
   await assert.equal(await select.textContent(), "Beta");
   await assert.equal(await page.getByRole("listbox").count(), 0);
   await assert.equal(await page.evaluate(() => document.activeElement?.id), await select.getAttribute("id"));
+  await select.click();
+  await page.keyboard.press("Tab");
+  assert.equal(await page.getByRole("listbox").count(), 0);
+  assert.equal(await page.evaluate(() => document.activeElement?.id), "menu-trigger");
+  await select.focus();
   await select.press("b");
   await assert.equal(await page.getByRole("listbox").count(), 1);
   await page.mouse.click(700, 500);

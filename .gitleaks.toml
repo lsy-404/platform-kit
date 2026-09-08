@@ -1,0 +1,12 @@
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "Public desktop transport framing constant; account authorization is separate"
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^oauth/packages/providers/src/trae-api\.ts$''']
+regexes = ['''^6195f24ca4d430f8a4833de7db8dac37d148a084e7464a351ffa68585c16b955$''']

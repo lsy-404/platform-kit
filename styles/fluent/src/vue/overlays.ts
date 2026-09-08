@@ -20,20 +20,22 @@ type FluentTheme = {
   mode: "light" | "dark";
   accent?: string;
   accentText?: string;
+  resolveTokens?: () => Record<string, string>;
 };
 const fallbackTheme = computed<FluentTheme>(() => ({ mode: "light" }));
 const useTheme = (): ComputedRef<FluentTheme> =>
   inject(fluentThemeKey, fallbackTheme);
 function themeAttrs(theme: ComputedRef<FluentTheme>) {
-  return computed(() => ({
+  return { get value() { return {
     "data-fluent-theme": theme.value.mode,
     style: {
+      ...theme.value.resolveTokens?.(),
       ...(theme.value.accent ? { "--fluent-accent": theme.value.accent } : {}),
       ...(theme.value.accentText
         ? { "--fluent-accent-text": theme.value.accentText }
         : {}),
     },
-  }));
+  }; } };
 }
 
 export const FluentDialog = defineComponent({
@@ -120,6 +122,7 @@ export const FluentPopover = defineComponent({
   name: "FluentPopover",
   props: {
     open: Boolean,
+    restoreFocusOnClose: { type: Boolean, default: true },
     label: { type: String, required: true },
     anchor: { type: Object as PropType<HTMLElement | null>, default: null },
     portal: { type: Object as PropType<HTMLElement | null>, default: null },
@@ -137,7 +140,8 @@ export const FluentPopover = defineComponent({
       maxWidth: number | null;
       side: "top" | "bottom";
     }>({ left: 0, top: 0, maxHeight: null, maxWidth: null, side: "bottom" });
-    let release: (() => void) | null = null;
+    let release: ((restoreFocus?: boolean) => void) | null = null;
+    let restoreFocus = true;
     let observer: ResizeObserver | null = null;
     let mounted = false;
     const style = computed(() => ({
@@ -172,8 +176,10 @@ export const FluentPopover = defineComponent({
       if (
         !target ||
         (!panel.value?.contains(target) && !props.anchor?.contains(target))
-      )
+      ) {
+        restoreFocus = false;
         close();
+      }
     };
     const stop = () => {
       if (!mounted) return;
@@ -185,6 +191,7 @@ export const FluentPopover = defineComponent({
     };
     const activate = () => {
       if (!mounted || release) return;
+      restoreFocus = true;
       release = registerOverlay({ kind: "popover", onRequestClose: close });
       document.addEventListener("pointerdown", outside, true);
       window.addEventListener("resize", reposition);
@@ -203,7 +210,7 @@ export const FluentPopover = defineComponent({
       });
     };
     const deactivate = () => {
-      release?.();
+      release?.(restoreFocus && props.restoreFocusOnClose);
       release = null;
       stop();
       if (panel.value?.matches(":popover-open")) panel.value.hidePopover();

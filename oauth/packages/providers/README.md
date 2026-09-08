@@ -17,21 +17,20 @@ Credentials contain `access`, `refresh`, `expires` (Unix milliseconds), and opti
 
 The host owns model availability, secret persistence, account removal and routing policy. OAuth switches, independent credential weights, and cooldowns are handled by `@model-auth/core`. Removing a local credential is not a claim of vendor-side revocation.
 
-## TRAE Enterprise CLI
+## Trae browser authorization
 
 ```ts
-import { TraeProvider } from "@model-auth/providers/trae";
+import { authorizeTrae, refreshTrae, listTraeModels, completeTrae } from "@model-auth/providers/trae";
 
-const trae = new TraeProvider({ session: { homeDir: appOwnedTraeDirectory } });
-await trae.login(signal);
-const result = await trae.execute({ prompt, tools, signal });
-await trae.logout(signal);
+const credential = await authorizeTrae({ openExternal, signal });
+const models = await listTraeModels(credential, { signal });
+const result = await completeTrae(credential, {
+  model: models[0].name,
+  messages: [{ role: "user", content: "Hello" }],
+  signal,
+});
 ```
 
-Install the official `traecli` separately. `TRAE_HOME` isolates the application's configuration/runtime directory without changing HOME. `status()` distinguishes a missing executable from a logged-out session; login and logout verify the resulting status. Execution returns only `{ assistantText, toolCalls }`, never raw CLI diagnostics. Tool calls are proposals for the host to validate and execute, not an authorization to bypass its approval rules.
+The host opens the browser and securely stores the whole credential, including its client ID and device key. Authorization uses a correlated loopback callback, PKCE and the same device binding for token exchange and refresh. No installed Trae CLI is required. Refresh the stored credential with `refreshTrae` before it expires and persist the rotated value atomically.
 
-The official CLI requires a TRAE Enterprise flagship subscription; personal subscriptions are not claimed as supported. The adapter reports `accountProfilesSupported: false`: use one application-owned session until vendor account isolation can be verified. Omitting `model` uses the CLI's own default; this is not a models.dev model entry. Do not display guessed model names.
-
-The implementation has process and contract tests. Verify CLI login and inference separately with an actual binary in the target host environment.
-
-Apache-2.0. See LICENSE and THIRD-PARTY.md.
+Model discovery returns the account's actual service metadata. `streamTrae` and `completeTrae` currently support text and reasoning with usage when supplied by the service. Structured tool definitions and tool messages are rejected because that wire contract has not been verified. Authentication and inference preserve server account and entitlement checks.

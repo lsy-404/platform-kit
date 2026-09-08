@@ -1,13 +1,17 @@
 {
   "name": "@model-auth/core",
-  "version": "0.2.7",
+  "version": "0.3.0",
   "description": "Framework-neutral model authentication state and credential routing.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "license": "Apache-2.0",
   "sideEffects": false,
-  "files": ["dist", "LICENSE", "README.md"],
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

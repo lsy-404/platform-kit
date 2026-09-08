@@ -3,6 +3,7 @@ import {
   defineComponent,
   getCurrentInstance,
   h,
+  mergeProps,
   nextTick,
   onBeforeUnmount,
   onMounted,
@@ -61,6 +62,7 @@ export const FluentSelect = defineComponent({
     const trigger = ref<HTMLElement | null>(null);
     const activeIndex = ref(-1);
     const open = ref(false);
+    const restoreFocus = ref(true);
     const id = typeof attrs.id === "string" ? attrs.id : `fluent-select-${nextSelectionId++}`;
     let typeahead = "";
     let typeaheadTimer: ReturnType<typeof setTimeout> | null = null;
@@ -84,6 +86,7 @@ export const FluentSelect = defineComponent({
     };
     const show = (preferred?: number) => {
       if (props.disabled) return;
+      restoreFocus.value = true;
       const selectedIndex = props.options.findIndex((option) => option.value === props.modelValue && enabled(option));
       const index = preferred ?? (selectedIndex >= 0 ? selectedIndex : firstEnabled(props.options, enabled));
       if (index < 0) return;
@@ -100,6 +103,11 @@ export const FluentSelect = defineComponent({
     const onKeydown = (event: KeyboardEvent) => {
       if (props.disabled) return;
       const key = event.key;
+      if (key === "Tab" && open.value) {
+        restoreFocus.value = false;
+        close();
+        return;
+      }
       if (key === "ArrowDown" || key === "ArrowUp") {
         event.preventDefault();
         if (!open.value) return show(key === "ArrowDown" ? firstEnabled(props.options, enabled) : lastEnabled(props.options, enabled));
@@ -145,11 +153,11 @@ export const FluentSelect = defineComponent({
     return () =>
       h("div", { class: ["fluent-select", { "fluent-select--open": open.value, "fluent-select--disabled": props.disabled }] }, [
         props.label ? h("span", { id: `${id}-label`, class: "fluent-select__label" }, props.label) : null,
-        h("button", {
-          ...attrs,
+        h("button", mergeProps(attrs, {
           ref: trigger,
           id,
           type: "button",
+          role: "combobox",
           class: ["fluent-select__control", attrs.class],
           disabled: props.disabled,
           "aria-labelledby": props.label ? `${id}-label` : attrs["aria-labelledby"],
@@ -159,7 +167,7 @@ export const FluentSelect = defineComponent({
           "aria-activedescendant": open.value ? activeId.value : undefined,
           onClick: () => (open.value ? close() : show()),
           onKeydown,
-        }, [
+        }), [
           h("span", { class: "fluent-select__value" }, selected.value?.label ?? ""),
           h("span", { class: "fluent-select__chevron", "aria-hidden": "true" }),
         ]),
@@ -169,6 +177,7 @@ export const FluentSelect = defineComponent({
           anchor: trigger.value,
           role: "presentation",
           focusOnOpen: false,
+          restoreFocusOnClose: restoreFocus.value,
           "onUpdate:open": (next: boolean) => { if (!next) close(); },
         }, {
           default: () => h("div", {
@@ -181,6 +190,7 @@ export const FluentSelect = defineComponent({
             key: option.value,
             type: "button",
             role: "option",
+            tabindex: -1,
             class: ["fluent-select__option", { "is-active": activeIndex.value === index, "is-selected": option.value === props.modelValue }],
             disabled: option.disabled,
             "aria-selected": String(option.value === props.modelValue),
@@ -203,11 +213,14 @@ export const FluentMenu = defineComponent({
     items: { type: Array as PropType<readonly FluentMenuItem[]>, default: () => [] },
     modelValue: { type: [String, Array] as PropType<string | readonly string[] | undefined>, default: undefined },
     multiple: Boolean,
-    closeOnSelect: { type: Boolean, default: true },
+    closeOnSelect: { type: Boolean, default: undefined },
   },
   emits: ["update:open", "close", "select", "update:modelValue", "change"],
   setup(props, { emit }) {
     const activeIndex = ref(-1);
+    const restoreFocus = ref(true);
+    let typeahead = "";
+    let typeaheadTimer: ReturnType<typeof setTimeout> | undefined;
     const id = `fluent-menu-${nextSelectionId++}`;
     const enabled = (item: FluentMenuItem) => !item.separator && !item.disabled && Boolean(item.value);
     const selected = (item: FluentMenuItem) => Array.isArray(props.modelValue)
@@ -237,10 +250,15 @@ export const FluentMenu = defineComponent({
       emit("select", item.value, item);
       emit("update:modelValue", nextValue);
       emit("change", nextValue);
-      if (props.closeOnSelect && !props.multiple) close();
+      if (props.closeOnSelect ?? !props.multiple) close();
     };
     const onKeydown = (event: KeyboardEvent) => {
-      if (!props.open || event.target !== props.anchor) return;
+      if (!props.open || !(event.target instanceof Node) || (!props.anchor?.contains(event.target) && !document.getElementById(id)?.contains(event.target))) return;
+      if (event.key === "Tab") {
+        restoreFocus.value = false;
+        close();
+        return;
+      }
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault();
         const next = enabledIndex(props.items, activeIndex.value, event.key === "ArrowDown" ? 1 : -1, enabled);
@@ -251,16 +269,32 @@ export const FluentMenu = defineComponent({
         event.preventDefault(); setActive(lastEnabled(props.items, enabled));
       } else if (event.key === "Enter" || event.key === " ") {
         event.preventDefault(); choose();
+      } else if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        typeahead += event.key.toLocaleLowerCase();
+        if (typeaheadTimer) clearTimeout(typeaheadTimer);
+        typeaheadTimer = setTimeout(() => { typeahead = ""; }, 600);
+        for (let offset = 1; offset <= props.items.length; offset++) {
+          const index = (activeIndex.value + offset + props.items.length) % props.items.length;
+          const item = props.items[index];
+          if (item && enabled(item) && item.label?.toLocaleLowerCase().startsWith(typeahead)) {
+            event.preventDefault();
+            setActive(index);
+            break;
+          }
+        }
       }
     };
     const syncActive = () => {
-      if (props.open) setActive(firstEnabled(props.items, enabled));
+      if (props.open) { restoreFocus.value = true; setActive(firstEnabled(props.items, enabled)); }
       else activeIndex.value = -1;
     };
     watch(() => props.open, syncActive, { immediate: true });
     if (getCurrentInstance()) {
       onMounted(() => document.addEventListener("keydown", onKeydown, true));
-      onBeforeUnmount(() => document.removeEventListener("keydown", onKeydown, true));
+      onBeforeUnmount(() => {
+        document.removeEventListener("keydown", onKeydown, true);
+        if (typeaheadTimer) clearTimeout(typeaheadTimer);
+      });
     }
     return () => h(FluentPopover, {
       open: props.open,
@@ -269,6 +303,7 @@ export const FluentMenu = defineComponent({
       portal: props.portal,
       role: "presentation",
       focusOnOpen: false,
+      restoreFocusOnClose: restoreFocus.value,
       "onUpdate:open": (next: boolean) => { if (!next) close(); },
     }, {
       default: () => h("div", { id, class: "fluent-menu", role: "menu", "aria-label": props.label }, props.items.map((item, index) => item.separator
@@ -277,6 +312,7 @@ export const FluentMenu = defineComponent({
           id: `${id}-item-${index}`,
           key: item.value ?? index,
           type: "button",
+          tabindex: -1,
           role: props.multiple ? "menuitemcheckbox" : "menuitem",
           class: ["fluent-menu__item", { "is-active": activeIndex.value === index, "is-selected": selected(item) }],
           disabled: item.disabled,

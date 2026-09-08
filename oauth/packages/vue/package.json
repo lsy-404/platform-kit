@@ -1,14 +1,27 @@
 {
   "name": "@model-auth/vue",
-  "version": "0.2.7",
+  "version": "0.3.0",
   "description": "Vue dialogs and custom elements for model authentication.",
   "type": "module",
   "main": "./dist/model-auth-vue.js",
   "types": "./dist/index.d.ts",
-  "typesVersions": { "*": { "custom-element": ["dist/custom-element.d.ts"] } },
+  "typesVersions": {
+    "*": {
+      "custom-element": [
+        "dist/custom-element.d.ts"
+      ]
+    }
+  },
   "license": "Apache-2.0",
-  "files": ["dist", "LICENSE", "README.md", "THIRD-PARTY.md"],
-  "sideEffects": ["**/*.css"],
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md",
+    "THIRD-PARTY.md"
+  ],
+  "sideEffects": [
+    "**/*.css"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

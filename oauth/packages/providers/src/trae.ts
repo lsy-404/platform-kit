@@ -217,3 +217,6 @@ function listen(server: ReturnType<typeof createServer>): Promise<number> {
   }); });
 }
 function close(server: ReturnType<typeof createServer>): Promise<void> { return new Promise(resolve => server.close(() => resolve())); }
+
+export { listTraeModels, streamTrae, completeTrae } from "./trae-api.js";
+export type { TraeModel, TraeTextMessage, TraeCompletionOptions, TraeCompletion, TraeStreamEvent, TraeApiOptions, TraeUsage } from "./trae-api.js";

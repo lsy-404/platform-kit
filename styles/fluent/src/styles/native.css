@@ -32,7 +32,7 @@
 :where(.fluent-theme, [data-fluent-theme]) :where(input, textarea, select):not([class*="fluent-"]):where(:focus-visible) { border-color: var(--fluent-accent); }
 :where(.fluent-theme, [data-fluent-theme]) :where(input, textarea):not([class*="fluent-"]):where([readonly]) { color: var(--fluent-muted); background: var(--fluent-surface); }
 :where(.fluent-theme, [data-fluent-theme]) :where(input, textarea, select):not([class*="fluent-"]):where(:disabled) { opacity: .5; background: var(--fluent-bg); }
-:where(.fluent-theme, [data-fluent-theme]) :where(input, textarea, select):where([aria-invalid="true"], :user-invalid) { border-color: var(--fluent-danger); }
+:where(.fluent-theme, [data-fluent-theme]) :is(input, textarea, select):is([aria-invalid="true"], :user-invalid) { border-color: var(--fluent-danger); }
 :where(.fluent-theme, [data-fluent-theme]) :where(textarea) { resize: vertical; min-height: 80px; }
 :where(.fluent-theme, [data-fluent-theme]) :where(input[type="checkbox"], input[type="radio"], input[type="range"], progress, meter) { accent-color: var(--fluent-accent); }
 :where(.fluent-theme, [data-fluent-theme]) :where(input[type="checkbox"], input[type="radio"]):not([class*="fluent-"]) { width: 18px; height: 18px; vertical-align: middle; }

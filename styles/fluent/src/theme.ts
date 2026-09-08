@@ -16,6 +16,7 @@ export interface FluentThemeState {
   mode: "light" | "dark";
   accent?: string;
   accentText?: string;
+  resolveTokens?: () => Record<string, string>;
 }
 export const fluentThemeKey: InjectionKey<ComputedRef<FluentThemeState>> =
   Symbol("fluent-theme");
@@ -29,6 +30,7 @@ export const FluentTheme = defineComponent({
     accentText: String,
   },
   setup(props, { slots, attrs }) {
+    const element = ref<HTMLElement | null>(null);
     const systemDark = ref(false);
     let media: MediaQueryList | undefined;
     const sync = () => {
@@ -49,6 +51,16 @@ export const FluentTheme = defineComponent({
           : props.mode,
       ...(props.accent ? { accent: props.accent } : {}),
       ...(props.accentText ? { accentText: props.accentText } : {}),
+      resolveTokens: () => {
+        if (!element.value) return {};
+        const style = getComputedStyle(element.value);
+        const values: Record<string, string> = {};
+        for (let index = 0; index < style.length; index++) {
+          const name = style.item(index);
+          if (name.startsWith("--fluent-")) values[name] = style.getPropertyValue(name);
+        }
+        return values;
+      },
     }));
     provide(fluentThemeKey, theme);
     return () =>
@@ -56,6 +68,7 @@ export const FluentTheme = defineComponent({
         "div",
         {
           ...attrs,
+          ref: element,
           class: ["fluent-theme", attrs.class],
           "data-fluent-theme": theme.value.mode,
           style: [
