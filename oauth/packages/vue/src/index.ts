@@ -1,3 +1,4 @@
+export { default as ModelConnectionPanel } from "./ModelConnectionPanel.vue";
 export { default as ModelAuthDialog } from "./ModelAuthDialog.vue";
 export type * from "./types";
 export { defaultMessages } from "./messages";

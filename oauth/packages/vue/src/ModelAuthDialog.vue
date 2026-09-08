@@ -83,6 +83,7 @@ const credentials = computed<OAuthCredential[]>(() => {
   const provider = selectedProvider.value;
   return (method.value === "oauth" ? provider?.oauthCredentials : provider?.apiKeyCredentials) ?? [];
 });
+const connectionModels = computed(() => [...new Set(credentials.value.flatMap(credential => credential.models || []))]);
 const canUseMethod = computed(() => Boolean(selectedProvider.value?.available
   && (method.value !== "oauth" || selectedProvider.value.oauthEnabled !== false)));
 const authReady = computed(() => canUseMethod.value && credentials.value.some(credential => credential.enabled && credential.healthy));
@@ -327,7 +328,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
 
         <div v-else-if="connectionMissing" key="missing-connection" class="model-auth-detail" part="connection-empty" data-part="connection-empty">
           <p class="model-auth-empty" role="status">{{ text.noConnections }}</p>
-          <button type="button" class="model-auth-primary" data-part="new-connection" @click="startNewConnection">{{ text.newConnection }}</button>
+          <button type="button" class="model-auth-primary" data-part="new-connection" :disabled="busy" @click="startNewConnection">{{ text.newConnection }}</button>
         </div>
         <div v-else-if="step === 'detail' && selectedProvider" key="detail" :class="['model-auth-detail', transitionName, { 'model-auth-connection-detail': connectionMode }]" part="detail" :data-part="connectionMode ? 'connection-info' : 'detail'">
           <strong class="model-auth-selected-provider">{{ selectedProvider.name }}</strong>
@@ -338,7 +339,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
               <div><strong>{{ connectionMode ? text.connections : text.oauth }}</strong><small>{{ text.credentialHint }}</small></div>
               <button v-if="!connectionMode" type="button" class="model-auth-primary" :disabled="busy || !canUseMethod" @click="authorize()">{{ selectedProvider.authorizeLabel || text.authorize }}</button>
             </div>
-            <label v-if="!connectionMode" class="model-auth-toggle model-auth-provider-toggle">
+            <label class="model-auth-toggle model-auth-provider-toggle">
               <input type="checkbox" role="switch" :checked="selectedProvider.oauthEnabled !== false" :disabled="busy" :aria-label="text.oauthEnabled" @change="emit('update-provider', { providerId: selectedProvider.id, oauthEnabled: ($event.target as HTMLInputElement).checked })" />
               <span class="model-auth-switch-track" aria-hidden="true"></span>{{ text.oauthEnabled }}
             </label>
@@ -376,7 +377,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
             <p v-if="!credentials.length" class="model-auth-empty">{{ connectionMode ? text.noConnections : text.noCredentials }}</p>
           </section>
           <section v-if="connectionMode" class="model-auth-credential-section" data-part="connection-policy">
-            <div class="model-auth-section-heading"><div><strong>{{ text.models }}</strong><small>{{ credentials.flatMap(credential => credential.models || []).join(' · ') || text.emptyModels }}</small></div></div>
+            <details class="model-auth-connection-models"><summary>{{ text.models }} ({{ connectionModels.length }})</summary><ul v-if="connectionModels.length"><li v-for="name in connectionModels" :key="name">{{ name }}</li></ul><p v-else>{{ text.emptyModels }}</p></details>
             <div class="model-auth-section-heading"><div><strong>{{ text.current }}</strong><small>{{ currentModel }}</small></div><StrategyPicker :model-value="currentStrategy" :options="strategyOptions" :label="text.strategy" :disabled="busy" @update:model-value="updateStrategy" /></div>
           </section>
 
