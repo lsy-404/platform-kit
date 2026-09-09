@@ -69,8 +69,18 @@ export async function authorizeBrowserOAuth(
       response_type: "code", client_id: config.clientId, redirect_uri: config.redirectUri, scope: config.scope,
       code_challenge: challenge, code_challenge_method: "S256", state, ...config.extraAuthorize,
     });
-    await openBrowser(options.openExternal, `${config.authorizeUrl}?${parameters}`, signal, timeoutController.signal);
-    const code = await callback.result;
+    const opening = Promise.resolve().then(() => options.openExternal(`${config.authorizeUrl}?${parameters}`));
+    const browser = opening.then(
+      () => undefined,
+      () => { throw new BrowserOAuthError("browser", "Browser authorization could not be opened."); },
+    );
+    // The host opener can remain pending after a browser has already reached the callback.
+    void browser.catch(() => {});
+    const first = await Promise.race([
+      browser,
+      callback.result.then(code => ({ code })),
+    ]);
+    const code = first ? first.code : await callback.result;
     ensureNotAborted(signal, timeoutController.signal);
     const token = await requestToken(config, {
       grant_type: "authorization_code", client_id: config.clientId, code, code_verifier: verifier, redirect_uri: config.redirectUri,
@@ -140,7 +150,7 @@ function credentialFrom(payload: unknown, accountIdFromAccess?: (access: string)
   return { type: "oauth", access, refresh, expires: Date.now() + lifetimeMs - Math.min(EXPIRY_SKEW_MS, Math.floor(lifetimeMs / 10)), ...(accountId ? { accountId } : {}) };
 }
 
-interface CallbackListener { readonly result: Promise<string>; close(): Promise<void>; }
+interface CallbackListener { readonly result: Promise<string>; close(force?: boolean): Promise<void>; }
 
 async function startCallbackListener(config: BrowserOAuthConfiguration, state: string, signal: AbortSignal, timeoutSignal: AbortSignal): Promise<CallbackListener> {
   const redirect = safeLoopbackRedirect(config.redirectUri, config.callbackPath);
@@ -153,9 +163,9 @@ async function startCallbackListener(config: BrowserOAuthConfiguration, state: s
   const result = new Promise<string>((resolve, reject) => { resolveCode = resolve; rejectCode = reject; });
   // The request handler can reject before the caller reaches `await result`.
   void result.catch(() => {});
-  const close = async () => {
+  const close = async (force = false) => {
     removeAbort();
-    server.closeAllConnections();
+    if (force) server.closeAllConnections();
     if (!closing && server.listening) closing = new Promise<void>(resolve => server.close(() => resolve()));
     await closing;
   };
@@ -165,7 +175,7 @@ async function startCallbackListener(config: BrowserOAuthConfiguration, state: s
     void close();
     if (error) rejectCode(error); else resolveCode(code!);
   };
-  const abort = () => { void close(); finish(cancellation(signal, timeoutSignal)); };
+  const abort = () => { void close(true); finish(cancellation(signal, timeoutSignal)); };
   const handler = (request: IncomingMessage, response: ServerResponse) => {
     const host = typeof request.headers.host === "string" ? request.headers.host : "";
     const expectedHost = redirect.host;
@@ -175,12 +185,12 @@ async function startCallbackListener(config: BrowserOAuthConfiguration, state: s
     if (url.pathname !== config.callbackPath) { response.writeHead(404).end(); return; }
     const code = singleParameter(url, "code"), callbackState = singleParameter(url, "state"), error = singleParameter(url, "error");
     if (!code || !callbackState || callbackState !== state || error || hasDuplicate(url, "error_description")) {
-      response.writeHead(400, { "content-type": "text/html; charset=utf-8" }).end(callbackPage(false));
-      finish(new BrowserOAuthError("callback", "Browser authorization callback was rejected."));
+      response.once("finish", () => finish(new BrowserOAuthError("callback", "Browser authorization callback was rejected.")));
+      response.writeHead(400, { "connection": "close", "content-type": "text/html; charset=utf-8" }).end(callbackPage(false));
       return;
     }
-    response.writeHead(200, { "content-type": "text/html; charset=utf-8" }).end(callbackPage(true));
-    finish(undefined, code);
+    response.once("finish", () => finish(undefined, code));
+    response.writeHead(200, { "connection": "close", "content-type": "text/html; charset=utf-8" }).end(callbackPage(true));
   };
   server.on("request", handler);
   signal.addEventListener("abort", abort, { once: true });
@@ -192,29 +202,14 @@ async function startCallbackListener(config: BrowserOAuthConfiguration, state: s
       server.listen(Number(redirect.port), "127.0.0.1", () => { server.removeListener("error", onError); resolve(); });
     });
   } catch (error) {
-    await close();
+    await close(true);
     throw error;
   }
-  if (signal.aborted) { await close(); throw cancellation(signal, timeoutSignal); }
+  if (signal.aborted) { await close(true); throw cancellation(signal, timeoutSignal); }
   server.once("error", () => finish(new BrowserOAuthError("transport", "OAuth callback listener failed.")));
   return { result, close };
 }
 
-async function openBrowser(openExternal: BrowserOAuthAuthorizationOptions["openExternal"], url: string, signal: AbortSignal, timeoutSignal: AbortSignal): Promise<void> {
-  try {
-    await Promise.race([Promise.resolve().then(() => openExternal(url)), waitForAbort(signal)]);
-  } catch {
-    ensureNotAborted(signal, timeoutSignal);
-    throw new BrowserOAuthError("browser", "Browser authorization could not be opened.");
-  }
-}
-
-function waitForAbort(signal: AbortSignal): Promise<never> {
-  return new Promise((_, reject) => {
-    if (signal.aborted) { reject(signal.reason); return; }
-    signal.addEventListener("abort", () => reject(signal.reason), { once: true });
-  });
-}
 function safeLoopbackRedirect(value: string, path: string): URL {
   let redirect: URL;
   try { redirect = new URL(value); } catch { throw new BrowserOAuthError("response", "OAuth redirect URI is invalid."); }

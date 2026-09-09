@@ -1,15 +1,18 @@
 // @vitest-environment node
 import { createServer } from "node:http";
 import { request } from "node:http";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { authorizeAnthropic, refreshAnthropic } from "../../oauth/packages/providers/src/anthropic.js";
 import { authorizeOpenAI, refreshOpenAI } from "../../oauth/packages/providers/src/openai.js";
 
 const token = (access = "access", refresh = "refresh") => new Response(JSON.stringify({ access_token: access, refresh_token: refresh, expires_in: 3600 }));
-const requestCallback = (url: URL): Promise<number> => new Promise((resolve, reject) => {
-  const call = request({ hostname: "127.0.0.1", port: Number(url.port), path: `${url.pathname}${url.search}`, headers: { host: url.host } }, response => { response.resume(); response.on("end", () => resolve(response.statusCode ?? 0)); });
+const requestCallbackResponse = (url: URL): Promise<{ status: number; body: string }> => new Promise((resolve, reject) => {
+  const call = request({ hostname: "127.0.0.1", port: Number(url.port), path: `${url.pathname}${url.search}`, headers: { host: url.host } }, response => {
+    let body = ""; response.setEncoding("utf8"); response.on("data", chunk => { body += chunk; }); response.on("end", () => resolve({ status: response.statusCode ?? 0, body }));
+  });
   call.on("error", reject); call.end();
 });
+const requestCallback = async (url: URL): Promise<number> => (await requestCallbackResponse(url)).status;
 const callback = (opened: string, code = "authorization-code"): URL => {
   const authorize = new URL(opened), redirect = new URL(authorize.searchParams.get("redirect_uri")!);
   redirect.searchParams.set("code", code); redirect.searchParams.set("state", authorize.searchParams.get("state")!);
@@ -17,14 +20,12 @@ const callback = (opened: string, code = "authorization-code"): URL => {
 };
 const jwt = (accountId: string) => `header.${Buffer.from(JSON.stringify({ "https://api.openai.com/auth": { chatgpt_account_id: accountId } })).toString("base64url")}.signature`;
 
-afterEach(() => new Promise(resolve => setTimeout(resolve, 10)));
-
 describe("official browser OAuth providers", () => {
   it("uses the established OpenAI PKCE parameters, fixed callback and form token exchange", async () => {
     let opened = ""; let init: RequestInit | undefined;
     const credential = await authorizeOpenAI({
       fetchImpl: async (_url, request) => { init = request; return token(jwt("account")); },
-      openExternal: async url => { opened = url; expect(await requestCallback(callback(url))).toBe(200); },
+      openExternal: async url => { opened = url; const response = await requestCallbackResponse(callback(url)); expect(response).toMatchObject({ status: 200, body: "Authorization complete. You can close this window." }); },
     });
     const url = new URL(opened), form = new URLSearchParams(String(init?.body));
     expect(url.origin + url.pathname).toBe("https://auth.openai.com/oauth/authorize");
@@ -34,6 +35,9 @@ describe("official browser OAuth providers", () => {
     expect(Object.fromEntries(form)).toMatchObject({ grant_type: "authorization_code", code: "authorization-code", redirect_uri: "http://localhost:1455/auth/callback" });
     expect(credential).toMatchObject({ type: "oauth", access: jwt("account"), refresh: "refresh", accountId: "account" });
     expect(credential.expires).toBeGreaterThan(Date.now() + 3_200_000);
+    const reusable = createServer();
+    await new Promise<void>((resolve, reject) => { reusable.once("error", reject); reusable.listen(1455, "127.0.0.1", resolve); });
+    await new Promise<void>(resolve => reusable.close(() => resolve()));
   });
 
   it("uses Anthropic's callback, provider flag, JSON exchange and state form field", async () => {
@@ -87,6 +91,19 @@ describe("official browser OAuth providers", () => {
     await expect(result).rejects.toMatchObject({ code: "aborted" });
     await expect(authorizeAnthropic({ openExternal: () => { throw new Error("private"); } })).rejects.toMatchObject({ code: "browser", message: "Browser authorization could not be opened." });
     await expect(authorizeOpenAI({ timeoutMs: 10, openExternal: () => new Promise(() => {}) })).rejects.toMatchObject({ code: "timeout" });
+  });
+
+  it("uses callback completion over a pending browser opener", async () => {
+    const success = await authorizeOpenAI({
+      fetchImpl: async () => token(jwt("account")),
+      openExternal: url => { void requestCallback(callback(url)); return new Promise(() => {}); },
+    });
+    expect(success.accountId).toBe("account");
+    const denied = authorizeAnthropic({ openExternal: url => {
+      const rejected = callback(url); rejected.searchParams.set("state", "wrong");
+      void requestCallback(rejected).catch(() => {}); return new Promise(() => {});
+    } });
+    await expect(denied).rejects.toMatchObject({ code: "callback" });
   });
 
   it("reports a callback port collision and releases an aborted listener", async () => {
