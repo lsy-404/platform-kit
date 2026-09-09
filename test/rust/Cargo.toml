@@ -1,0 +1,9 @@
+[package]
+name = "model-auth-native-tests"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dev-dependencies]
+base64 = "0.22"
+model-auth-native = { path = "../../oauth/rust" }
