@@ -23,6 +23,13 @@ for(const target of targets){
  if(!listing.includes('package/LICENSE') || /(?:^|\/)(?:agents|inventory|kits|\.env|node_modules)(?:\/|$)|IRIS-LICENSE/.test(listing))throw new Error('Package archive boundary violation');
  archives.push(archive);
 }
+const nativeSource=resolve('oauth/rust');
+execFileSync('cargo',['package','--manifest-path',resolve(nativeSource,'Cargo.toml'),'--locked','--allow-dirty'],{stdio:'inherit'});
+const nativeVersion=(await readFile(resolve(nativeSource,'Cargo.toml'),'utf8')).match(/^version\s*=\s*"([^"]+)"/m)?.[1];
+if(!nativeVersion)throw new Error('Native package version is required');
+const nativeArchive='model-auth-native-'+nativeVersion+'.crate';
+await cp(resolve(nativeSource,'target/package',nativeArchive),resolve(output,nativeArchive));
+archives.push(nativeArchive);
 const checksums=[];
 for(const file of archives) checksums.push(createHash('sha256').update(await readFile(resolve(output,file))).digest('hex')+'  '+file);
 await writeFile(resolve(output,'SHA256SUMS'),checksums.join('\n')+'\n');

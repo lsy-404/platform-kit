@@ -15,15 +15,15 @@ pnpm --dir oauth test:packages
 
 The pack command writes local artifacts to `oauth/release/`:
 
-- `model-auth-core-0.3.0.tgz`
-- `model-auth-providers-0.3.0.tgz`
-- `model-auth-vue-0.4.1.tgz`
+- `model-auth-core-0.4.0.tgz`
+- `model-auth-providers-0.4.0.tgz`
+- `model-auth-vue-0.4.2.tgz`
 
 The package-consumer test installs those archives into a temporary consumer and verifies exports, declarations, styles, runtime behavior, and included notices.
 
 ## Boundaries
 
-The toolkit does not contain credentials or provider binaries. Hosts own credential persistence, network authorization, provider availability, and model selection. See `docs/` and package READMEs for API contracts.
+The toolkit does not contain credentials or provider binaries. The providers package implements browser OAuth for OpenAI, Anthropic, WorkBuddy and Trae. Hosts own secure credential persistence, browser opening, provider availability and model requests. See `docs/` and package READMEs for API contracts.
 
 ## License
 

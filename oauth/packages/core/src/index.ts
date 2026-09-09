@@ -1,4 +1,4 @@
-export const MODEL_AUTH_VERSION = "0.3.0";
+export const MODEL_AUTH_VERSION = "0.4.0";
 
 export type AuthMethod = "oauth" | "api-key";
 export type CredentialHealth = "healthy" | "cooling-down" | "permanently-failed";
@@ -509,6 +509,22 @@ export interface ProviderAdapter {
   readonly host: ProviderAdapterHost;
 }
 
+export const OPENAI_CAPABILITY_DESCRIPTOR: ProviderCapabilityDescriptor = {
+  providerId: "openai-codex",
+  displayName: "OpenAI",
+  authMethods: ["oauth"],
+  defaultModelId: "",
+  models: [],
+};
+
+export const ANTHROPIC_CAPABILITY_DESCRIPTOR: ProviderCapabilityDescriptor = {
+  providerId: "anthropic",
+  displayName: "Anthropic",
+  authMethods: ["oauth"],
+  defaultModelId: "",
+  models: [],
+};
+
 export const WORKBUDDY_CAPABILITY_DESCRIPTOR: ProviderCapabilityDescriptor = {
   providerId: "workbuddy",
   displayName: "WorkBuddy",
@@ -559,4 +575,12 @@ export function createWorkBuddyAdapter(host: ProviderAdapterHost): ProviderAdapt
 
 export function createTraeAdapter(host: ProviderAdapterHost): ProviderAdapter {
   return adapter(capabilityWithHostOverride(TRAE_CAPABILITY_DESCRIPTOR, host.capability), host);
+}
+
+export function createOpenAIAdapter(host: ProviderAdapterHost): ProviderAdapter {
+  return adapter(capabilityWithHostOverride(OPENAI_CAPABILITY_DESCRIPTOR, host.capability), host);
+}
+
+export function createAnthropicAdapter(host: ProviderAdapterHost): ProviderAdapter {
+  return adapter(capabilityWithHostOverride(ANTHROPIC_CAPABILITY_DESCRIPTOR, host.capability), host);
 }

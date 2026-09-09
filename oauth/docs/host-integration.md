@@ -25,6 +25,8 @@ The example contains no credential material. A host may keep displaying the prev
 
 The UI calls host-owned actions. The providers package performs actual authorization in that trusted process; neither Vue nor a core adapter factory is a credential vault.
 
+Use `@model-auth/providers/openai` (`authorizeOpenAI`, `refreshOpenAI`), `@model-auth/providers/anthropic` (`authorizeAnthropic`, `refreshAnthropic`), `@model-auth/providers/workbuddy`, or `@model-auth/providers/trae`. OpenAI runtime credentials use provider ID `openai-codex`; Anthropic uses `anthropic`. Their metadata adapters are `createOpenAIAdapter` and `createAnthropicAdapter`. Both receive the same `ProviderAdapterHost` contract shown below.
+
 ```ts
 import {
   createCredentialMetadata,

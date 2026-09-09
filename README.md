@@ -7,7 +7,8 @@ Apache-2.0 theme and OAuth packages, distributed directly through this repositor
 | `@platform-kit/fluent` | Native Fluent themes, Vue controls, navigation and overlays |
 | `@platform-kit/ui-tokens` | Lightweight CSS theme variables |
 | `@model-auth/core` | Authentication state, credential routing and provider contracts |
-| `@model-auth/providers` | Complete host-side WorkBuddy and Trae authorization adapters |
+| `@model-auth/providers` | Host-side OpenAI, Anthropic, WorkBuddy and Trae browser OAuth |
+| `model-auth-native` | Rust browser OAuth for OpenAI and Anthropic; host-owned credential storage |
 | `@model-auth/vue` | Vue authentication interface and custom element |
 
 ## Install
@@ -17,15 +18,23 @@ Use public release archive URLs in `package.json`. No private registry token or 
 ```json
 {
   "dependencies": {
-    "@lsypkg/fluent": "https://github.com/lsy-404/platform-kit/releases/download/v0.3.2/platform-kit-fluent-0.2.1.tgz",
-    "@model-auth/core": "https://github.com/lsy-404/platform-kit/releases/download/v0.3.2/model-auth-core-0.3.0.tgz",
-    "@model-auth/providers": "https://github.com/lsy-404/platform-kit/releases/download/v0.3.2/model-auth-providers-0.3.0.tgz",
-    "@model-auth/vue": "https://github.com/lsy-404/platform-kit/releases/download/v0.3.2/model-auth-vue-0.4.2.tgz"
+    "@lsypkg/fluent": "https://github.com/lsy-404/platform-kit/releases/download/v0.4.0/platform-kit-fluent-0.2.1.tgz",
+    "@model-auth/core": "https://github.com/lsy-404/platform-kit/releases/download/v0.4.0/model-auth-core-0.4.0.tgz",
+    "@model-auth/providers": "https://github.com/lsy-404/platform-kit/releases/download/v0.4.0/model-auth-providers-0.4.0.tgz",
+    "@model-auth/vue": "https://github.com/lsy-404/platform-kit/releases/download/v0.4.0/model-auth-vue-0.4.2.tgz"
   }
 }
 ```
 
 Public npm dependencies such as Vue and tough-cookie continue to resolve from the consumer's normal npm registry.
+
+Rust hosts use the native crate from the same release:
+
+```toml
+model-auth-native = { git = "https://github.com/lsy-404/platform-kit", tag = "v0.4.0" }
+```
+
+The release also includes `model-auth-native-0.4.0.crate`. See [native OAuth](oauth/rust/README.md) for the backend API.
 
 ## Develop
 
@@ -37,6 +46,7 @@ pnpm install --frozen-lockfile
 pnpm --dir oauth install --frozen-lockfile
 pnpm typecheck
 pnpm test
+cargo test --manifest-path test/rust/Cargo.toml --locked
 pnpm build
 pnpm pack:release
 node test/release-consumer.mjs

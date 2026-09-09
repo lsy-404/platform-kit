@@ -1,7 +1,7 @@
 {
   "name": "@model-auth/providers",
-  "version": "0.3.0",
-  "description": "Host-side browser authorization and official CLI provider sessions.",
+  "version": "0.4.0",
+  "description": "Host-side browser OAuth for OpenAI, Anthropic, WorkBuddy and Trae.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -12,6 +12,12 @@
       ],
       "trae": [
         "dist/trae.d.ts"
+      ],
+      "openai": [
+        "dist/openai.d.ts"
+      ],
+      "anthropic": [
+        "dist/anthropic.d.ts"
       ]
     }
   },
@@ -38,6 +44,14 @@
     "./trae": {
       "types": "./dist/trae.d.ts",
       "import": "./dist/trae.js"
+    },
+    "./openai": {
+      "types": "./dist/openai.d.ts",
+      "import": "./dist/openai.js"
+    },
+    "./anthropic": {
+      "types": "./dist/anthropic.d.ts",
+      "import": "./dist/anthropic.js"
     }
   },
   "scripts": {

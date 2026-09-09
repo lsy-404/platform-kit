@@ -3,6 +3,8 @@ import {
   CatalogCache,
   CredentialRouter,
   createCredentialMetadata,
+  createOpenAIAdapter,
+  createAnthropicAdapter,
   createTraeAdapter,
   createWorkBuddyAdapter,
   normalizeModelId,
@@ -56,6 +58,21 @@ describe("model-auth core", () => {
       invalidPackage: { npm: {}, models: { model: { tool_call: true, modalities: { output: ["text"] } } } },
     } }).providers[0]?.packageName).toBeNull();
     expect(() => parseModelsDevPayload([])).toThrow();
+  });
+
+  it.each([
+    ["openai-codex", createOpenAIAdapter],
+    ["anthropic", createAnthropicAdapter],
+  ] as const)("validates %s host credentials before exposing metadata", async (providerId, createAdapter) => {
+    const credential = createCredentialMetadata({ id: "account", providerId, authMethod: "oauth", modelIds: ["model"] });
+    const adapter = createAdapter({
+      authorize: async () => ({ ...credential, access: "private-value" }),
+      remove: async () => {},
+      refresh: async () => ({ ...credential, providerId: "wrong-provider" }),
+    });
+    expect(adapter.capability.providerId).toBe(providerId);
+    expect(await adapter.host.authorize()).toEqual(credential);
+    await expect(adapter.host.refresh!("account")).rejects.toThrow("incompatible credential");
   });
 
   it("keeps the previous cache catalog when a refresh payload fails", () => {

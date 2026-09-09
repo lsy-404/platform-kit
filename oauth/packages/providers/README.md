@@ -2,6 +2,24 @@
 
 Real provider authorization for trusted desktop host processes. Never import this package into a renderer or send its credentials through renderer IPC.
 
+## OpenAI and Anthropic browser authorization
+
+```ts
+import { authorizeOpenAI, refreshOpenAI } from "@model-auth/providers/openai";
+import { authorizeAnthropic, refreshAnthropic } from "@model-auth/providers/anthropic";
+
+const credential = await authorizeOpenAI({ openExternal, signal });
+await secureStore.set(accountId, credential);
+const renewed = await refreshOpenAI(credential, { signal });
+await secureStore.set(accountId, renewed);
+```
+
+Use `authorizeAnthropic` and `refreshAnthropic` with the same host contract for Anthropic. Both providers implement browser authorization, PKCE, correlated loopback callbacks and token renewal. OpenAI listens on port 1455 and Anthropic on port 53692; a port already in use produces an error. Hosts open the system browser and propagate cancellation through `signal`. Authorization is bounded by `timeoutMs` (ten minutes by default). No installed provider CLI is needed.
+
+Credentials contain `type: "oauth"`, `access`, `refresh`, `expires` (Unix milliseconds), and an optional `accountId`. Store and renew them only in a trusted host process. Persist rotated refresh tokens before the next request. The package does not authenticate a user's subscription by displaying a provider card; a successful token exchange is required and service account restrictions still apply.
+
+## WorkBuddy browser authorization
+
 ```ts
 import { authorizeWorkBuddy, refreshWorkBuddy } from "@model-auth/providers/workbuddy";
 

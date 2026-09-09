@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use url::Url;
 use uuid::Uuid;
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 const ANTHROPIC_AUTHORIZE_URL: &str = "https://claude.ai/oauth/authorize";
 const ANTHROPIC_TOKEN_URL: &str = "https://platform.claude.com/v1/oauth/token";
@@ -66,6 +66,7 @@ pub struct TokenRequest {
     pub url: String,
     pub content_type: &'static str,
     pub body: String,
+    pub timeout: Duration,
 }
 
 impl std::fmt::Debug for TokenRequest {
@@ -79,38 +80,74 @@ impl std::fmt::Debug for TokenRequest {
     }
 }
 
+impl Drop for TokenRequest {
+    fn drop(&mut self) {
+        self.body.zeroize();
+    }
+}
+
 pub trait TokenTransport: Send + Sync {
-    fn send(&self, request: TokenRequest) -> Result<String, Error>;
+    fn send(&self, request: TokenRequest, is_cancelled: &dyn Fn() -> bool)
+        -> Result<String, Error>;
 }
 
 pub struct UreqTransport;
 
 impl TokenTransport for UreqTransport {
-    fn send(&self, request: TokenRequest) -> Result<String, Error> {
-        let response = ureq::AgentBuilder::new()
-            .timeout(Duration::from_secs(30))
-            .redirects(0)
-            .https_only(true)
-            .build()
-            .post(&request.url)
-            .set("accept", "application/json")
-            .set("content-type", request.content_type)
-            .send_string(&request.body)
-            .map_err(|_| Error::new("OAuth token request failed."))?;
-        if !(200..300).contains(&response.status()) {
-            return Err(Error::new("OAuth token request failed."));
+    fn send(
+        &self,
+        mut request: TokenRequest,
+        is_cancelled: &dyn Fn() -> bool,
+    ) -> Result<String, Error> {
+        if is_cancelled() {
+            return Err(Error::new("Browser OAuth authorization was cancelled."));
         }
-        let mut body = String::new();
-        response
-            .into_reader()
-            .take((RESPONSE_LIMIT + 1) as u64)
-            .read_to_string(&mut body)
-            .map_err(|error| Error::new(format!("Cannot read OAuth token response: {error}")))?;
-        if body.len() > RESPONSE_LIMIT {
-            return Err(Error::new("OAuth token response exceeds the size limit."));
+        if request.timeout.is_zero() {
+            return Err(Error::new("OAuth token request timed out."));
         }
-        Ok(body)
+        request.timeout = request.timeout.min(Duration::from_secs(30));
+        let deadline = Instant::now() + request.timeout;
+        let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+        std::thread::spawn(move || {
+            let response = send_request(request).map(Zeroizing::new);
+            let _ = sender.send(response);
+        });
+        loop {
+            check_authorization(deadline, is_cancelled)?;
+            match receiver.recv_timeout(Duration::from_millis(20)) {
+                Ok(response) => return response.map(|body| body.to_string()),
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                Err(_) => return Err(Error::new("OAuth token request failed.")),
+            }
+        }
     }
+}
+
+fn send_request(request: TokenRequest) -> Result<String, Error> {
+    let response = ureq::AgentBuilder::new()
+        .timeout(request.timeout)
+        .redirects(0)
+        .https_only(true)
+        .build()
+        .post(&request.url)
+        .set("accept", "application/json")
+        .set("content-type", request.content_type)
+        .send_string(&request.body)
+        .map_err(|_| Error::new("OAuth token request failed."))?;
+    if !(200..300).contains(&response.status()) {
+        return Err(Error::new("OAuth token request failed."));
+    }
+    let mut body = String::new();
+    response
+        .into_reader()
+        .take((RESPONSE_LIMIT + 1) as u64)
+        .read_to_string(&mut body)
+        .map_err(|_| Error::new("Cannot read OAuth token response."))?;
+    if body.len() > RESPONSE_LIMIT {
+        body.zeroize();
+        return Err(Error::new("OAuth token response exceeds the size limit."));
+    }
+    Ok(body)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -184,6 +221,12 @@ pub fn authorize(
     if is_cancelled() {
         return Err(Error::new("Browser OAuth authorization was cancelled."));
     }
+    if timeout.is_zero() || timeout > Duration::from_secs(600) {
+        return Err(Error::new(
+            "Authorization timeout must be within ten minutes.",
+        ));
+    }
+    let deadline = Instant::now() + timeout;
     let config = Config::for_provider(provider);
     let verifier = pkce_verifier();
     let state = random_token();
@@ -197,8 +240,21 @@ pub fn authorize(
         return Err(Error::new("Browser OAuth authorization was cancelled."));
     }
     open_external(&url)?;
-    let code = wait_for_callback(&listener, &config, &state, timeout, &is_cancelled)?;
-    exchange_code(provider, &config, &code, &verifier, &state, transport)
+    let code = wait_for_callback(&listener, &config, &state, deadline, &is_cancelled)?;
+    check_authorization(deadline, &is_cancelled)?;
+    drop(listener);
+    let credential = exchange_code(
+        provider,
+        &config,
+        &code,
+        &verifier,
+        &state,
+        transport,
+        deadline,
+        &is_cancelled,
+    )?;
+    check_authorization(deadline, &is_cancelled)?;
+    Ok(credential)
 }
 
 /// Refreshes a credential. A refresh response without `refresh_token` retains the previous token.
@@ -207,6 +263,9 @@ pub fn refresh(
     current: &Credential,
     transport: &dyn TokenTransport,
 ) -> Result<Credential, Error> {
+    if !valid_token(&current.refresh) {
+        return Err(Error::new("OAuth refresh credential is invalid."));
+    }
     let config = Config::for_provider(provider);
     let client_id = config.client_id()?;
     let body = match provider {
@@ -218,11 +277,15 @@ pub fn refresh(
     } else {
         "application/x-www-form-urlencoded"
     };
-    let response = transport.send(TokenRequest {
-        url: config.token_url.into(),
-        content_type,
-        body,
-    })?;
+    let response = Zeroizing::new(transport.send(
+        TokenRequest {
+            url: config.token_url.into(),
+            content_type,
+            body,
+            timeout: Duration::from_secs(30),
+        },
+        &|| false,
+    )?);
     parse_token_response(provider, &response, Some(current), now_ms())
 }
 
@@ -233,6 +296,8 @@ fn exchange_code(
     verifier: &str,
     state: &str,
     transport: &dyn TokenTransport,
+    deadline: Instant,
+    is_cancelled: &dyn Fn() -> bool,
 ) -> Result<Credential, Error> {
     let client_id = config.client_id()?;
     let body = match provider {
@@ -244,11 +309,19 @@ fn exchange_code(
     } else {
         "application/x-www-form-urlencoded"
     };
-    let response = transport.send(TokenRequest {
-        url: config.token_url.into(),
-        content_type,
-        body,
-    })?;
+    let response = Zeroizing::new(
+        transport.send(
+            TokenRequest {
+                url: config.token_url.into(),
+                content_type,
+                body,
+                timeout: deadline
+                    .saturating_duration_since(Instant::now())
+                    .min(Duration::from_secs(30)),
+            },
+            is_cancelled,
+        )?,
+    );
     parse_token_response(provider, &response, None, now_ms())
 }
 
@@ -258,28 +331,37 @@ pub fn parse_token_response(
     previous: Option<&Credential>,
     now: i64,
 ) -> Result<Credential, Error> {
-    let payload: Value = serde_json::from_str(body)
+    if body.len() > RESPONSE_LIMIT {
+        return Err(Error::new("OAuth token response exceeds the size limit."));
+    }
+    let mut payload: Value = serde_json::from_str(body)
         .map_err(|_| Error::new("OAuth token response is not valid JSON."))?;
     let access = payload
-        .get("access_token")
-        .and_then(Value::as_str)
-        .unwrap_or_default()
-        .trim()
-        .to_owned();
-    let refresh = payload
-        .get("refresh_token")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(str::to_owned)
-        .or_else(|| previous.map(|credential| credential.refresh.clone()))
+        .get_mut("access_token")
+        .map(Value::take)
+        .and_then(|v| {
+            if let Value::String(s) = v {
+                Some(s)
+            } else {
+                None
+            }
+        })
         .unwrap_or_default();
+    let refresh = match payload.get_mut("refresh_token") {
+        None => previous
+            .map(|credential| credential.refresh.clone())
+            .unwrap_or_default(),
+        Some(value) => match value.take() {
+            Value::String(s) => s,
+            _ => String::new(),
+        },
+    };
     let expires_in = payload
         .get("expires_in")
         .and_then(Value::as_i64)
         .unwrap_or_default();
-    if access.is_empty()
-        || refresh.is_empty()
+    if !valid_token(&access)
+        || !valid_token(&refresh)
         || !(1..=MAX_TOKEN_LIFETIME_SECONDS).contains(&expires_in)
     {
         return Err(Error::new(
@@ -299,7 +381,7 @@ pub fn parse_token_response(
         refresh,
         expires_at: now
             .saturating_add(expires_in.saturating_mul(1000))
-            .saturating_sub(5 * 60_000),
+            .saturating_sub((expires_in * 100).min(5 * 60_000)),
         account_id,
     })
 }
@@ -337,31 +419,35 @@ fn authorization_url(
     Ok(url.into())
 }
 
+fn check_authorization(deadline: Instant, is_cancelled: &dyn Fn() -> bool) -> Result<(), Error> {
+    if is_cancelled() {
+        return Err(Error::new("Browser OAuth authorization was cancelled."));
+    }
+    if Instant::now() >= deadline {
+        return Err(Error::new("Browser OAuth authorization timed out."));
+    }
+    Ok(())
+}
+
 fn wait_for_callback(
     listener: &TcpListener,
     config: &Config,
     state: &str,
-    timeout: Duration,
+    deadline: Instant,
     is_cancelled: &dyn Fn() -> bool,
 ) -> Result<String, Error> {
-    let deadline = Instant::now() + timeout;
     loop {
-        if is_cancelled() {
-            return Err(Error::new("Browser OAuth authorization was cancelled."));
-        }
-        if Instant::now() >= deadline {
-            return Err(Error::new("Browser OAuth authorization timed out."));
-        }
+        check_authorization(deadline, is_cancelled)?;
         match listener.accept() {
             Ok((stream, _)) => {
-                if let Some(code) = read_callback(stream, config, state)? {
+                if let Some(code) = read_callback(stream, config, state, deadline, is_cancelled)? {
                     return Ok(code);
                 }
             }
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                std::thread::sleep(Duration::from_millis(40))
+                std::thread::sleep(Duration::from_millis(20))
             }
-            Err(error) => return Err(Error::new(format!("OAuth callback failed: {error}"))),
+            Err(_) => return Err(Error::new("OAuth callback could not be read.")),
         }
     }
 }
@@ -370,42 +456,129 @@ fn read_callback(
     mut stream: TcpStream,
     config: &Config,
     state: &str,
+    deadline: Instant,
+    is_cancelled: &dyn Fn() -> bool,
 ) -> Result<Option<String>, Error> {
     stream
-        .set_read_timeout(Some(Duration::from_secs(3)))
-        .map_err(|error| Error::new(error.to_string()))?;
-    let mut request = [0_u8; 16 * 1024];
-    let read = stream
-        .read(&mut request)
-        .map_err(|error| Error::new(error.to_string()))?;
-    let target = std::str::from_utf8(&request[..read])
-        .ok()
-        .and_then(|value| value.lines().next())
-        .and_then(|line| line.split_whitespace().nth(1))
-        .unwrap_or("/");
-    let result = callback_code(target, config, state);
-    let page = if result.is_some() {
-        "Authorization received. Return to the application."
-    } else {
-        "Authorization was not completed. Return to the application."
+        .set_read_timeout(Some(Duration::from_millis(40)))
+        .map_err(|_| Error::new("Cannot configure OAuth callback."))?;
+    stream
+        .set_write_timeout(Some(Duration::from_millis(200)))
+        .map_err(|_| Error::new("Cannot configure OAuth callback."))?;
+    let mut request = Vec::new();
+    let request_deadline = deadline.min(Instant::now() + Duration::from_secs(3));
+    loop {
+        check_authorization(deadline, is_cancelled)?;
+        if Instant::now() >= request_deadline {
+            return Ok(None);
+        }
+        let mut chunk = [0_u8; 1024];
+        match stream.read(&mut chunk) {
+            Ok(0) => return Ok(None),
+            Ok(count) => request.extend_from_slice(&chunk[..count]),
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) =>
+            {
+                continue
+            }
+            Err(_) => return Ok(None),
+        }
+        if request.len() > 16 * 1024 {
+            write_callback(&mut stream, 400);
+            return Ok(None);
+        }
+        if request.windows(4).any(|part| part == b"\r\n\r\n") {
+            break;
+        }
+    }
+    let Some(code) = callback_code(&request, config, state) else {
+        write_callback(&mut stream, 400);
+        return Ok(None);
     };
-    let _ = stream.write_all(format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{page}", page.len()).as_bytes());
-    Ok(result)
+    match code {
+        Ok(code) => {
+            write_callback(&mut stream, 200);
+            Ok(Some(code))
+        }
+        Err(()) => {
+            write_callback(&mut stream, 400);
+            Err(Error::new("Browser OAuth authorization was denied."))
+        }
+    }
 }
 
-fn callback_code(target: &str, config: &Config, state: &str) -> Option<String> {
-    let url = Url::parse(&format!("http://localhost{target}")).ok()?;
-    if url.path() != config.callback_path {
+fn write_callback(stream: &mut TcpStream, status: u16) {
+    let (reason, page) = if status == 200 {
+        ("OK", "Authorization received. Return to the application.")
+    } else {
+        (
+            "Bad Request",
+            "Authorization was not completed. Return to the application.",
+        )
+    };
+    let _ = stream.write_all(format!("HTTP/1.1 {status} {reason}\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{page}", page.len()).as_bytes());
+}
+
+fn callback_code(request: &[u8], config: &Config, state: &str) -> Option<Result<String, ()>> {
+    let text = std::str::from_utf8(request).ok()?;
+    let mut lines = text.split("\r\n");
+    let parts: Vec<_> = lines.next()?.split_whitespace().collect();
+    if parts.len() != 3
+        || parts[0] != "GET"
+        || !matches!(parts[2], "HTTP/1.1" | "HTTP/1.0")
+        || !parts[1].starts_with('/')
+        || parts[1].starts_with("//")
+    {
         return None;
     }
-    let params = url
-        .query_pairs()
-        .collect::<std::collections::HashMap<_, _>>();
-    (params.get("state").map(|value| value.as_ref()) == Some(state)
-        && !params.contains_key("error"))
-    .then(|| params.get("code").map(|value| value.trim().to_owned()))
-    .flatten()
-    .filter(|value| !value.is_empty())
+    let hosts: Vec<_> = lines
+        .take_while(|line| !line.is_empty())
+        .filter_map(|line| line.split_once(':'))
+        .filter(|(name, _)| name.eq_ignore_ascii_case("host"))
+        .map(|(_, value)| value.trim())
+        .collect();
+    let port = config.port().ok()?;
+    if hosts.len() != 1
+        || (hosts[0] != format!("localhost:{port}") && hosts[0] != format!("127.0.0.1:{port}"))
+    {
+        return None;
+    }
+    let url = Url::parse(&format!("http://localhost{}", parts[1])).ok()?;
+    if url.path() != config.callback_path || url.fragment().is_some() {
+        return None;
+    }
+    let params: Vec<_> = url.query_pairs().collect();
+    let values = |name: &str| {
+        params
+            .iter()
+            .filter(|(key, _)| key == name)
+            .map(|(_, value)| value.as_ref())
+            .collect::<Vec<_>>()
+    };
+    let states = values("state");
+    if states.len() != 1 || states[0] != state {
+        return None;
+    }
+    let errors = values("error");
+    if !errors.is_empty() {
+        return Some(Err(()));
+    }
+    let codes = values("code");
+    if codes.len() != 1 || !valid_token(codes[0]) {
+        return None;
+    }
+    Some(Ok(codes[0].to_owned()))
+}
+
+fn valid_token(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 32768
+        && value
+            .bytes()
+            .all(|byte| !byte.is_ascii_whitespace() && !byte.is_ascii_control())
 }
 
 fn form(values: &[(&str, &str)]) -> String {

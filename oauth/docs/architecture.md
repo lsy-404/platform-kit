@@ -18,13 +18,13 @@ Use an explicit runtime binding when a host provider is not named exactly like i
 2. A searchable, single-column provider list filtered by the selected method.
 3. Provider credential and model configuration, with enabled and weight controlled independently.
 
-The host supplies the catalog, existing metadata, and callbacks. OAuth actions invoke the providers package or the host's native implementation, store tokens securely, and return only non-secret metadata. API-key actions likewise validate and store the key in the host boundary. Closing the dialog aborts an active authorization through `execute(action, { signal })`; host IPC must propagate cancellation.
+The host supplies the catalog, existing metadata, and callbacks. OAuth actions invoke the shared provider implementation in a trusted host, store tokens securely, and return only non-secret metadata. API-key actions likewise validate and store the key in the host boundary. Closing the dialog aborts an active authorization through `execute(action, { signal })`; host IPC must propagate cancellation.
 
 ## Trusted authorization
 
-`@model-auth/providers` contains actual vendor authorization. WorkBuddy uses state issuance, a validated browser login URL, a private cookie jar, bounded token polling, profile lookup, and renewable tokens. Redirects never receive credential headers, and errors contain only safe codes. Account IDs, encrypted persistence, and pool routing remain host-owned. Use the same credential ID for renewal, reconnect, request routing, and removal.
+`@model-auth/providers` contains OpenAI, Anthropic, WorkBuddy and Trae authorization. OpenAI and Anthropic share PKCE, bounded loopback callback handling and renewable-token validation. WorkBuddy uses state issuance, a validated browser login URL, a private cookie jar, bounded token polling, profile lookup, and renewable tokens. Redirects never receive credential headers, and errors contain only safe codes. Account IDs, encrypted persistence, and pool routing remain host-owned. Use the same credential ID for renewal, reconnect, request routing, and removal.
 
-The package is not renderer-safe: import it only in the Electron main process or a trusted service. Tauri hosts retain native Rust protocol and OS keyring implementations while consuming the shared presentation contract.
+The package is not renderer-safe: import it only in the Electron main process or a trusted service. Native hosts use the Rust library in `oauth/rust` and keep browser opening, encrypted storage and cancellation wiring in their backend.
 
 ## Standalone Custom Element
 
@@ -34,4 +34,4 @@ The Vue entry exports `ModelAuthDialog`, messages and public types, and includes
 
 ## Host boundary
 
-The boundary is one-way for secrets. A host adapter may receive secrets internally, but `ProviderAdapterHost.authorize()` and `refresh()` must return sanitized metadata. `createWorkBuddyAdapter` and `createTraeAdapter` validate that metadata against their capability descriptors; they do not know OAuth endpoints, API-key formats, browser APIs, or keychain APIs.
+The boundary is one-way for secrets. A host adapter may receive secrets internally, but `ProviderAdapterHost.authorize()` and `refresh()` must return sanitized metadata. `createOpenAIAdapter`, `createAnthropicAdapter`, `createWorkBuddyAdapter` and `createTraeAdapter` validate that metadata against their capability descriptors; they do not know OAuth endpoints, API-key formats, browser APIs, or keychain APIs.

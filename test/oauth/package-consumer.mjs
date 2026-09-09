@@ -7,7 +7,7 @@ import { createContext, runInContext } from "node:vm";
 import { createRequire } from "node:module";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../oauth");
-const output = resolve(dirname(fileURLToPath(import.meta.url)), ".output");
+const output = resolve(dirname(fileURLToPath(import.meta.url)), "../artifacts/oauth-packages");
 const require = createRequire(join(root, "package.json"));
 const { Window } = require("happy-dom");
 mkdirSync(output, { recursive: true });
@@ -19,8 +19,10 @@ assert.ok(pnpm, "Run through pnpm test:packages");
 for (const name of ["core", "vue", "providers"]) {
   execFileSync(process.execPath, [pnpm, "--dir", join(root, "packages", name), "pack", "--pack-destination", archives], { stdio: "pipe" });
 }
-const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
-const files = ["core", "vue", "providers"].map(name => join(archives, "model-auth-" + name + "-" + version + ".tgz"));
+const files = ["core", "vue", "providers"].map(name => {
+  const version = JSON.parse(readFileSync(join(root, "packages", name, "package.json"), "utf8")).version;
+  return join(archives, "model-auth-" + name + "-" + version + ".tgz");
+});
 for (const archive of files) assert.ok(existsSync(archive));
 const consumer = join(run, "app");
 mkdirSync(consumer);
@@ -67,17 +69,24 @@ import { ModelAuthDialog, type ModelAuthProvider } from "@model-auth/vue";
 import { registerModelAuthElement } from "@model-auth/vue/custom-element";
 import { CredentialRouter, createCredentialMetadata } from "@model-auth/core";
 import { authorizeWorkBuddy, refreshWorkBuddy } from "@model-auth/providers/workbuddy";
+import { authorizeOpenAI, refreshOpenAI } from "@model-auth/providers/openai";
+import { authorizeAnthropic, refreshAnthropic } from "@model-auth/providers/anthropic";
 import { authorizeTrae, refreshTrae, listTraeModels, streamTrae } from "@model-auth/providers/trae";
 const providers: ModelAuthProvider[] = [];
 const router = new CredentialRouter([createCredentialMetadata({ id: "one", providerId: "sample", authMethod: "api-key", modelIds: ["sample"] })]);
-void [providers, router, ModelAuthDialog, registerModelAuthElement, authorizeWorkBuddy, refreshWorkBuddy, authorizeTrae, refreshTrae, listTraeModels, streamTrae];
+void [providers, router, ModelAuthDialog, registerModelAuthElement, authorizeWorkBuddy, refreshWorkBuddy, authorizeTrae, refreshTrae, listTraeModels, streamTrae, authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic];
 `);
 execFileSync(process.execPath, [join(root, "node_modules/typescript/bin/tsc"), "--noEmit", "--strict", "--skipLibCheck", "--moduleResolution", "bundler", "--module", "esnext", "--target", "es2023", join(consumer, "entry.ts")], { stdio: "pipe", cwd: consumer });
 execFileSync(process.execPath, [join(root, "node_modules/typescript/bin/tsc"), "--noEmit", "--strict", "--skipLibCheck", "--moduleResolution", "node", "--module", "commonjs", "--target", "es2023", join(consumer, "entry.ts")], { stdio: "pipe", cwd: consumer });
 execFileSync(process.execPath, ["--input-type=module", "-e", `
 import { CredentialRouter, createCredentialMetadata } from "@model-auth/core";
 import { authorizeWorkBuddy, refreshWorkBuddy } from "@model-auth/providers/workbuddy";
+import { authorizeOpenAI, refreshOpenAI } from "@model-auth/providers/openai";
+import { authorizeAnthropic, refreshAnthropic } from "@model-auth/providers/anthropic";
 if (typeof authorizeWorkBuddy !== "function" || typeof refreshWorkBuddy !== "function") throw new Error("Installed providers unavailable");
+for (const provider of [authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic]) {
+  if (typeof provider !== "function") throw new Error("Installed browser OAuth unavailable");
+}
 const router = new CredentialRouter([createCredentialMetadata({ id: "one", providerId: "sample", authMethod: "api-key", modelIds: ["sample"] })]);
 if (router.candidates({ providerId: "sample", modelId: "sample" })[0]?.id !== "one") throw new Error("Installed core cannot route");
 `], { stdio: "pipe", cwd: consumer });

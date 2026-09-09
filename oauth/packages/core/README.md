@@ -18,4 +18,4 @@ const [candidate] = router.candidates({ providerId: "workbuddy", modelId: "glm-5
 
 The host looks up the secret by `candidate.id`; no secret is passed to this package.
 
-OAuth authorization, API-key validation, secret storage, network access, and provider endpoints remain host responsibilities. See the local integration guides for adapter boundaries.
+OAuth authorization uses the providers package in the trusted host. API-key validation, secret storage and model requests remain host responsibilities. See the local integration guides for adapter boundaries.
