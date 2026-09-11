@@ -6,7 +6,7 @@ publish = false
 
 [dev-dependencies]
 base64 = "0.22"
-model-auth-native = { path = "../../oauth/rust" }
+model-auth-native = { path = "../../model-auth/rust" }
 url = "2.5"
 serde_json = "1"
 sha2 = "0.10"

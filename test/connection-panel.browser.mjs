@@ -5,7 +5,7 @@ import { extname, join, normalize } from "node:path";
 import { chromium } from "@playwright/test";
 
 const root = process.cwd();
-const dist = join(root, "oauth/packages/vue/dist");
+const dist = join(root, "model-auth/packages/vue/dist");
 const artifact = join(root, "test/artifacts");
 const fixture = JSON.stringify([
   { id: "oauth", name: "OAuth service", description: "OAuth", authMethods: ["oauth"], available: true, models: Array.from({ length: 30 }, (_, index) => `very-long-model-name-${index}-abcdefghijklmnopqrstuvwxyz`), loadStrategy: "weighted-round-robin", oauthCredentials: [{ id: "oauth-1", label: "Primary", account: "person@example.test", enabled: true, healthy: true, weight: 2, models: ["o-model"] }, { id: "oauth-2", label: "Paused", enabled: false, healthy: false, weight: 3, models: ["o-model"] }] },

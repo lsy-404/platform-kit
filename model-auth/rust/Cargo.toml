@@ -1,0 +1,17 @@
+[package]
+name = "model-auth-native"
+version = "0.5.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Backend-safe browser OAuth protocol for OpenAI Codex and Anthropic"
+repository = "https://github.com/lsy-404/platform-kit"
+documentation = "https://github.com/lsy-404/platform-kit/tree/main/model-auth/rust"
+
+[dependencies]
+base64 = "0.22"
+serde_json = "1"
+sha2 = "0.10"
+ureq = { version = "2.12", default-features = true }
+url = "2.5"
+uuid = { version = "1.18", features = ["v4"] }
+zeroize = "1.8"

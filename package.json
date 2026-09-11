@@ -1,6 +1,6 @@
 {
   "name": "platform-kit",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "license": "Apache-2.0",
   "packageManager": "pnpm@10.17.1",
@@ -8,10 +8,10 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "pnpm -r --if-present build && pnpm --dir oauth build",
-    "typecheck": "pnpm --filter @platform-kit/fluent build && pnpm -r --if-present typecheck && pnpm --dir oauth typecheck",
-    "test": "vitest run && pnpm --dir oauth test",
-    "check": "pnpm --dir oauth install --frozen-lockfile && pnpm typecheck && pnpm test && pnpm build",
+    "build": "pnpm -r --if-present build && pnpm --dir model-auth build",
+    "typecheck": "pnpm --filter @platform-kit/fluent build && pnpm -r --if-present typecheck && pnpm --dir model-auth typecheck",
+    "test": "vitest run && pnpm --dir model-auth test",
+    "check": "pnpm --dir model-auth install --frozen-lockfile && pnpm typecheck && pnpm test && pnpm build",
     "pack:release": "node scripts/pack-release.mjs"
   },
   "devDependencies": {

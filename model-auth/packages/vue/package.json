@@ -1,0 +1,50 @@
+{
+  "name": "@model-auth/vue",
+  "version": "0.5.0",
+  "description": "Vue dialogs and custom elements for public AI provider access.",
+  "type": "module",
+  "main": "./dist/model-auth-vue.js",
+  "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "custom-element": [
+        "dist/custom-element.d.ts"
+      ]
+    }
+  },
+  "license": "Apache-2.0",
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md",
+    "THIRD-PARTY.md"
+  ],
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/model-auth-vue.js"
+    },
+    "./custom-element": {
+      "types": "./dist/custom-element.d.ts",
+      "import": "./dist/model-auth-element.js"
+    },
+    "./style.css": "./dist/model-auth.css"
+  },
+  "scripts": {
+    "build": "vite build && vite build --config vite.element.config.ts && vue-tsc -p tsconfig.build.json --emitDeclarationOnly",
+    "dev": "vite",
+    "typecheck": "vue-tsc -p tsconfig.json --noEmit"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "6.0.8",
+    "vite": "8.2.2",
+    "vue": "3.5.42",
+    "vue-tsc": "3.3.11"
+  }
+}

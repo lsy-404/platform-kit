@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 const output=resolve('release');
 await mkdir(output,{recursive:true});
-const targets=['styles/fluent','styles/ui-tokens','oauth/packages/core','oauth/packages/providers','oauth/packages/vue'];
+const targets=['styles/fluent','styles/ui-tokens','model-auth/packages/core','model-auth/packages/providers','model-auth/packages/vue'];
 const archives=[];
 for(const target of targets){
  const source=resolve(target);const stage=resolve(output,'.stage',target.replaceAll('/','-'));
@@ -23,7 +23,7 @@ for(const target of targets){
  if(!listing.includes('package/LICENSE') || /(?:^|\/)(?:agents|inventory|kits|\.env|node_modules)(?:\/|$)|IRIS-LICENSE/.test(listing))throw new Error('Package archive boundary violation');
  archives.push(archive);
 }
-const nativeSource=resolve('oauth/rust');
+const nativeSource=resolve('model-auth/rust');
 execFileSync('cargo',['package','--manifest-path',resolve(nativeSource,'Cargo.toml'),'--locked','--allow-dirty'],{stdio:'inherit'});
 const nativeVersion=(await readFile(resolve(nativeSource,'Cargo.toml'),'utf8')).match(/^version\s*=\s*"([^"]+)"/m)?.[1];
 if(!nativeVersion)throw new Error('Native package version is required');

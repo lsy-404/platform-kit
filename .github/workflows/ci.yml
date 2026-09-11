@@ -18,11 +18,11 @@ jobs:
           node-version: 24
       - run: corepack enable
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --dir oauth install --frozen-lockfile
+      - run: pnpm --dir model-auth install --frozen-lockfile
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
-      - run: cargo fmt --manifest-path oauth/rust/Cargo.toml -- --check
+      - run: cargo fmt --manifest-path model-auth/rust/Cargo.toml -- --check
       - run: cargo test --manifest-path test/rust/Cargo.toml --locked
       - run: node test/public-boundary.mjs
       - run: pnpm typecheck
@@ -62,5 +62,5 @@ jobs:
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             echo "Release already exists; keeping published archives unchanged."
           else
-            gh release create "$RELEASE_TAG" release/*.tgz release/*.crate release/SHA256SUMS --verify-tag --title "$RELEASE_TAG" --notes "Apache-2.0 theme and complete OAuth packages. Install the archives directly from this repository."
+            gh release create "$RELEASE_TAG" release/*.tgz release/*.crate release/SHA256SUMS --verify-tag --title "$RELEASE_TAG" --notes "Apache-2.0 theme and complete public AI access packages. Install the archives directly from this repository."
           fi

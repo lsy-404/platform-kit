@@ -1,0 +1,20 @@
+# @model-auth/vue
+
+Persistent connection information and a separate authorization dialog, with a default Fluent-style theme.
+
+```ts
+import { ModelConnectionPanel, ModelAuthDialog, useModelAuth } from "@model-auth/vue";
+import { registerModelConnectionPanelElement, registerModelAuthElement } from "@model-auth/vue/custom-element";
+```
+
+Pass the host state to `ModelConnectionPanel` (`providers`, `model`, `busy`, `error`). Its `manage` event carries `{ providerId, method }`; pass that value as `ModelAuthDialog.initialConnection` to open the saved connection directly. The `add` event opens the dialog with `initialConnection: null`. Handle `refresh` by reloading host state. Custom-element events carry Vue argument arrays in `event.detail`.
+
+Load saved state when the host page mounts and update it after account operations. The panel keeps disabled, unhealthy and temporarily unavailable connections visible. The information dialog exposes safe account metadata, models, status, weights and routing strategy; management actions remain in this view instead of advancing through the authorization wizard.
+
+Credentials remain in the host. Handle authentication/API-key events and update controlled provider data after operations succeed. Dynamic provider prompts and notices are exposed through `auth` state and the `respond-auth`/`cancel-auth` events. Never pass tokens, cookies, or API-key values as connection metadata; use `extend` only for non-sensitive scalar context.
+
+The Vue entry includes styles. The standalone entry bundles Vue and Shadow DOM styles. Pass `styled=false` to disable the theme, or override CSS variables, `::part()` and Vue slots.
+
+Licensed under Apache-2.0. The standalone custom-element bundle includes Vue; see THIRD-PARTY.md.
+
+Saved connection details and the final authorization step offer models from saved credentials. Selection emits `select-model` and reflects the host-confirmed `model` prop. Disabled, unhealthy, cooling, and unavailable connections remain visible but cannot be selected. `useModelAuth` keeps the dialog open after a successful selection; Confirm and Close finish the dialog explicitly.

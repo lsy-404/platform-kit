@@ -1,0 +1,85 @@
+{
+  "name": "@model-auth/providers",
+  "version": "0.5.0",
+  "description": "Host-side AI provider access, authentication, requests and usage queries.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "workbuddy": [
+        "dist/workbuddy.d.ts"
+      ],
+      "trae": [
+        "dist/trae.d.ts"
+      ],
+      "openai": [
+        "dist/openai.d.ts"
+      ],
+      "anthropic": [
+        "dist/anthropic.d.ts"
+      ],
+      "grok": [
+        "dist/grok.d.ts"
+      ],
+      "ollama": [
+        "dist/ollama.d.ts"
+      ],
+      "usage": [
+        "dist/usage.d.ts"
+      ]
+    }
+  },
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md",
+    "THIRD-PARTY.md"
+  ],
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./workbuddy": {
+      "types": "./dist/workbuddy.d.ts",
+      "import": "./dist/workbuddy.js"
+    },
+    "./trae": {
+      "types": "./dist/trae.d.ts",
+      "import": "./dist/trae.js"
+    },
+    "./openai": {
+      "types": "./dist/openai.d.ts",
+      "import": "./dist/openai.js"
+    },
+    "./anthropic": {
+      "types": "./dist/anthropic.d.ts",
+      "import": "./dist/anthropic.js"
+    },
+    "./grok": {
+      "types": "./dist/grok.d.ts",
+      "import": "./dist/grok.js"
+    },
+    "./ollama": {
+      "types": "./dist/ollama.d.ts",
+      "import": "./dist/ollama.js"
+    },
+    "./usage": {
+      "types": "./dist/usage.d.ts",
+      "import": "./dist/usage.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "tough-cookie": "6.0.2"
+  }
+}
