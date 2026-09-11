@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from "vue";
 import { defaultMessages, type ModelAuthMessages } from "./messages";
 import StrategyPicker from "./StrategyPicker.vue";
 import ModelPicker from "./ModelPicker.vue";
+import { formatPercentage } from "./percentage";
 import type {
   AddApiKeyPayload, AuthMethod, CredentialExtend, CredentialUpdatePayload, CatalogStatus, LoadStrategy,
   ModelAuthProvider, ModelAuthSelection, ModelConnectionTarget, ProviderAuthResponseRequest, ProviderAuthState, ProviderCredential, ProviderAuthNotice, ProviderUpdatePayload, StrategyUpdatePayload, Theme, CredentialUsageEstimate,
@@ -19,6 +20,7 @@ const props = withDefaults(defineProps<{
   loadStrategy?: LoadStrategy;
   catalogStatus?: CatalogStatus;
   messages?: Partial<ModelAuthMessages>;
+  percentagePrecision?: number;
   busy?: boolean;
   error?: string | null;
   auth?: ProviderAuthState;
@@ -26,6 +28,7 @@ const props = withDefaults(defineProps<{
   open: false, providers: () => [], styled: true, theme: "system", initialMethod: "oauth", initialConnection: null,
   model: null, loadStrategy: "round-robin", catalogStatus: () => ({ state: "loading" }),
   messages: () => ({}), busy: false, error: null,
+  percentagePrecision: 2,
   auth: () => ({ status: "idle", loginId: null, notices: [], prompt: null, error: null }),
 });
 const emit = defineEmits<{
@@ -242,8 +245,11 @@ function queryUsage(credential: ProviderCredential) {
   emit("query-usage", provider.id, credential.id);
 }
 function usageEstimateText(estimate: CredentialUsageEstimate): string {
-  const remaining = estimate.remainingPercent === null ? text.value.remainingUnknown : `${estimate.remainingPercent}%`;
+  const remaining = estimate.remainingPercent === null ? text.value.remainingUnknown : `${formatPercentage(estimate.remainingPercent, props.percentagePrecision)}%`;
   return text.value.usageEstimate.replace("{tokens}", new Intl.NumberFormat().format(estimate.windowTokens)).replace("{remaining}", remaining);
+}
+function usagePercentText(value: number | null): string {
+  return value === null ? "—" : formatPercentage(value, props.percentagePrecision) + "%";
 }
 function noticeText(notice: ProviderAuthNotice): string {
   if (notice.type === "device_code") return `${text.value.authDeviceCode}: ${notice.userCode} · ${notice.verificationUri}`;
@@ -473,7 +479,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                 <div v-if="credential.usage" class="model-auth-usage" data-part="credential-usage">
                   <span v-if="credential.usage.plan">{{ credential.usage.plan }}</span>
                   <span v-if="credential.usage.balance">{{ credential.usage.balance.amount }} {{ credential.usage.balance.unit }}</span>
-                  <span v-for="window in credential.usage.windows" :key="window.id">{{ window.label }} · {{ window.usedPercent === null ? '—' : window.usedPercent.toFixed(1) + '%' }}</span>
+                  <span v-for="window in credential.usage.windows" :key="window.id">{{ window.label }} · {{ usagePercentText(window.usedPercent) }}</span>
                   <span v-if="credential.usage.estimate">{{ usageEstimateText(credential.usage.estimate) }}</span>
                   <span v-if="credential.usage.error">{{ credential.usage.error }}</span>
                 </div>
