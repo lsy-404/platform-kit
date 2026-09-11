@@ -15,6 +15,8 @@ Credentials remain in the host. Handle authentication/API-key events and update 
 
 The Vue entry includes styles. The standalone entry bundles Vue and Shadow DOM styles. Pass `styled=false` to disable the theme, or override CSS variables, `::part()` and Vue slots.
 
+`ModelAuthDialog` accepts `percentagePrecision`: `0` shows whole percentages, `-1` keeps the full meaningful decimal representation, and any other non-negative integer sets fixed decimal places. The default is `2`.
+
 Licensed under Apache-2.0. The standalone custom-element bundle includes Vue; see THIRD-PARTY.md.
 
 Saved connection details and the final authorization step offer models from saved credentials. Selection emits `select-model` and reflects the host-confirmed `model` prop. Disabled, unhealthy, cooling, and unavailable connections remain visible but cannot be selected. `useModelAuth` keeps the dialog open after a successful selection; Confirm and Close finish the dialog explicitly.
