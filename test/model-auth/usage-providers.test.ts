@@ -51,11 +51,12 @@ describe("provider usage adapters", () => {
     expect(codex.plan).toBe("pro");
     expect(codex.planMultiplier).toBe(5);
     expect(codex.windows.map(window => window.usedPercent)).toEqual([42, 10]);
+    expect(codex.windows.map(window => window.remainingPercent)).toEqual([58, 90]);
     expect(codex.balance).toEqual({ amount: 12.5, unit: "credits" });
 
     const anthropic = parseAnthropicUsage({ subscription_type: "max", five_hour: { utilization: 120, resets_at: "2030-02-03T04:05:06Z" } });
     expect(anthropic.plan).toBe("max");
-    expect(anthropic.windows[0]).toMatchObject({ id: "five_hour", usedPercent: 100, resetAt: Date.parse("2030-02-03T04:05:06Z") });
+    expect(anthropic.windows[0]).toMatchObject({ id: "five_hour", usedPercent: 100, remainingPercent: 0, resetAt: Date.parse("2030-02-03T04:05:06Z") });
     expect(JSON.stringify(anthropic)).not.toMatch(/access|refresh|token|secret/i);
   });
 
@@ -113,13 +114,13 @@ describe("provider usage adapters", () => {
       prepaidBalance: { val: 4 },
     } });
     expect(weekly).toMatchObject({ plan: "SuperGrok Heavy", status: "ok", balance: { amount: 4, unit: "credits" } });
-    expect(weekly.windows[0]).toMatchObject({ label: "Weekly credits", usedPercent: 37.5 });
+    expect(weekly.windows[0]).toMatchObject({ label: "Weekly credits", usedPercent: 37.5, remainingPercent: 62.5 });
 
     const monthly = parseGrokBilling({ config: {
       currentPeriod: { start: "2026-09-01T00:00:00Z", end: "2026-10-01T00:00:00Z" },
       monthlyLimit: { val: 100 }, usage: { includedUsed: { val: 12 } },
     } });
-    expect(monthly.windows[0]).toMatchObject({ id: "included", usedPercent: 12, remaining: 88 });
+    expect(monthly.windows[0]).toMatchObject({ id: "included", usedPercent: 12, remainingPercent: 88, remaining: 88 });
 
     const unknown = parseGrokBilling({ config: { currentPeriod: { start: "2026-09-01T00:00:00Z", end: "2026-10-01T00:00:00Z" } } });
     expect(unknown.status).toBe("unknown");
@@ -136,7 +137,7 @@ describe("provider usage adapters", () => {
       },
     });
     expect(usage).toMatchObject({ providerId: "grok", credentialId: "account-1", status: "ok" });
-    expect(usage.windows[0]).toMatchObject({ usedPercent: 25, remaining: 75 });
+    expect(usage.windows[0]).toMatchObject({ usedPercent: 25, remainingPercent: 75, remaining: 75 });
     expect(calls.map(call => call.url)).toEqual([GROK_ENDPOINTS.billing, GROK_ENDPOINTS.billingDefault]);
     expect(calls[0]!.headers.get("authorization")).toBe("Bearer oauth-access");
     expect(calls[0]!.headers.get("x-xai-token-auth")).toBe("xai-grok-cli");
@@ -149,7 +150,7 @@ describe("provider usage adapters", () => {
     const parsed = parseOllamaSettings(html);
     expect(parsed).toMatchObject({ plan: "Pro", status: "ok" });
     expect(parsed.windows).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: "included", usedPercent: 12.5, limit: 60, remaining: 52.5, unit: "USD" }),
+      expect.objectContaining({ id: "included", usedPercent: 12.5, remainingPercent: 87.5, limit: 60, remaining: 52.5, unit: "USD" }),
       expect.objectContaining({ id: "session", usedPercent: 12.5 }),
       expect.objectContaining({ id: "weekly", usedPercent: 40 }),
     ]));

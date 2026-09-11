@@ -95,7 +95,8 @@ export function parseOllamaSettings(html: string): ProviderUsageData {
     const used = parseMoney(money[1]);
     const limit = parseMoney(money[2]);
     if (used !== null && limit !== null && limit > 0) {
-      windows.push({ id: "included", label: "Monthly included", usedPercent: ratioPercent(used, limit), resetAt: resetAtNear(source, source.search(/included usage|monthly included|included credits/i)), used, limit, remaining: Math.max(0, limit - used), unit: "USD" });
+      const usedPercent = ratioPercent(used, limit);
+      windows.push({ id: "included", label: "Monthly included", usedPercent, remainingPercent: 100 - usedPercent, resetAt: resetAtNear(source, source.search(/included usage|monthly included|included credits/i)), used, limit, remaining: Math.max(0, limit - used), unit: "USD" });
     }
   }
   for (const [id, label, pattern] of [

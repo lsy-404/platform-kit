@@ -108,12 +108,12 @@ export function parseGrokBilling(payload: unknown): ProviderUsageData {
   const prepaid = amount(config.prepaidBalance ?? config.prepaid_balance);
   const windows: ProviderUsageWindow[] = [];
   if (periodIsCurrent && explicitPercent !== null) {
-    windows.push({ id: "credits", label: periodLabel(periodStart, resetAt), usedPercent: explicitPercent, resetAt });
+    windows.push({ id: "credits", label: periodLabel(periodStart, resetAt), usedPercent: explicitPercent, remainingPercent: 100 - explicitPercent, resetAt });
   } else if (periodIsCurrent && monthlyLimit !== null && monthlyLimit > 0 && includedUsed !== null) {
-    windows.push({ id: "included", label: "Monthly included", usedPercent: ratioPercent(includedUsed, monthlyLimit), resetAt,
+    windows.push({ id: "included", label: "Monthly included", usedPercent: ratioPercent(includedUsed, monthlyLimit), remainingPercent: 100 - ratioPercent(includedUsed, monthlyLimit), resetAt,
       used: includedUsed, limit: monthlyLimit, remaining: Math.max(0, monthlyLimit - includedUsed), unit: "credits" });
   } else if (periodIsCurrent && onDemandCap !== null && onDemandCap > 0 && onDemandUsed !== null) {
-    windows.push({ id: "on-demand", label: "On-demand", usedPercent: ratioPercent(onDemandUsed, onDemandCap), resetAt,
+    windows.push({ id: "on-demand", label: "On-demand", usedPercent: ratioPercent(onDemandUsed, onDemandCap), remainingPercent: 100 - ratioPercent(onDemandUsed, onDemandCap), resetAt,
       used: onDemandUsed, limit: onDemandCap, remaining: Math.max(0, onDemandCap - onDemandUsed), unit: "credits" });
   }
   const plan = firstText(config.subscriptionTierDisplay, config.subscription_tier_display, config.subscriptionTier, config.subscription_tier, config.plan, root.plan);

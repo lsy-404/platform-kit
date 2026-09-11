@@ -1,6 +1,6 @@
 {
   "name": "@model-auth/vue",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Vue dialogs and custom elements for public AI provider access.",
   "type": "module",
   "main": "./dist/model-auth-vue.js",

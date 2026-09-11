@@ -20,7 +20,7 @@ export const defaultMessages = {
   credentials: "已保存凭据", oauthEnabled: "启用此提供商的 OAuth", ready: "可用", needsReconnect: "需要重新连接",
   cooling: "冷却至", modelCount: "个模型", oauthCount: "个 OAuth 账号", apiKeyCount: "个 API Key",
   working: "正在处理…", current: "当前使用", weightInvalid: "权重必须是 1–100 的整数。",
-  queryUsage: "查询用量", refreshUsage: "刷新用量", logout: "退出登录", extend: "附加信息", extendHint: "仅填写非敏感的标量 JSON 字段。", extendInvalid: "附加信息必须是标量 JSON 对象。",
+  queryUsage: "查询用量", refreshUsage: "刷新用量", usageEstimate: "估算窗口：{tokens} tokens · 剩余 {remaining}", remainingUnknown: "未知", logout: "退出登录", extend: "附加信息", extendHint: "仅填写非敏感的标量 JSON 字段。", extendInvalid: "附加信息必须是标量 JSON 对象。",
   authOpenBrowser: "打开认证页面", authChooseOption: "请选择", authSubmit: "提交", authCancel: "取消认证", authDeviceCode: "设备码",
   modelSearch: "搜索模型", select: "选择", emptyModels: "没有可用模型", enabledState: "开", disabledState: "关",
   configured: "已配置", strategyHint: "对当前提供商的所有已启用凭据生效。",
