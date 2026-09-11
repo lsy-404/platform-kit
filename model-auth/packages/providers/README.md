@@ -55,7 +55,7 @@ Model discovery returns the account's actual service metadata. `streamTrae` and 
 
 ## Grok access and usage
 
-`authorizeGrok` and `refreshGrok` provide the browser authentication lifecycle. `grokHeaders` binds a trusted-host request to the returned access token, and `queryGrokUsage` reads non-secret credit windows and balances from the provider billing surface.
+`authorizeGrok` and `refreshGrok` provide the browser authentication lifecycle. `grokHeaders` binds a trusted-host request to the returned access token, and `queryGrokUsage` reads non-secret credit windows and balances from the provider billing surface. All usage snapshots preserve source precision and may carry a host-owned token/request estimate.
 
 ## Ollama web session and usage
 

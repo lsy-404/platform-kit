@@ -54,7 +54,7 @@ const workBuddyHost: ProviderAdapterHost = {
 const workBuddy = createWorkBuddyAdapter(workBuddyHost);
 ```
 
-`host`, `signal`, `credentialId`, `verifiedModels`, and `hostSecureCredentialStore` above are host values. New accounts require distinct IDs; reconnect replaces the selected ID only. For API keys, validate and store the key in the host, then return metadata with `authMethod: "api-key"`; never put the key into `CredentialMetadata`. `extend` is a controlled scalar object for non-sensitive per-key context, not a secret bag.
+`host`, `signal`, `credentialId`, `verifiedModels`, and `hostSecureCredentialStore` above are host values. New accounts require distinct IDs; reconnect replaces the selected ID only. For API keys, validate and store the key in the host, then return metadata with `authMethod: "api-key"`; never put the key into `CredentialMetadata`. `extend` is a controlled scalar object for non-sensitive per-key context, not a secret bag. A host may attach its own `ProviderUsageEstimate` to a usage snapshot; token counts and learned limits must be labeled as estimates and unknown limits must stay `null`.
 
 Dynamic providers can use the interaction supplied to `authorize`:
 

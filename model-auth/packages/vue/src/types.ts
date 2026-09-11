@@ -40,11 +40,32 @@ export interface CredentialUsageWindow {
   id: string;
   label: string;
   usedPercent: number | null;
+  remainingPercent?: number | null;
   resetAt: number | null;
   used?: number | null;
   limit?: number | null;
   remaining?: number | null;
   unit?: string | null;
+}
+
+export type CredentialUsageEstimateSource = "configured" | "learned" | "unknown";
+export type CredentialUsageEstimateUnit = "tokens" | "requests";
+
+export interface CredentialUsageEstimate {
+  provider: string;
+  account: string;
+  windowHours: number;
+  unit: CredentialUsageEstimateUnit | null;
+  windowTokens: number;
+  windowRequests: number;
+  windowUsage: number;
+  limitEstimate: number | null;
+  remainingRatio: number | null;
+  remainingPercent: number | null;
+  confidence: CredentialUsageEstimateSource;
+  lowConfidence: boolean;
+  observations: number;
+  nextResetAt: number | null;
 }
 
 export interface CredentialUsage {
@@ -59,6 +80,7 @@ export interface CredentialUsage {
   metadataError?: string | null;
   windows: CredentialUsageWindow[];
   balance: { amount: number; unit: string } | null;
+  estimate?: CredentialUsageEstimate | null;
   fetchedAtUtc: string;
   error: string | null;
 }

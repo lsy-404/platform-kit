@@ -1,4 +1,4 @@
-export const MODEL_AUTH_VERSION = "0.5.1";
+export const MODEL_AUTH_VERSION = "0.5.2";
 
 export type AuthMethod = "oauth" | "api-key";
 export type ProviderAuthType = "oauth" | "api_key";
@@ -601,6 +601,7 @@ export interface ProviderUsageWindow {
   readonly id: string;
   readonly label: string;
   readonly usedPercent: number | null;
+  readonly remainingPercent?: number | null;
   readonly resetAt: number | null;
   readonly windowSeconds?: number;
   readonly used?: number | null;
@@ -612,6 +613,26 @@ export interface ProviderUsageWindow {
 export interface ProviderUsageBalance {
   readonly amount: number;
   readonly unit: string;
+}
+
+export type ProviderUsageEstimateSource = "configured" | "learned" | "unknown";
+export type ProviderUsageEstimateUnit = "tokens" | "requests";
+
+export interface ProviderUsageEstimate {
+  readonly provider: string;
+  readonly account: string;
+  readonly windowHours: number;
+  readonly unit: ProviderUsageEstimateUnit | null;
+  readonly windowTokens: number;
+  readonly windowRequests: number;
+  readonly windowUsage: number;
+  readonly limitEstimate: number | null;
+  readonly remainingRatio: number | null;
+  readonly remainingPercent: number | null;
+  readonly confidence: ProviderUsageEstimateSource;
+  readonly lowConfidence: boolean;
+  readonly observations: number;
+  readonly nextResetAt: number | null;
 }
 
 export interface ProviderUsageSnapshot {
@@ -626,6 +647,7 @@ export interface ProviderUsageSnapshot {
   readonly metadataError?: string | null;
   readonly windows: readonly ProviderUsageWindow[];
   readonly balance: ProviderUsageBalance | null;
+  readonly estimate?: ProviderUsageEstimate | null;
   readonly fetchedAtUtc: string;
   readonly error: string | null;
 }
@@ -716,6 +738,44 @@ function validateAdapterCredential(capability: ProviderCapabilityDescriptor, cre
   return cloneCredential(credential);
 }
 
+function validateUsageEstimate(estimate: ProviderUsageEstimate): ProviderUsageEstimate {
+  if (!estimate || typeof estimate !== "object"
+    || typeof estimate.provider !== "string" || !estimate.provider.trim()
+    || typeof estimate.account !== "string" || !estimate.account.trim()
+    || typeof estimate.windowHours !== "number" || !Number.isFinite(estimate.windowHours) || estimate.windowHours <= 0
+    || (estimate.unit !== null && estimate.unit !== "tokens" && estimate.unit !== "requests")
+    || typeof estimate.windowTokens !== "number" || !Number.isFinite(estimate.windowTokens) || estimate.windowTokens < 0
+    || typeof estimate.windowRequests !== "number" || !Number.isFinite(estimate.windowRequests) || estimate.windowRequests < 0
+    || typeof estimate.windowUsage !== "number" || !Number.isFinite(estimate.windowUsage) || estimate.windowUsage < 0
+    || (estimate.limitEstimate !== null && (typeof estimate.limitEstimate !== "number" || !Number.isFinite(estimate.limitEstimate) || estimate.limitEstimate < 0))
+    || (estimate.remainingRatio !== null && (typeof estimate.remainingRatio !== "number" || !Number.isFinite(estimate.remainingRatio) || estimate.remainingRatio < 0 || estimate.remainingRatio > 1))
+    || (estimate.remainingPercent !== null && (typeof estimate.remainingPercent !== "number" || !Number.isFinite(estimate.remainingPercent) || estimate.remainingPercent < 0 || estimate.remainingPercent > 100))
+    || (estimate.remainingRatio === null ? estimate.remainingPercent !== null : estimate.remainingPercent === null
+      || Math.abs(estimate.remainingPercent - estimate.remainingRatio * 100) > Number.EPSILON * Math.max(1, Math.abs(estimate.remainingPercent)))
+    || !["configured", "learned", "unknown"].includes(estimate.confidence)
+    || typeof estimate.lowConfidence !== "boolean"
+    || !Number.isInteger(estimate.observations) || estimate.observations < 0
+    || (estimate.nextResetAt !== null && (typeof estimate.nextResetAt !== "number" || !Number.isFinite(estimate.nextResetAt)))) {
+    throw new Error("adapter returned an invalid usage estimate");
+  }
+  return {
+    provider: estimate.provider.trim(),
+    account: estimate.account.trim(),
+    windowHours: estimate.windowHours,
+    unit: estimate.unit,
+    windowTokens: estimate.windowTokens,
+    windowRequests: estimate.windowRequests,
+    windowUsage: estimate.windowUsage,
+    limitEstimate: estimate.limitEstimate,
+    remainingRatio: estimate.remainingRatio,
+    remainingPercent: estimate.remainingPercent,
+    confidence: estimate.confidence,
+    lowConfidence: estimate.lowConfidence,
+    observations: estimate.observations,
+    nextResetAt: estimate.nextResetAt,
+  };
+}
+
 function validateUsageSnapshot(capability: ProviderCapabilityDescriptor, credentialId: string, snapshot: ProviderUsageSnapshot): ProviderUsageSnapshot {
   if (!snapshot || typeof snapshot !== "object" || snapshot.providerId !== capability.providerId
     || snapshot.credentialId !== credentialId || typeof snapshot.credentialId !== "string" || !snapshot.credentialId.trim()
@@ -735,6 +795,9 @@ function validateUsageSnapshot(capability: ProviderCapabilityDescriptor, credent
     if (!window || typeof window !== "object" || typeof window.id !== "string" || !window.id.trim()
       || typeof window.label !== "string" || !window.label.trim()
       || (window.usedPercent !== null && (typeof window.usedPercent !== "number" || !Number.isFinite(window.usedPercent) || window.usedPercent < 0 || window.usedPercent > 100))
+      || (window.remainingPercent !== undefined && window.remainingPercent !== null && (typeof window.remainingPercent !== "number" || !Number.isFinite(window.remainingPercent) || window.remainingPercent < 0 || window.remainingPercent > 100))
+      || (window.usedPercent !== null && window.remainingPercent !== undefined && window.remainingPercent !== null
+        && Math.abs(window.remainingPercent - (100 - window.usedPercent)) > Number.EPSILON * Math.max(1, Math.abs(window.remainingPercent)))
       || (window.resetAt !== null && (typeof window.resetAt !== "number" || !Number.isFinite(window.resetAt)))
       || (window.windowSeconds !== undefined && (typeof window.windowSeconds !== "number" || !Number.isFinite(window.windowSeconds) || window.windowSeconds <= 0))
       || (window.used !== undefined && window.used !== null && (typeof window.used !== "number" || !Number.isFinite(window.used)))
@@ -747,6 +810,7 @@ function validateUsageSnapshot(capability: ProviderCapabilityDescriptor, credent
       id: window.id.trim(),
       label: window.label.trim(),
       usedPercent: window.usedPercent,
+      ...(window.remainingPercent !== undefined ? { remainingPercent: window.remainingPercent } : {}),
       resetAt: window.resetAt,
       ...(window.windowSeconds !== undefined ? { windowSeconds: window.windowSeconds } : {}),
       ...(window.used !== undefined ? { used: window.used } : {}),
@@ -761,6 +825,7 @@ function validateUsageSnapshot(capability: ProviderCapabilityDescriptor, credent
     ? { amount: snapshot.balance.amount, unit: snapshot.balance.unit.trim() }
     : undefined;
   if (snapshot.balance !== null && !balance) throw new Error("adapter returned an invalid usage balance");
+  const estimate = snapshot.estimate === undefined ? undefined : snapshot.estimate === null ? null : validateUsageEstimate(snapshot.estimate);
   return {
     providerId: capability.providerId,
     credentialId: snapshot.credentialId,
@@ -773,6 +838,7 @@ function validateUsageSnapshot(capability: ProviderCapabilityDescriptor, credent
     ...(snapshot.metadataError !== undefined ? { metadataError: safeUsageText(snapshot.metadataError) } : {}),
     windows,
     balance: balance ?? null,
+    ...(estimate !== undefined ? { estimate } : {}),
     fetchedAtUtc: snapshot.fetchedAtUtc,
     error: safeUsageText(snapshot.error),
   };

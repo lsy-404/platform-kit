@@ -6,6 +6,8 @@
 
 `@model-auth/core` is framework-neutral. The host fetches a `models.dev` payload and passes it to `parseModelsDevPayload`; the core parser filters unusable providers and models and returns a stable catalog. `CatalogCache` can retain a cached or fallback snapshot while a live refresh runs. The core package does not fetch the source, persist credentials, open browsers, or call provider APIs.
 
+Usage snapshots expose validated provider windows, balances, and an optional `ProviderUsageEstimate`. The estimate carries observed token/request amounts, configured or learned limit data, confidence, and both a 0..1 `remainingRatio` and an unrounded 0..100 `remainingPercent`. Hosts attach estimates from their own transcript or request history; an unknown limit remains `null`.
+
 Credentials are non-secret metadata: an opaque host-owned ID, provider and authentication method, enabled state, independent weight, allowed model IDs, health state, and a validated scalar `extend` object for non-sensitive per-key context. `CredentialRouter` selects eligible credentials by provider and model using `round-robin`, `weighted-round-robin`, or stable-order `failover`. Enabled state and weight are independent: disabling a credential does not change its weight, and changing weight does not enable it.
 
 Use an explicit runtime binding when a host provider is not named exactly like its `models.dev` provider. `bindRuntimeProviders` accepts a catalog provider ID and an optional `includeModel` predicate, so one catalog entry can safely serve several host-specific runtime providers.

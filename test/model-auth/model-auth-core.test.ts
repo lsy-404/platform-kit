@@ -18,6 +18,7 @@ import {
   type CredentialMetadata,
   type ProviderAuthInteraction,
   type ProviderRequest,
+  type ProviderUsageEstimate,
 } from "../../model-auth/packages/core/src/index.js";
 
 const oauth = (id: string, models = ["shared"]): CredentialMetadata => createCredentialMetadata({
@@ -174,13 +175,18 @@ describe("model-auth core", () => {
   it("keeps authentication interaction, requests and usage on the trusted host boundary", async () => {
     const metadata = createCredentialMetadata({ id: "credential", providerId: "grok", authMethod: "oauth", modelIds: ["grok-build"], extend: { region: "us" } });
     const request: ProviderRequest = { modelId: "grok-build", input: { messages: [] } };
+    const estimate: ProviderUsageEstimate = {
+      provider: "grok", account: "default", windowHours: 5, unit: "tokens", windowTokens: 1234,
+      windowRequests: 12, windowUsage: 1234, limitEstimate: 10000, remainingRatio: 0.8766,
+      remainingPercent: 87.66, confidence: "learned", lowConfidence: false, observations: 3, nextResetAt: null,
+    };
     let received: ProviderAuthInteraction | undefined;
     let called: { credentialId: string; request: ProviderRequest } | undefined;
     const adapter = createGrokAdapter({
       async authorize(interaction) { received = interaction; return metadata; },
       async remove() {},
       async request(credentialId, value) { called = { credentialId, request: value }; return { output: "ok", modelId: value.modelId, finishReason: "stop" }; },
-      async queryUsage(credentialId) { return { providerId: "grok", credentialId, status: "unknown", plan: null, windows: [], balance: null, fetchedAtUtc: new Date().toISOString(), error: null }; },
+      async queryUsage(credentialId) { return { providerId: "grok", credentialId, status: "unknown", plan: null, windows: [], balance: null, estimate, fetchedAtUtc: new Date().toISOString(), error: null }; },
     });
     const interaction: ProviderAuthInteraction = {
       providerId: "grok", authType: "oauth", loginId: "login-1", notify() {}, prompt: async () => "value",
@@ -189,7 +195,12 @@ describe("model-auth core", () => {
     expect(received).toBe(interaction);
     await expect(adapter.host.request?.("credential", request, {})).resolves.toEqual({ output: "ok", modelId: "grok-build", finishReason: "stop" });
     expect(called).toEqual({ credentialId: "credential", request });
-    await expect(adapter.host.queryUsage?.("credential")).resolves.toMatchObject({ providerId: "grok", status: "unknown" });
+    await expect(adapter.host.queryUsage?.("credential")).resolves.toMatchObject({ providerId: "grok", status: "unknown", estimate });
+    await expect(createGrokAdapter({
+      async authorize() { return metadata; },
+      async remove() {},
+      async queryUsage(credentialId) { return { providerId: "grok", credentialId, status: "unknown", plan: null, windows: [], balance: null, estimate: { ...estimate, remainingPercent: 87.6 }, fetchedAtUtc: new Date().toISOString(), error: null }; },
+    }).host.queryUsage?.("credential")).rejects.toThrow("invalid usage estimate");
   });
 
   it("validates and serializes only non-sensitive scalar extend fields", () => {

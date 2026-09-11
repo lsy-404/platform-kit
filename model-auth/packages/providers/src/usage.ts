@@ -4,6 +4,7 @@ export interface ProviderUsageWindow {
   readonly id: string;
   readonly label: string;
   readonly usedPercent: number | null;
+  readonly remainingPercent?: number | null;
   readonly resetAt: number | null;
   readonly windowSeconds?: number;
   readonly used?: number | null;
@@ -17,6 +18,26 @@ export interface ProviderUsageBalance {
   readonly unit: string;
 }
 
+export type ProviderUsageEstimateSource = "configured" | "learned" | "unknown";
+export type ProviderUsageEstimateUnit = "tokens" | "requests";
+
+export interface ProviderUsageEstimate {
+  readonly provider: string;
+  readonly account: string;
+  readonly windowHours: number;
+  readonly unit: ProviderUsageEstimateUnit | null;
+  readonly windowTokens: number;
+  readonly windowRequests: number;
+  readonly windowUsage: number;
+  readonly limitEstimate: number | null;
+  readonly remainingRatio: number | null;
+  readonly remainingPercent: number | null;
+  readonly confidence: ProviderUsageEstimateSource;
+  readonly lowConfidence: boolean;
+  readonly observations: number;
+  readonly nextResetAt: number | null;
+}
+
 export interface ProviderUsageData {
   readonly status?: ProviderUsageStatus;
   readonly plan: string | null;
@@ -27,6 +48,7 @@ export interface ProviderUsageData {
   readonly metadataError?: string | null;
   readonly windows: readonly ProviderUsageWindow[];
   readonly balance: ProviderUsageBalance | null;
+  readonly estimate?: ProviderUsageEstimate | null;
   readonly error?: string | null;
 }
 
@@ -74,8 +96,14 @@ export function usageSnapshot(providerId: string, credentialId: string, data: Pr
     ...(data.subscriptionRenewsAt !== undefined ? { subscriptionRenewsAt: data.subscriptionRenewsAt } : {}),
     ...(data.subscriptionExpiresAt !== undefined ? { subscriptionExpiresAt: data.subscriptionExpiresAt } : {}),
     ...(data.metadataError !== undefined ? { metadataError: data.metadataError } : {}),
-    windows: data.windows.map((window) => ({ ...window })),
+    windows: data.windows.map((window) => ({
+      ...window,
+      ...(window.remainingPercent === undefined && window.usedPercent !== null
+        ? { remainingPercent: 100 - window.usedPercent }
+        : {}),
+    })),
     balance: data.balance ? { ...data.balance } : null,
+    ...(data.estimate !== undefined ? { estimate: data.estimate ? { ...data.estimate } : null } : {}),
     fetchedAtUtc: new Date().toISOString(),
     error: data.error ?? null,
   };
@@ -123,6 +151,7 @@ function windowFrom(id: string, label: string, value: unknown): ProviderUsageWin
     id,
     label,
     usedPercent,
+    remainingPercent: usedPercent === null ? null : 100 - usedPercent,
     resetAt: timestamp(row.reset_at ?? row.resetAt ?? row.resets_at),
     ...(numberValue(row.limit_window_seconds, row.window_seconds) !== null ? { windowSeconds: numberValue(row.limit_window_seconds, row.window_seconds) as number } : {}),
     ...(used !== null ? { used } : {}),

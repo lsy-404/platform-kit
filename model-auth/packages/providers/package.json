@@ -1,6 +1,6 @@
 {
   "name": "@model-auth/providers",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Host-side AI provider access, authentication, requests and usage queries.",
   "type": "module",
   "main": "./dist/index.js",
