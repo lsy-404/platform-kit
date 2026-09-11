@@ -37,7 +37,7 @@ The same composable can be used in each Vue host. It never logs action payloads 
 | `auth` | idle state | Dynamic authentication notices and current prompt |
 | `messages` | Chinese defaults | Override any visible string |
 
-An available provider can support browser authentication, API keys or both. `oauthEnabled=false` disables the provider's browser authentication independently of its individual credential preferences. Each credential has `enabled`, `weight`, health state, optional `usage`, and optional scalar `extend` metadata. Supply discovered `models` on credentials to restrict eligibility; only explicitly healthy and enabled credentials can expose models for selection.
+An available provider can support browser authentication, API keys or both. `oauthEnabled=false` disables the provider's browser authentication independently of its individual credential preferences. Set `usageEnabled` or `logoutEnabled` only when the host handles those actions. Each credential has `enabled`, `weight`, health state, optional `usage`, and optional scalar `extend` metadata. Supply discovered `models` on credentials to restrict eligibility; only explicitly healthy and enabled credentials can expose models for selection.
 
 ## Events
 

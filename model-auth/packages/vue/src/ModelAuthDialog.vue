@@ -238,7 +238,7 @@ function updateExtend(credential: ProviderCredential, value: string) {
 }
 function queryUsage(credential: ProviderCredential) {
   const provider = selectedProvider.value;
-  if (!provider || props.busy) return;
+  if (!provider || props.busy || (!provider.usageEnabled && !credential.usage)) return;
   emit("query-usage", provider.id, credential.id);
 }
 function noticeText(notice: ProviderAuthNotice): string {
@@ -457,8 +457,8 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                 <div class="model-auth-credential-actions">
                   <label class="model-auth-weight">{{ text.weight }}<input :value="credential.weight" :disabled="busy" type="number" min="1" max="100" step="1" :aria-label="text.weight + ' ' + credential.label" @change="updateCredential(credential, credential.enabled, Number(($event.target as HTMLInputElement).value))" /></label>
                   <button v-if="method === 'oauth'" type="button" class="model-auth-secondary" :disabled="busy || !canUseMethod" @click="authorize(credential.id)">{{ text.reconnect }}</button>
-                  <button type="button" class="model-auth-secondary" data-part="query-usage" :disabled="busy" @click="queryUsage(credential)">{{ credential.usage ? text.refreshUsage : text.queryUsage }}</button>
-                  <button v-if="method === 'oauth'" type="button" class="model-auth-secondary" data-part="logout" :disabled="busy" @click="emit('logout', selectedProvider!.id, credential.id)">{{ text.logout }}</button>
+                  <button v-if="selectedProvider.usageEnabled || credential.usage" type="button" class="model-auth-secondary" data-part="query-usage" :disabled="busy" @click="queryUsage(credential)">{{ credential.usage ? text.refreshUsage : text.queryUsage }}</button>
+                  <button v-if="method === 'oauth' && selectedProvider.logoutEnabled" type="button" class="model-auth-secondary" data-part="logout" :disabled="busy" @click="emit('logout', selectedProvider!.id, credential.id)">{{ text.logout }}</button>
                   <button type="button" class="model-auth-danger" :disabled="busy" :data-confirmed="pendingRemoval === credential.id" @click="removeCredential(credential)">{{ pendingRemoval === credential.id ? text.confirmRemove : text.remove }}</button>
                 </div>
                 <details class="model-auth-credential-extend" data-part="credential-extend">

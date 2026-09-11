@@ -98,6 +98,8 @@ export interface ModelAuthProvider {
   loadStrategy?: LoadStrategy;
   mark?: string;
   authorizeLabel?: string;
+  usageEnabled?: boolean;
+  logoutEnabled?: boolean;
   models: string[];
   oauthModels?: string[];
   apiKeyModels?: string[];

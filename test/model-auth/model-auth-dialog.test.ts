@@ -254,7 +254,8 @@ describe("authentication dialog", () => {
   });
 
   it("edits per-key extend metadata and exposes a usage query action", async () => {
-    const { events } = await mount();
+    const { events, state } = await mount();
+    state.providers[0]!.usageEnabled = true;
     await details("api-key");
     await click('[data-part="credential-extend"] summary');
     const textarea = get<HTMLTextAreaElement>('[data-part="credential-extend"] textarea');
