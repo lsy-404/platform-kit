@@ -64,3 +64,7 @@ Model discovery returns the account's actual service metadata. `streamTrae` and 
 ## Dynamic authentication and generic requests
 
 Hosts may expose `ProviderAuthPrompt` and `ProviderAuthNotice` events through the core adapter interaction to support device codes, browser URLs, selections, and manual codes. The same adapter boundary contains generic `logout`, `request`, `stream`, and `queryUsage` callbacks; provider secrets never appear in `CredentialMetadata`, Vue state, or usage snapshots.
+
+## Pi OAuth bridge
+
+`@model-auth/providers/pi` adapts a host-provided Pi provider OAuth object and imports neither Pi, Pine, nor credential storage. It supports Pi's built-in `github-copilot`, `kimi-coding`, and `openrouter` providers. `listPiOAuthProviders` discovers available descriptors; `createPiOAuthAdapter` maps shared prompts, notices, cancellation, credential validation, refresh, and request-auth resolution. Its credential envelope binds the provider ID while retaining all provider-specific Pi credential fields.

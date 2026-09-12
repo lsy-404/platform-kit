@@ -27,6 +27,9 @@
       ],
       "usage": [
         "dist/usage.d.ts"
+      ],
+      "pi": [
+        "dist/pi.d.ts"
       ]
     }
   },
@@ -73,6 +76,10 @@
     "./usage": {
       "types": "./dist/usage.d.ts",
       "import": "./dist/usage.js"
+    },
+    "./pi": {
+      "types": "./dist/pi.d.ts",
+      "import": "./dist/pi.js"
     }
   },
   "scripts": {
@@ -80,6 +87,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@model-auth/core": "workspace:*",
     "tough-cookie": "6.0.2"
   }
 }
