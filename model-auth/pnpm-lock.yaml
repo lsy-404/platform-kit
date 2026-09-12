@@ -37,12 +37,13 @@ importers:
 
   packages/providers:
     dependencies:
-      '@model-auth/core':
-        specifier: workspace:*
-        version: link:../core
       tough-cookie:
         specifier: 6.0.2
         version: 6.0.2
+    devDependencies:
+      '@model-auth/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/vue:
     devDependencies:

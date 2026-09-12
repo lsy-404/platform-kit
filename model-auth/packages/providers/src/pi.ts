@@ -1,7 +1,9 @@
 import type { ProviderAuthInteraction, ProviderAuthNotice, ProviderAuthPrompt } from "@model-auth/core";
+import { MODEL_AUTH_PROVIDER_CAPABILITIES, modelAuthProviderCapability } from "./capabilities.js";
 
-export const PI_OAUTH_PROVIDER_IDS = ["github-copilot", "kimi-coding", "openrouter"] as const;
-export type PiOAuthProviderId = typeof PI_OAUTH_PROVIDER_IDS[number];
+export type PiOAuthProviderId = "github-copilot" | "kimi-coding" | "openrouter";
+export const PI_OAUTH_PROVIDER_IDS: readonly PiOAuthProviderId[] = Object.freeze(MODEL_AUTH_PROVIDER_CAPABILITIES
+  .filter(entry => entry.authorization.kind === "runtime-oauth").map(entry => entry.id as PiOAuthProviderId));
 export interface PiOAuthCredential extends Readonly<Record<string, unknown>> { readonly type: "oauth"; readonly access: string; readonly refresh: string; readonly expires: number; }
 export interface PiOAuthCredentialEnvelope { readonly providerId: PiOAuthProviderId; readonly credential: PiOAuthCredential; }
 export interface PiRequestAuth { readonly apiKey?: string; readonly headers?: Readonly<Record<string, string | null>>; readonly baseUrl?: string; }
@@ -14,7 +16,7 @@ export interface PiOAuthAuth {
   toAuth(credential: PiOAuthCredential): Promise<PiRequestAuth>;
 }
 export interface PiOAuthProvider { readonly id: string; readonly name?: string; readonly auth?: { readonly oauth?: PiOAuthAuth }; }
-export interface PiOAuthProviderDescriptor { readonly providerId: PiOAuthProviderId; readonly name: string; readonly loginLabel?: string; readonly isSubscription?: boolean; }
+export interface PiOAuthProviderDescriptor { readonly providerId: PiOAuthProviderId; readonly name: string; readonly catalogProviderId: string; readonly loginLabel?: string; readonly isSubscription?: boolean; }
 export interface PiOAuthAdapter {
   readonly descriptor: PiOAuthProviderDescriptor;
   authorize(interaction: ProviderAuthInteraction): Promise<PiOAuthCredentialEnvelope>;
@@ -36,9 +38,16 @@ export function createPiOAuthAdapter(provider: PiOAuthProvider): PiOAuthAdapter 
       if (interaction.providerId !== bridgeDescriptor.providerId || interaction.authType !== "oauth" || !text(interaction.loginId)) throw new PiOAuthBridgeError("Pi OAuth interaction is incompatible with its provider.");
       const signal = interaction.signal ?? new AbortController().signal;
       active(signal);
-      return envelope(bridgeDescriptor.providerId, await oauth.login({ signal, notify: notice => interaction.notify(noticeFromPi(notice)), prompt: prompt => promptFromPi(interaction, prompt) }));
+      const value = await abortable(oauth.login({ signal, notify: notice => { active(signal); interaction.notify(noticeFromPi(notice)); }, prompt: prompt => promptFromPi(interaction, prompt) }), signal);
+      active(signal);
+      return envelope(bridgeDescriptor.providerId, value);
     },
-    async refresh(value, signal = new AbortController().signal) { active(signal); return envelope(bridgeDescriptor.providerId, await oauth.refresh(envelopeCredential(value, bridgeDescriptor.providerId), signal)); },
+    async refresh(value, signal = new AbortController().signal) {
+      active(signal);
+      const renewed = await abortable(oauth.refresh(envelopeCredential(value, bridgeDescriptor.providerId), signal), signal);
+      active(signal);
+      return envelope(bridgeDescriptor.providerId, renewed);
+    },
     async toAuth(value) { return requestAuth(await oauth.toAuth(envelopeCredential(value, bridgeDescriptor.providerId))); },
   };
 }
@@ -47,7 +56,7 @@ function descriptor(provider: PiOAuthProvider): PiOAuthProviderDescriptor {
   const oauth = provider.auth?.oauth;
   if (!oauth || !text(oauth.name) || typeof oauth.login !== "function" || typeof oauth.refresh !== "function" || typeof oauth.toAuth !== "function") throw new PiOAuthBridgeError("Pi OAuth provider is unavailable.");
   const loginLabel = text(oauth.loginLabel);
-  return { providerId: provider.id as PiOAuthProviderId, name: oauth.name.trim(), ...(loginLabel ? { loginLabel } : {}), ...(typeof oauth.isSubscription === "boolean" ? { isSubscription: oauth.isSubscription } : {}) };
+  return { providerId: provider.id as PiOAuthProviderId, name: oauth.name.trim(), catalogProviderId: modelAuthProviderCapability(provider.id)!.catalogProviderId!, ...(loginLabel ? { loginLabel } : {}), ...(typeof oauth.isSubscription === "boolean" ? { isSubscription: oauth.isSubscription } : {}) };
 }
 function noticeFromPi(notice: PiAuthNotice): ProviderAuthNotice {
   if (notice.type !== "info") return notice;
@@ -64,8 +73,8 @@ function promptFromPi(interaction: ProviderAuthInteraction, prompt: PiAuthPrompt
   return abortable(interaction.prompt(shared), signal);
 }
 function credential(value: unknown): PiOAuthCredential {
-  if (!record(value) || value.type !== "oauth" || !text(value.access) || !text(value.refresh) || typeof value.expires !== "number" || !Number.isFinite(value.expires) || value.expires <= 0) throw new PiOAuthBridgeError("Pi OAuth credential is invalid.");
-  const access = text(value.access)!, refresh = text(value.refresh)!;
+  if (!record(value) || value.type !== "oauth" || !text(value.access) || typeof value.refresh !== "string" || typeof value.expires !== "number" || !Number.isFinite(value.expires) || value.expires <= 0) throw new PiOAuthBridgeError("Pi OAuth credential is invalid.");
+  const access = text(value.access)!, refresh = value.refresh;
   return { ...value, type: "oauth", access, refresh, expires: value.expires };
 }
 function envelope(providerId: PiOAuthProviderId, value: unknown): PiOAuthCredentialEnvelope { return { providerId, credential: credential(value) }; }
@@ -82,7 +91,12 @@ function requestAuth(value: unknown): PiRequestAuth {
   return { ...(apiKey ? { apiKey } : {}), ...(headers ? { headers } : {}), ...(baseUrl ? { baseUrl } : {}) };
 }
 function abortable<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
-  return new Promise<T>((resolve, reject) => { const abort = () => reject(new PiOAuthBridgeError("Pi OAuth prompt was cancelled.")); signal.addEventListener("abort", abort, { once: true }); void operation.then(resolve, reject).finally(() => signal.removeEventListener("abort", abort)); });
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => { signal.removeEventListener("abort", abort); reject(new PiOAuthBridgeError("Pi OAuth operation was cancelled.")); };
+    signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) abort();
+    void operation.then(resolve, reject).finally(() => signal.removeEventListener("abort", abort));
+  });
 }
 function active(signal: AbortSignal): void { if (signal.aborted) throw new PiOAuthBridgeError("Pi OAuth operation was cancelled."); }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }

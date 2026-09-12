@@ -87,7 +87,12 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@model-auth/core": "workspace:*",
     "tough-cookie": "6.0.2"
+  },
+  "peerDependencies": {
+    "@model-auth/core": "^0.6.0"
+  },
+  "devDependencies": {
+    "@model-auth/core": "workspace:*"
   }
 }

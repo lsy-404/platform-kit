@@ -46,7 +46,7 @@ describe("model-auth core", () => {
       "Provider A": { id: "Provider_A", name: "Provider A", npm: "@ai-sdk/provider-a", models: {
         "model-a": { name: "Model A", tool_call: true, release_date: "2025-01-01", modalities: { output: ["text"] } },
         "model-b": { id: "model-b", name: "Model B", tool_call: true, release_date: "2026-01-01", modalities: { output: ["text"] } },
-        "deprecated": { tool_call: true, deprecated: true, modalities: { output: ["text"] } },
+        "deprecated": { tool_call: true, deprecated: true, status: "active", modalities: { output: ["text"] } },
         "status-deprecated": { tool_call: true, status: "deprecated", modalities: { output: ["text"] } },
         "no-tools": { tool_call: false, modalities: { output: ["text"] } },
         "no-text": { tool_call: true, modalities: { output: ["image"] } },

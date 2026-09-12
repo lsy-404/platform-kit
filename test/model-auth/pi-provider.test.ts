@@ -42,4 +42,27 @@ describe("Pi OAuth provider bridge", () => {
     const failing = createPiOAuthAdapter({ ...provider(), auth: { oauth: { ...provider().auth!.oauth!, async login() { throw new Error("callback failed"); } } } });
     await expect(failing.authorize(interaction())).rejects.toThrow("callback failed");
   });
+
+  it("preserves OpenRouter grants without inventing refresh tokens", async () => {
+    const source = provider("openrouter");
+    source.auth!.oauth!.login = async () => ({ type: "oauth", access: "router-key", refresh: "", expires: Number.MAX_SAFE_INTEGER });
+    const adapter = createPiOAuthAdapter(source);
+    const grant = await adapter.authorize(interaction({ providerId: "openrouter" }));
+    expect(grant.credential.refresh).toBe("");
+    expect(grant.credential.expires).toBe(Number.MAX_SAFE_INTEGER);
+  });
+
+  it("does not return a late grant or refresh after cancellation", async () => {
+    const controller = new AbortController();
+    let complete!: (value: unknown) => void;
+    const source = provider();
+    source.auth!.oauth!.login = async () => new Promise(resolve => { complete = resolve as typeof complete; });
+    const adapter = createPiOAuthAdapter(source);
+    const pending = adapter.authorize(interaction({ signal: controller.signal }));
+    const rejected = expect(pending).rejects.toThrow(/cancelled/);
+    controller.abort();
+    await rejected;
+    complete({ type: "oauth", access: "late", refresh: "late", expires: 1000 });
+    await expect(adapter.refresh({ providerId: "github-copilot", credential: { type: "oauth", access: "old", refresh: "old", expires: 1000 } }, controller.signal)).rejects.toThrow(/cancelled/);
+  });
 });

@@ -213,7 +213,7 @@ export function parseModelsDevPayload(payload: unknown): ModelsDevCatalog {
       const efforts = reasoningEfforts(model.reasoning_options);
       const attachment = optionalBoolean(model.attachment);
       const toolCall = optionalBoolean(model.tool_call);
-      const status = optionalString(model.status) ?? (optionalBoolean(model.deprecated) ? "deprecated" : undefined);
+      const status = model.deprecated === true ? "deprecated" : optionalString(model.status);
       const modalities = modelModalities(model.modalities);
       const limits = modelLimits(model.limit);
       const cost = modelCost(model.cost);
