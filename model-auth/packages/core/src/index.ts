@@ -52,13 +52,43 @@ export interface ProviderLoginResult {
 export interface ModelDescriptor {
   readonly id: string;
   readonly name: string;
-  readonly releaseDate: string | null;
+  readonly description?: string;
+  readonly knowledgeCutoff?: string;
+  readonly reasoning?: boolean;
+  readonly reasoningEfforts?: readonly string[];
+  readonly attachment?: boolean;
+  readonly toolCall?: boolean;
+  readonly status?: string;
+  readonly modalities?: ModelModalities;
+  readonly limits?: ModelLimits;
+  readonly cost?: ModelCost;
+  readonly releaseDate?: string;
+}
+
+export interface ModelModalities {
+  readonly input?: readonly string[];
+  readonly output?: readonly string[];
+}
+
+export interface ModelLimits {
+  readonly context?: number;
+  readonly input?: number;
+  readonly output?: number;
+}
+
+export interface ModelCost {
+  readonly input?: number;
+  readonly output?: number;
+  readonly cacheRead?: number;
+  readonly cacheWrite?: number;
 }
 
 export interface ProviderBinding {
   readonly id: string;
   readonly name: string;
   readonly packageName: string | null;
+  readonly api?: string;
+  readonly env?: readonly string[];
   readonly models: readonly ModelDescriptor[];
 }
 
@@ -78,6 +108,8 @@ export interface ModelsDevCatalog {
   readonly providers: readonly ProviderBinding[];
 }
 
+export type CatalogModelPredicate = (model: ModelDescriptor, provider: ProviderBinding) => boolean;
+
 export class ModelsDevParseError extends Error {
   public constructor(message: string) {
     super(message);
@@ -92,6 +124,60 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function requiredString(value: unknown, path: string): string {
   if (typeof value !== "string" || value.trim() === "") throw new ModelsDevParseError(`${path} must be a non-empty string`);
   return value.trim();
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function optionalBoolean(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function optionalNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+function stringList(value: unknown): readonly string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const entries = [...new Set(value.flatMap((item) => typeof item === "string" && item.trim() ? [item.trim()] : []))];
+  return entries.length > 0 ? entries : undefined;
+}
+
+function modelModalities(value: unknown): ModelModalities | undefined {
+  if (!isRecord(value)) return undefined;
+  const input = stringList(value.input);
+  const output = stringList(value.output);
+  return input || output ? { ...(input ? { input } : {}), ...(output ? { output } : {}) } : undefined;
+}
+
+function modelLimits(value: unknown): ModelLimits | undefined {
+  if (!isRecord(value)) return undefined;
+  const context = optionalNumber(value.context);
+  const input = optionalNumber(value.input);
+  const output = optionalNumber(value.output);
+  return context !== undefined || input !== undefined || output !== undefined
+    ? { ...(context !== undefined ? { context } : {}), ...(input !== undefined ? { input } : {}), ...(output !== undefined ? { output } : {}) }
+    : undefined;
+}
+
+function modelCost(value: unknown): ModelCost | undefined {
+  if (!isRecord(value)) return undefined;
+  const input = optionalNumber(value.input);
+  const output = optionalNumber(value.output);
+  const cacheRead = optionalNumber(value.cache_read);
+  const cacheWrite = optionalNumber(value.cache_write);
+  return input !== undefined || output !== undefined || cacheRead !== undefined || cacheWrite !== undefined
+    ? { ...(input !== undefined ? { input } : {}), ...(output !== undefined ? { output } : {}), ...(cacheRead !== undefined ? { cacheRead } : {}), ...(cacheWrite !== undefined ? { cacheWrite } : {}) }
+    : undefined;
+}
+
+function reasoningEfforts(value: unknown): readonly string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const efforts = [...new Set(value.flatMap((option) => isRecord(option)
+    ? [option.values, option.options, option.efforts].flatMap((candidate) => stringList(candidate) ?? [])
+    : []))];
+  return efforts.length > 0 ? efforts : undefined;
 }
 
 export function normalizeProviderId(value: string): string {
@@ -117,13 +203,37 @@ export function parseModelsDevPayload(payload: unknown): ModelsDevCatalog {
     const name = typeof raw.name === "string" && raw.name.trim() ? raw.name.trim() : id;
     if (!isRecord(raw.models)) return [];
     const models = Object.entries(raw.models).flatMap(([modelKey, model]) => {
-      if (!isRecord(model) || model.status === "deprecated" || model.deprecated === true || model.tool_call !== true || !hasTextOutput(model)) return [];
+      if (!isRecord(model)) return [];
       let modelId: string;
       try { modelId = normalizeModelId(typeof model.id === "string" ? model.id : modelKey); } catch { return []; }
       const modelName = typeof model.name === "string" && model.name.trim() ? model.name.trim() : modelId;
-      let releaseDate: string | null = null;
-      try { releaseDate = model.release_date === undefined || model.release_date === null ? null : requiredString(model.release_date, `model ${id}/${modelId}.release_date`); } catch { return []; }
-      return [{ id: modelId, name: modelName, releaseDate }];
+      const description = optionalString(model.description);
+      const knowledgeCutoff = optionalString(model.knowledge_cutoff) ?? optionalString(model.knowledge);
+      const reasoning = optionalBoolean(model.reasoning);
+      const efforts = reasoningEfforts(model.reasoning_options);
+      const attachment = optionalBoolean(model.attachment);
+      const toolCall = optionalBoolean(model.tool_call);
+      const status = optionalString(model.status) ?? (optionalBoolean(model.deprecated) ? "deprecated" : undefined);
+      const modalities = modelModalities(model.modalities);
+      const limits = modelLimits(model.limit);
+      const cost = modelCost(model.cost);
+      const releaseDate = optionalString(model.release_date);
+      const descriptor: ModelDescriptor = {
+        id: modelId,
+        name: modelName,
+        ...(description ? { description } : {}),
+        ...(knowledgeCutoff ? { knowledgeCutoff } : {}),
+        ...(reasoning !== undefined ? { reasoning } : {}),
+        ...(efforts ? { reasoningEfforts: efforts } : {}),
+        ...(attachment !== undefined ? { attachment } : {}),
+        ...(toolCall !== undefined ? { toolCall } : {}),
+        ...(status ? { status } : {}),
+        ...(modalities ? { modalities } : {}),
+        ...(limits ? { limits } : {}),
+        ...(cost ? { cost } : {}),
+        ...(releaseDate ? { releaseDate } : {}),
+      };
+      return [descriptor];
     });
     const validModels = models.filter((model): model is ModelDescriptor => model !== null);
     validModels.sort((left, right) => (right.releaseDate ?? "").localeCompare(left.releaseDate ?? "") || left.id.localeCompare(right.id));
@@ -138,7 +248,9 @@ export function parseModelsDevPayload(payload: unknown): ModelsDevCatalog {
       : typeof raw.npm === "string" && raw.npm.trim()
         ? raw.npm.trim()
         : null;
-    return unique.length > 0 ? [{ id, name, packageName, models: unique }] : [];
+    const api = optionalString(raw.api);
+    const env = stringList(raw.env);
+    return unique.length > 0 ? [{ id, name, packageName, ...(api ? { api } : {}), ...(env ? { env } : {}), models: unique }] : [];
   });
   providers.sort((left, right) => left.id.localeCompare(right.id));
   return { providers: providers.filter((provider, index) => index === 0 || providers[index - 1]?.id !== provider.id) };
@@ -156,20 +268,29 @@ export function filterProviderModels(catalog: ModelsDevCatalog, providerId: stri
   return provider.models.filter((model) => allowed.has(model.id));
 }
 
+export function supportsTextToolCalls(model: ModelDescriptor): boolean {
+  return model.toolCall === true && model.modalities?.output?.includes("text") === true;
+}
+
+export function filterCatalogModels(catalog: ModelsDevCatalog, includeModel: CatalogModelPredicate): ModelsDevCatalog {
+  return {
+    providers: catalog.providers.flatMap((provider) => {
+      const models = provider.models.filter((model) => includeModel(model, provider));
+      return models.length > 0 ? [{ ...provider, models: models.map(cloneModelDescriptor) }] : [];
+    }),
+  };
+}
+
+export function agentModelCatalog(catalog: ModelsDevCatalog): ModelsDevCatalog {
+  return filterCatalogModels(catalog, (model) => model.status !== "deprecated" && supportsTextToolCalls(model));
+}
+
 export function bindRuntimeProviders(catalog: ModelsDevCatalog, bindings: readonly RuntimeProviderBindingInput[]): readonly RuntimeProviderBinding[] {
   return bindings.map((binding) => {
     const provider = providerBinding(catalog, binding.catalogProviderId);
     const models = provider?.models.filter((model) => binding.includeModel === undefined || binding.includeModel(model)) ?? [];
     return { runtimeProviderId: normalizeProviderId(binding.runtimeProviderId), catalogProviderId: provider?.id ?? normalizeProviderId(binding.catalogProviderId), models };
   });
-}
-
-function hasTextOutput(model: Record<string, unknown>): boolean {
-  const modalities = model.modalities;
-  if (isRecord(modalities) && Array.isArray(modalities.output)) return modalities.output.includes("text");
-  if (Array.isArray(model.output)) return model.output.includes("text");
-  if (Array.isArray(model.output_modalities)) return model.output_modalities.includes("text");
-  return false;
 }
 
 export type CatalogSnapshotStatus = "cached" | "live" | "fallback" | "error";
@@ -234,8 +355,25 @@ function cloneCatalog(catalog: ModelsDevCatalog): ModelsDevCatalog {
       id: provider.id,
       name: provider.name,
       packageName: provider.packageName,
-      models: provider.models.map((model) => ({ ...model })),
+      ...(provider.api ? { api: provider.api } : {}),
+      ...(provider.env ? { env: [...provider.env] } : {}),
+      models: provider.models.map(cloneModelDescriptor),
     })),
+  };
+}
+
+function cloneModelDescriptor(model: ModelDescriptor): ModelDescriptor {
+  return {
+    ...model,
+    ...(model.reasoningEfforts ? { reasoningEfforts: [...model.reasoningEfforts] } : {}),
+    ...(model.modalities ? {
+      modalities: {
+        ...(model.modalities.input ? { input: [...model.modalities.input] } : {}),
+        ...(model.modalities.output ? { output: [...model.modalities.output] } : {}),
+      },
+    } : {}),
+    ...(model.limits ? { limits: { ...model.limits } } : {}),
+    ...(model.cost ? { cost: { ...model.cost } } : {}),
   };
 }
 

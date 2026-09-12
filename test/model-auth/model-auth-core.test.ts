@@ -12,8 +12,11 @@ import {
   normalizeProviderId,
   parseModelsDevPayload,
   filterProviderModels,
+  filterCatalogModels,
+  agentModelCatalog,
   bindRuntimeProviders,
   providerBinding,
+  supportsTextToolCalls,
   serializeCredentialMetadata,
   type CredentialMetadata,
   type ProviderAuthInteraction,
@@ -38,7 +41,7 @@ const apiKey = (id: string, models = ["shared"], weight = 1, enabled = true): Cr
 });
 
 describe("model-auth core", () => {
-  it("strictly parses and normalizes a models.dev provider binding", () => {
+  it("parses and normalizes a complete models.dev provider catalog", () => {
     const catalog = parseModelsDevPayload({ providers: {
       "Provider A": { id: "Provider_A", name: "Provider A", npm: "@ai-sdk/provider-a", models: {
         "model-a": { name: "Model A", tool_call: true, release_date: "2025-01-01", modalities: { output: ["text"] } },
@@ -52,16 +55,65 @@ describe("model-auth core", () => {
     expect(normalizeProviderId(" Provider_A ")).toBe("provider-a");
     expect(normalizeModelId("model-a")).toBe("model-a");
     expect(catalog.providers[0]?.id).toBe("provider-a");
-    expect(catalog.providers[0]?.models.map((model) => model.id)).toEqual(["model-b", "model-a"]);
+    expect(catalog.providers[0]?.models.map((model) => model.id)).toEqual(["model-b", "model-a", "deprecated", "no-text", "no-tools", "status-deprecated"]);
     expect(catalog.providers[0]?.packageName).toBe("@ai-sdk/provider-a");
     expect(providerBinding(catalog, "PROVIDER_A")?.id).toBe("provider-a");
     expect(filterProviderModels(catalog, "provider-a", ["model-b"]).map((model) => model.id)).toEqual(["model-b"]);
+    expect(agentModelCatalog(catalog).providers[0]?.models.map((model) => model.id)).toEqual(["model-b", "model-a"]);
+    expect(filterCatalogModels(catalog, supportsTextToolCalls).providers[0]?.models.map((model) => model.id)).toEqual(["model-b", "model-a", "deprecated", "status-deprecated"]);
     expect(bindRuntimeProviders(catalog, [{ runtimeProviderId: "openai-codex", catalogProviderId: "provider-a", includeModel: (model) => model.id.startsWith("model-") }])[0]?.models.map((model) => model.id)).toEqual(["model-b", "model-a"]);
     expect(parseModelsDevPayload({ providers: { broken: { models: [] } } }).providers).toEqual([]);
     expect(parseModelsDevPayload({ providers: {
       invalidPackage: { npm: {}, models: { model: { tool_call: true, modalities: { output: ["text"] } } } },
     } }).providers[0]?.packageName).toBeNull();
     expect(() => parseModelsDevPayload([])).toThrow();
+  });
+
+  it("preserves valid Atlas metadata while dropping invalid optional values", () => {
+    const catalog = parseModelsDevPayload({ providers: {
+      atlas: {
+        api: " https://api.example.test/v1 ",
+        env: ["ATLAS_API_KEY", "", 4, "ATLAS_API_KEY"],
+        npm: " @ai-sdk/openai-compatible ",
+        models: {
+          full: {
+            description: " Atlas model ",
+            knowledge_cutoff: "2025-06",
+            knowledge: "ignored",
+            reasoning: true,
+            reasoning_options: [{ values: ["low", "high"] }, { options: ["high", "max"] }, { efforts: ["minimal"] }, { values: [4] }],
+            attachment: true,
+            tool_call: true,
+            status: " active ",
+            modalities: { input: ["text", "image", "text", 4], output: ["text", "image"] },
+            limit: { context: 1000000, input: 900000, output: 100000, ignored: -1 },
+            cost: { input: 1.5, output: 6, cache_read: 0.15, cache_write: 0.3, ignored: Number.NaN },
+            release_date: "2026-01-01",
+          },
+          sparse: {
+            description: "",
+            knowledge: 2,
+            reasoning: "yes",
+            attachment: null,
+            tool_call: false,
+            status: [],
+            modalities: { input: [], output: [4] },
+            limit: { context: -1, input: Number.POSITIVE_INFINITY },
+            cost: { input: -1, output: Number.NaN },
+            release_date: 3,
+          },
+        },
+      },
+    } });
+
+    expect(catalog.providers[0]).toMatchObject({ id: "atlas", api: "https://api.example.test/v1", env: ["ATLAS_API_KEY"], packageName: "@ai-sdk/openai-compatible" });
+    expect(catalog.providers[0]?.models.find((model) => model.id === "full")).toEqual({
+      id: "full", name: "full", description: "Atlas model", knowledgeCutoff: "2025-06", reasoning: true,
+      reasoningEfforts: ["low", "high", "max", "minimal"], attachment: true, toolCall: true, status: "active",
+      modalities: { input: ["text", "image"], output: ["text", "image"] }, limits: { context: 1000000, input: 900000, output: 100000 },
+      cost: { input: 1.5, output: 6, cacheRead: 0.15, cacheWrite: 0.3 }, releaseDate: "2026-01-01",
+    });
+    expect(catalog.providers[0]?.models.find((model) => model.id === "sparse")).toEqual({ id: "sparse", name: "sparse", toolCall: false });
   });
 
   it.each([

@@ -101,7 +101,7 @@ describe("core review fixes", () => {
       older: { id: "same", release_date: "2025-01-01", tool_call: true, modalities: { output: ["text"] } },
       newer: { id: "same", release_date: "2026-01-01", tool_call: true, modalities: { output: ["text"] } },
     } } } });
-    expect(catalog.providers[0]?.models).toEqual([{ id: "same", name: "same", releaseDate: "2026-01-01" }]);
+    expect(catalog.providers[0]?.models).toEqual([{ id: "same", name: "same", toolCall: true, modalities: { output: ["text"] }, releaseDate: "2026-01-01" }]);
 
     const adapter = createWorkBuddyAdapter({
       async authorize() { return credential("workbuddy", "oauth"); },
