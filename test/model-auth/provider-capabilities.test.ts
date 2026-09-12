@@ -10,6 +10,7 @@ describe("model-auth provider capabilities", () => {
   });
 
   it("distinguishes renewable OAuth from an Ollama browser session", () => {
+    expect(modelAuthProviderCapability("workbuddy")?.access.usage).toBe(false);
     expect(modelAuthProviderCapability("grok")).toMatchObject({
       authorization: { kind: "browser-oauth", renewable: true, multiAccount: true },
       access: { inference: true, modelCatalog: true, usage: true },
