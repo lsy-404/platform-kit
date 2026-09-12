@@ -18,10 +18,10 @@ Use public release archive URLs in `package.json`. No private registry token or 
 ```json
 {
   "dependencies": {
-    "@lsypkg/fluent": "https://github.com/lsy-404/platform-kit/releases/download/v0.5.3/platform-kit-fluent-0.2.1.tgz",
-    "@model-auth/core": "https://github.com/lsy-404/platform-kit/releases/download/v0.5.3/model-auth-core-0.5.3.tgz",
-    "@model-auth/providers": "https://github.com/lsy-404/platform-kit/releases/download/v0.5.3/model-auth-providers-0.5.3.tgz",
-    "@model-auth/vue": "https://github.com/lsy-404/platform-kit/releases/download/v0.5.3/model-auth-vue-0.5.3.tgz"
+    "@lsypkg/fluent": "https://github.com/lsy-404/platform-kit/releases/download/v0.6.0/platform-kit-fluent-0.2.1.tgz",
+    "@model-auth/core": "https://github.com/lsy-404/platform-kit/releases/download/v0.6.0/model-auth-core-0.6.0.tgz",
+    "@model-auth/providers": "https://github.com/lsy-404/platform-kit/releases/download/v0.6.0/model-auth-providers-0.6.0.tgz",
+    "@model-auth/vue": "https://github.com/lsy-404/platform-kit/releases/download/v0.6.0/model-auth-vue-0.6.0.tgz"
   }
 }
 ```
@@ -31,10 +31,10 @@ Public npm dependencies such as Vue and tough-cookie continue to resolve from th
 Rust hosts use the native crate from the same release:
 
 ```toml
-model-auth-native = { git = "https://github.com/lsy-404/platform-kit", tag = "v0.5.3" }
+model-auth-native = { git = "https://github.com/lsy-404/platform-kit", tag = "v0.6.0" }
 ```
 
-The release also includes `model-auth-native-0.5.3.crate`. See [native authentication](model-auth/rust/README.md) for the backend API.
+The release also includes `model-auth-native-0.6.0.crate`. See [native authentication](model-auth/rust/README.md) for the backend API.
 
 ## Develop
 
