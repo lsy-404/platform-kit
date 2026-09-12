@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": { "@model-auth/core": ["../core/src/index.ts"] }
+  },
+  "include": ["src/**/*.ts"]
+}
