@@ -6,6 +6,15 @@ function render(component: { setup: Function }, props: Record<string, unknown>, 
   return component.setup(props, { attrs: {}, emit, slots: {} })();
 }
 
+function hasForbiddenGlyph(source: string): boolean {
+  return Array.from(source).some((character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    return codePoint > 0x7f && /\p{S}/u.test(character)
+      || character === "\u2039"
+      || character === "\u203a";
+  });
+}
+
 describe("Fluent selection controls", () => {
   it("renders inline SVG affordances and rejects character icon glyphs", async () => {
     const renderSelect = FluentSelect.setup({
@@ -32,12 +41,11 @@ describe("Fluent selection controls", () => {
     expect(menu.children[0].children[0].type).toBe("svg");
     expect(menu.children[0].children[0].props["data-icon"]).toBe("check");
 
-    const forbiddenGlyphs = /[\u2304\u2713\u2039\u203a\u25a3\u2630\u2261\u25a6\u25f7\u2659\u2699]/u;
     const fluentRoot = new URL("../styles/fluent/src/", import.meta.url);
     const fluentFiles = (await readdir(fluentRoot, { recursive: true }))
       .filter((file) => file.endsWith(".ts") || file.endsWith(".css"));
     const sources = await Promise.all(fluentFiles.map((file) => readFile(new URL(file, fluentRoot), "utf8")));
-    expect(sources.join("\n")).not.toMatch(forbiddenGlyphs);
+    expect(hasForbiddenGlyph(sources.join("\n"))).toBe(false);
   });
 
   it("renders a Fluent trigger instead of a browser-owned select", () => {
