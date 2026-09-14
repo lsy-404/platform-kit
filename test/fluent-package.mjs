@@ -49,7 +49,7 @@ import { readFile } from 'node:fs/promises';
 import { createSSRApp, h } from 'vue';
 import { renderToString } from 'vue/server-renderer';
 import * as suite from '@platform-kit/fluent/vue';
-for (const name of ['FluentTheme','FluentButton','FluentField','FluentSwitch','FluentSlider','FluentSelect','FluentNotice','FluentDialog','FluentPopover','FluentNavigation','fluentIcon']) assert(suite[name], name);
+for (const name of ['FluentTheme','FluentButton','FluentField','FluentFilePicker','FluentSwitch','FluentSlider','FluentSelect','FluentNotice','FluentProgressBar','FluentProgressRing','FluentDialog','FluentPopover','FluentNavigation','fluentIcon']) assert(suite[name], name);
 const app = createSSRApp({render:()=>h(suite.FluentTheme,{mode:'dark'},()=>h(suite.FluentButton,{disabled:true,type:'submit'},()=> 'Save'))});
 const html = await renderToString(app);
 assert(html.includes('data-fluent-theme="dark"'));

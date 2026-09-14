@@ -44,7 +44,15 @@ describe("Fluent feedback controls", () => {
       { value: 150, max: 120, label: "Upload" },
       { "aria-label": "File upload progress" },
     );
-    expect(node.props).toMatchObject({ max: 120, value: 120, "aria-label": "File upload progress" });
+    expect(node.type).toBe("div");
+    expect(node.props).toMatchObject({
+      role: "progressbar",
+      "aria-valuemin": 0,
+      "aria-valuemax": 120,
+      "aria-valuenow": 120,
+      "aria-label": "File upload progress",
+    });
+    expect(node.children[0].children[0].props.style.width).toBe("100%");
 
     const ring = render(FluentProgressRing, {
       value: -4,
@@ -61,6 +69,23 @@ describe("Fluent feedback controls", () => {
       "aria-valuenow": 0,
       "aria-label": "Loading",
     });
+  });
+
+  it("shows a value indicator and snaps progress to the requested step", () => {
+    const { node } = render(FluentProgressBar, {
+      value: 62,
+      max: 100,
+      label: "Upload",
+      showIndicator: true,
+      snap: true,
+      step: 10,
+    });
+    expect(node.props["aria-valuenow"]).toBe(60);
+    expect(node.props.class).toContain("fluent-progress-bar--with-indicator");
+    expect(node.props.class).toContain("fluent-progress-bar--snap");
+    expect(node.children[0].children[0].props.style.width).toBe("60%");
+    expect(node.children[1].children).toBe("60%");
+    expect(node.children[0].children[1].children).toHaveLength(11);
   });
 
   it("passes aria-label through to unlabeled range and switch controls", async () => {

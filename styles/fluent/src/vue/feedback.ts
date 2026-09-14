@@ -69,25 +69,65 @@ const progressProps = {
   max: { type: Number, default: 100 },
   label: String,
 };
-function progressValues(value: number, max: number) {
+function progressValues(value: number, max: number, step = 1, snap = false) {
   const limit = Number.isFinite(max) && max > 0 ? max : 100;
-  return { max: limit, value: Number.isFinite(value) ? Math.min(limit, Math.max(0, value)) : 0 };
+  const bounded = Number.isFinite(value) ? Math.min(limit, Math.max(0, value)) : 0;
+  const increment = Number.isFinite(step) && step > 0 ? step : 1;
+  const next = snap ? Math.round(bounded / increment) * increment : bounded;
+  return { max: limit, value: Math.min(limit, Math.max(0, next)), step: increment };
+}
+
+function progressTicks(max: number, step: number): number[] {
+  const count = Math.floor(max / step) + 1;
+  if (count > 101) return [];
+  const ticks = Array.from({ length: count }, (_, index) => (index * step / max) * 100);
+  if (ticks.at(-1) !== 100) ticks.push(100);
+  return ticks;
 }
 
 export const FluentProgressBar = defineComponent({
   name: "FluentProgressBar",
   inheritAttrs: false,
-  props: { ...progressProps, indeterminate: Boolean },
+  props: {
+    ...progressProps,
+    indeterminate: Boolean,
+    showIndicator: Boolean,
+    snap: Boolean,
+    step: { type: Number, default: 10 },
+  },
   setup(props, { attrs }) {
     return () => {
-      const state = progressValues(props.value, props.max);
-      return h("progress", {
+      const state = progressValues(props.value, props.max, props.step, props.snap);
+      const percentage = state.max > 0 ? (state.value / state.max) * 100 : 0;
+      const ticks = props.snap ? progressTicks(state.max, state.step) : [];
+      return h("div", {
         ...attrs,
-        class: ["fluent-progress-bar", attrs.class],
-        max: state.max,
-        value: props.indeterminate ? undefined : state.value,
+        class: ["fluent-progress-bar", {
+          "fluent-progress-bar--indeterminate": props.indeterminate,
+          "fluent-progress-bar--with-indicator": props.showIndicator,
+          "fluent-progress-bar--snap": props.snap,
+        }, attrs.class],
+        role: "progressbar",
         "aria-label": attrs["aria-label"] ?? props.label,
-      });
+        "aria-valuemin": 0,
+        "aria-valuemax": state.max,
+        "aria-valuenow": props.indeterminate ? undefined : state.value,
+      }, [
+        h("span", { class: "fluent-progress-bar__track" }, [
+          h("span", {
+            class: "fluent-progress-bar__value",
+            style: { width: props.indeterminate ? undefined : `${percentage}%` },
+          }),
+          ticks.length
+            ? h("span", { class: "fluent-progress-bar__ticks", "aria-hidden": "true" }, ticks.map((position) =>
+              h("span", { key: position, class: "fluent-progress-bar__tick", style: { left: `${position}%` } }),
+            ))
+            : null,
+        ]),
+        props.showIndicator && !props.indeterminate
+          ? h("output", { class: "fluent-progress-bar__indicator" }, `${percentage.toFixed(0)}%`)
+          : null,
+      ]);
     };
   },
 });
