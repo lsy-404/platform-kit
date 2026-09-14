@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import {
   FluentButton,
   FluentField,
+  FluentFilePicker,
   FluentNotice,
   FluentSlider,
   FluentSwitch,
@@ -121,6 +122,27 @@ describe("Fluent controls", () => {
     } as unknown as Event);
     expect(emit).toHaveBeenCalledWith("update:modelValue", "new");
     expect(onInput).toHaveBeenCalledOnce();
+  });
+
+  it("uses a Fluent trigger for file selection and emits the chosen files", () => {
+    const emit = vi.fn();
+    const node = render(
+      FluentFilePicker,
+      { modelValue: [], label: "Attachments", selectLabel: "Choose files", disabled: false, multiple: true },
+      emit,
+    );
+    const actions = node.children[1];
+    const input = actions.children[0];
+    const button = actions.children[1];
+    expect(input.type).toBe("input");
+    expect(input.props).toMatchObject({ type: "file", multiple: true, "aria-hidden": "true" });
+    expect(button.type).toBe("button");
+    expect(button.props["aria-label"]).toBe("Choose files");
+
+    const files = [{ name: "notes.md", size: 12, type: "text/markdown" }];
+    trigger(input.props.onChange, { target: { files, value: "selected" } } as unknown as Event);
+    expect(emit).toHaveBeenCalledWith("update:modelValue", files);
+    expect(emit).toHaveBeenCalledWith("change", files);
   });
 
   it("gives danger notices assertive alert semantics", () => {

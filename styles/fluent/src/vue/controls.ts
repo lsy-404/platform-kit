@@ -1,4 +1,5 @@
-import { defineComponent, h, mergeProps, type PropType } from "vue";
+import { defineComponent, h, mergeProps, ref, type PropType } from "vue";
+import { fluentIcon } from "./icon.js";
 
 export type FluentButtonTone = "primary" | "secondary" | "danger" | "subtle";
 export type FluentNoticeTone = "info" | "success" | "warning" | "danger";
@@ -7,6 +8,12 @@ export interface FluentSelectOption {
   readonly value: string;
   readonly label: string;
   readonly disabled?: boolean;
+}
+
+export interface FluentFile {
+  readonly name: string;
+  readonly size?: number;
+  readonly type?: string;
 }
 
 export function sliderPercentage(
@@ -23,6 +30,8 @@ export function sliderPercentage(
     return 0;
   return Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100));
 }
+
+let nextFilePickerId = 1;
 
 function inputValue(event: Event): string {
   return (event.target as HTMLInputElement).value;
@@ -180,6 +189,94 @@ export const FluentNumberField = defineComponent({
       modelValue: props.modelValue === null ? "" : String(props.modelValue),
       "onUpdate:modelValue": (value: string) => emit("update:modelValue", value === "" ? null : Number(value)),
     }));
+  },
+});
+
+export const FluentFilePicker = defineComponent({
+  name: "FluentFilePicker",
+  inheritAttrs: false,
+  props: {
+    modelValue: { type: Array as PropType<readonly FluentFile[]>, default: () => [] },
+    label: { type: String, required: true },
+    selectLabel: { type: String, default: "Choose files" },
+    emptyLabel: { type: String, default: "No files selected" },
+    clearLabel: { type: String, default: "Clear" },
+    accept: String,
+    multiple: Boolean,
+    disabled: Boolean,
+    required: Boolean,
+    name: String,
+  },
+  emits: ["update:modelValue", "change"],
+  setup(props, { attrs, emit }) {
+    const input = ref<HTMLInputElement | null>(null);
+    const inputId = `${typeof attrs.id === "string" ? attrs.id : `fluent-file-picker-${nextFilePickerId++}`}-input`;
+    const statusId = inputId ? `${inputId}-status` : undefined;
+    const open = () => {
+      if (!props.disabled) input.value?.click();
+    };
+    const updateFiles = (event: Event) => {
+      const target = event.target as HTMLInputElement;
+      const files = Array.from(target.files ?? []);
+      emit("update:modelValue", files);
+      emit("change", files);
+      target.value = "";
+    };
+    const clear = () => {
+      emit("update:modelValue", []);
+      emit("change", []);
+      if (input.value) input.value.value = "";
+    };
+    return () => {
+      const { class: className, style, id, ...rootAttrs } = attrs;
+      const files = props.modelValue ?? [];
+      return h("div", {
+        ...rootAttrs,
+        id,
+        class: ["fluent-file-picker", className],
+        style,
+      }, [
+        h("span", { class: "fluent-file-picker__label" }, props.label),
+        h("div", { class: "fluent-file-picker__actions" }, [
+          h("input", {
+            ref: input,
+            id: inputId,
+            class: "fluent-file-picker__input",
+            type: "file",
+            accept: props.accept,
+            multiple: props.multiple,
+            disabled: props.disabled,
+            required: props.required,
+            name: props.name,
+            tabindex: -1,
+            "aria-hidden": "true",
+            "aria-describedby": statusId,
+            onChange: updateFiles,
+          }),
+          h("button", {
+            type: "button",
+            class: "fluent-button fluent-file-picker__button",
+            disabled: props.disabled,
+            "aria-label": props.selectLabel,
+            "aria-describedby": statusId,
+            onClick: open,
+          }, [fluentIcon("upload", "fluent-file-picker__icon"), h("span", props.selectLabel)]),
+          files.length
+            ? h("button", {
+              type: "button",
+              class: "fluent-button fluent-button--subtle fluent-file-picker__clear",
+              disabled: props.disabled,
+              onClick: clear,
+            }, props.clearLabel)
+            : null,
+        ]),
+        files.length
+          ? h("ul", { id: statusId, class: "fluent-file-picker__list", "aria-label": props.label }, files.map((file, index) =>
+            h("li", { key: `${file.name}-${index}`, class: "fluent-file-picker__file" }, file.name),
+          ))
+          : h("p", { id: statusId, class: "fluent-file-picker__status" }, props.emptyLabel),
+      ]);
+    };
   },
 });
 

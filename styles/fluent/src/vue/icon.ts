@@ -1,6 +1,6 @@
 import { h, type VNode, type VNodeChild } from "vue";
 
-export type FluentIconName = "check" | "chevron-down" | "chevron-up";
+export type FluentIconName = "check" | "chevron-down" | "chevron-up" | "upload";
 
 export function fluentIcon(name: FluentIconName, className?: string): VNode {
   let children: VNodeChild[];
@@ -13,6 +13,9 @@ export function fluentIcon(name: FluentIconName, className?: string): VNode {
       break;
     case "chevron-up":
       children = [h("path", { d: "m6 15 6-6 6 6" })];
+      break;
+    case "upload":
+      children = [h("path", { d: "M12 16V4m0 0-4 4m4-4 4 4M5 14v4h14v-4" })];
       break;
   }
 

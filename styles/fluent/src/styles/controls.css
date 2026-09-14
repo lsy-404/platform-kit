@@ -86,6 +86,38 @@
   padding-right: 30px;
 }
 
+.fluent-file-picker {
+  display: grid;
+  gap: 8px;
+  color: var(--fluent-text);
+  font: inherit;
+}
+.fluent-file-picker__label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.fluent-file-picker__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.fluent-file-picker__input { display: none; }
+.fluent-file-picker__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.fluent-file-picker__icon { width: 16px; height: 16px; }
+.fluent-file-picker__status,
+.fluent-file-picker__list {
+  margin: 0;
+  color: var(--fluent-muted);
+  font-size: 0.8125rem;
+}
+.fluent-file-picker__list { padding-inline-start: 20px; }
+.fluent-file-picker__file { overflow-wrap: anywhere; }
+
 .fluent-switch {
   display: inline-flex;
   align-items: center;
@@ -236,25 +268,53 @@
   cursor: not-allowed;
 }
 .fluent-progress-bar {
-  display: block;
-  appearance: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
   width: 100%;
+}
+.fluent-progress-bar__track {
+  position: relative;
+  display: block;
   height: 4px;
-  border: 0;
-  border-radius: 999px;
   overflow: hidden;
-  accent-color: var(--fluent-accent);
+  border-radius: 999px;
   background: var(--fluent-border);
 }
-.fluent-progress-bar::-webkit-progress-bar { background: var(--fluent-border); }
-.fluent-progress-bar::-webkit-progress-value { background: var(--fluent-accent); }
-.fluent-progress-bar::-moz-progress-bar { background: var(--fluent-accent); }
-.fluent-progress-bar:indeterminate {
-  background: linear-gradient(to right, transparent 0 30%, var(--fluent-accent) 30% 60%, transparent 60%) var(--fluent-border);
-  background-size: 200% 100%;
+.fluent-progress-bar__value {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--fluent-accent);
+  transition: width var(--fluent-fast) var(--fluent-ease);
+}
+.fluent-progress-bar--indeterminate .fluent-progress-bar__value {
+  width: 40%;
+  background: linear-gradient(to right, transparent, var(--fluent-accent), transparent);
   animation: fluent-progress-slide 1.5s linear infinite;
 }
-.fluent-progress-bar:indeterminate::-webkit-progress-bar { background: transparent; }
+.fluent-progress-bar--with-indicator { grid-template-columns: minmax(0, 1fr) auto; }
+.fluent-progress-bar__indicator {
+  min-width: 3ch;
+  color: var(--fluent-muted);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+.fluent-progress-bar__ticks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.fluent-progress-bar__tick {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background: var(--fluent-surface);
+  opacity: 0.9;
+}
 .fluent-progress-ring { display: inline-flex; flex: none; color: var(--fluent-accent); }
 .fluent-progress-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .fluent-progress-ring circle { fill: none; stroke-width: 2; }
@@ -274,7 +334,7 @@
 @keyframes fluent-progress-slide { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 @media (prefers-reduced-motion: reduce) {
   .fluent-progress-ring--indeterminate svg,
-  .fluent-progress-bar:indeterminate { animation: none; }
+  .fluent-progress-bar--indeterminate .fluent-progress-bar__value { animation: none; }
 }
 
 /* State refinements are scoped to Fluent component classes. */

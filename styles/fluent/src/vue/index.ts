@@ -6,6 +6,7 @@ export {
   FluentTextArea,
   FluentPasswordField,
   FluentNumberField,
+  FluentFilePicker,
   FluentField,
   FluentSwitch,
   FluentSlider,
@@ -19,6 +20,7 @@ export type {
   FluentButtonTone,
   FluentNoticeTone,
   FluentSelectOption,
+  FluentFile,
 } from "./controls.js";
 export type { FluentNavigationItem } from "./navigation.js";
 
