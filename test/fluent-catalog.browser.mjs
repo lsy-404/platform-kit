@@ -30,7 +30,7 @@ try {
   assert.equal(await page.locator(".fluent-progress-bar").count(), 4);
   assert.equal(await page.locator(".fluent-progress-bar--with-indicator").count(), 2);
   assert.equal(await page.locator(".fluent-progress-bar--snap").count(), 1);
-  assert.equal(await page.locator(".fluent-progress-bar__indicator").nth(1).textContent(), "62%");
+  assert.equal(await page.locator(".fluent-progress-bar__indicator").first().textContent(), "62%");
   assert.equal(await page.locator(".fluent-progress-bar--snap .fluent-progress-bar__indicator").textContent(), "60%");
   assert.equal(await page.locator(".fluent-progress-bar--snap .fluent-progress-bar__tick").count(), 11);
   assert.equal(await page.locator(".fluent-progress-ring").count(), 2);
