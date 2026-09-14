@@ -107,10 +107,12 @@ describe("provider usage adapters", () => {
   });
 
   it("parses Grok weekly and monthly billing without treating missing usage as zero", () => {
+    const weeklyStart = new Date(Date.now() - 3 * 86_400_000).toISOString();
+    const weeklyEnd = new Date(Date.now() + 4 * 86_400_000).toISOString();
     const weekly = parseGrokBilling({ config: {
       subscriptionTierDisplay: "SuperGrok Heavy",
       creditUsagePercent: 37.5,
-      currentPeriod: { start: "2026-09-07T00:00:00Z", end: "2026-09-14T00:00:00Z" },
+      currentPeriod: { start: weeklyStart, end: weeklyEnd },
       prepaidBalance: { val: 4 },
     } });
     expect(weekly).toMatchObject({ plan: "SuperGrok Heavy", status: "ok", balance: { amount: 4, unit: "credits" } });

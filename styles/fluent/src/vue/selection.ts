@@ -13,6 +13,7 @@ import {
 } from "vue";
 import { FluentPopover } from "./overlays.js";
 import type { FluentSelectOption } from "./controls.js";
+import { fluentIcon } from "./icon.js";
 
 export type FluentMenuItem = {
   readonly value?: string;
@@ -169,7 +170,7 @@ export const FluentSelect = defineComponent({
           onKeydown,
         }), [
           h("span", { class: "fluent-select__value" }, selected.value?.label ?? ""),
-          h("span", { class: "fluent-select__chevron", "aria-hidden": "true" }),
+          fluentIcon(open.value ? "chevron-up" : "chevron-down", "fluent-select__chevron"),
         ]),
         h(FluentPopover, {
           open: open.value,
@@ -321,7 +322,7 @@ export const FluentMenu = defineComponent({
           onMousemove: () => { if (enabled(item)) setActive(index); },
           onClick: () => choose(index),
         }, [
-          props.multiple ? h("span", { class: "fluent-menu__check", "aria-hidden": "true" }, selected(item) ? "✓" : "") : null,
+          props.multiple && selected(item) ? fluentIcon("check", "fluent-menu__check") : null,
           h("span", { class: "fluent-menu__item-label" }, item.label),
         ]))),
     });

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { readFile, readdir } from "node:fs/promises";
 import { FluentMenu, FluentSelect } from "../styles/fluent/src/vue/selection.js";
 
 function render(component: { setup: Function }, props: Record<string, unknown>, emit = vi.fn()) {
@@ -6,6 +7,39 @@ function render(component: { setup: Function }, props: Record<string, unknown>, 
 }
 
 describe("Fluent selection controls", () => {
+  it("renders inline SVG affordances and rejects character icon glyphs", async () => {
+    const renderSelect = FluentSelect.setup({
+      modelValue: "light",
+      label: "Theme",
+      disabled: false,
+      options: [{ value: "light", label: "Light" }],
+    }, { attrs: {}, emit: vi.fn(), slots: {} });
+    const closed = renderSelect();
+    expect(closed.children[1].children[1].type).toBe("svg");
+    expect(closed.children[1].children[1].props["data-icon"]).toBe("chevron-down");
+
+    const menuTree = render(FluentMenu, {
+      open: true,
+      label: "Actions",
+      anchor: null,
+      portal: null,
+      multiple: true,
+      modelValue: ["copy"],
+      closeOnSelect: false,
+      items: [{ value: "copy", label: "Copy" }],
+    });
+    const menu = menuTree.children.default();
+    expect(menu.children[0].children[0].type).toBe("svg");
+    expect(menu.children[0].children[0].props["data-icon"]).toBe("check");
+
+    const forbiddenGlyphs = /[\u2304\u2713\u2039\u203a\u25a3\u2630\u2261\u25a6\u25f7\u2659\u2699]/u;
+    const fluentRoot = new URL("../styles/fluent/src/", import.meta.url);
+    const fluentFiles = (await readdir(fluentRoot, { recursive: true }))
+      .filter((file) => file.endsWith(".ts") || file.endsWith(".css"));
+    const sources = await Promise.all(fluentFiles.map((file) => readFile(new URL(file, fluentRoot), "utf8")));
+    expect(sources.join("\n")).not.toMatch(forbiddenGlyphs);
+  });
+
   it("renders a Fluent trigger instead of a browser-owned select", () => {
     const tree = render(FluentSelect, {
       modelValue: "light", label: "Theme", disabled: false,

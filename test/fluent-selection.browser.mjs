@@ -36,6 +36,8 @@ try {
   const select = page.getByRole("combobox", { name: "Choice" });
   await select.click();
   await assert.equal(await page.getByRole("listbox").count(), 1);
+  await assert.equal(await page.locator(".fluent-select__chevron").evaluate(el => el.tagName), "svg");
+  await assert.equal(await page.locator(".fluent-select__chevron").getAttribute("data-icon"), "chevron-up");
   assert.equal(await page.locator(".fluent-popover").evaluate(el => getComputedStyle(el).getPropertyValue("--fluent-control-hover").trim()), "rgb(12, 34, 56)");
   await page.evaluate(() => window.setFixtureTheme('dark'));
   await page.waitForTimeout(100);
@@ -61,7 +63,10 @@ try {
   await assert.equal(await page.getByRole("separator").count(), 1);
   await menuTrigger.press("ArrowDown");
   await menuTrigger.press("Enter");
-  await assert.equal(await page.getByRole("menuitemcheckbox", { name: "Share" }).getAttribute("aria-checked"), "true");
+  const shareItem = page.getByRole("menuitemcheckbox", { name: "Share" });
+  await assert.equal(await shareItem.getAttribute("aria-checked"), "true");
+  await assert.equal(await shareItem.locator(".fluent-menu__check").evaluate(el => el.tagName), "svg");
+  await assert.equal(await shareItem.locator(".fluent-menu__check").getAttribute("data-icon"), "check");
   await assert.equal(await page.getByRole("menu").count(), 1);
   await page.keyboard.press("Escape");
   await assert.equal(await page.getByRole("menu").count(), 0);
