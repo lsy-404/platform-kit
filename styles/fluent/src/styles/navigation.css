@@ -8,22 +8,8 @@
   gap: 2px;
   scrollbar-gutter: stable;
 }
-.fluent-navigation__selection {
-  position: absolute;
-  top: 0;
-  z-index: 0;
-  inset-inline: 4px;
-  border-radius: var(--fluent-radius);
-  background: var(--fluent-selection);
-  pointer-events: none;
-  transition:
-    transform var(--fluent-fast) var(--fluent-ease),
-    height var(--fluent-fast) var(--fluent-ease),
-    opacity var(--fluent-fast) var(--fluent-ease);
-}
 .fluent-navigation__item {
   position: relative;
-  z-index: 1;
   min-height: 36px;
   padding: 0 12px;
   overflow: hidden;
@@ -52,13 +38,10 @@
   opacity: 0.45;
   cursor: default;
 }
-@media (prefers-reduced-motion: reduce) {
-  .fluent-navigation__selection {
-    transition: none;
-  }
+.fluent-navigation__item.is-selected {
+  background: var(--fluent-selection);
 }
-
-.fluent-navigation__selection::before {
+.fluent-navigation__item.is-selected::before {
   content: "";
   position: absolute;
   inset-inline-start: 0;

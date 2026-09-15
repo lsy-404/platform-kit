@@ -3,9 +3,6 @@ import {
   defineComponent,
   h,
   nextTick,
-  onBeforeUnmount,
-  onMounted,
-  ref,
   watch,
   type PropType,
 } from "vue";
@@ -25,12 +22,14 @@ export const FluentNavigation = defineComponent({
   },
   emits: ["update:modelValue", "select"],
   setup(props, { emit }) {
-    const root = ref<HTMLElement | null>(null);
     const itemEls = new Map<string, HTMLElement>();
-    const selection = ref({ height: 0, y: 0, visible: false });
-    let observer: ResizeObserver | null = null;
     const selectedIndex = computed(() =>
       props.items.findIndex((item) => item.key === props.modelValue),
+    );
+    watch(
+      () => props.modelValue,
+      (value) => void nextTick(() => itemEls.get(value)?.scrollIntoView({ block: "nearest" })),
+      { immediate: true },
     );
     function select(item: FluentNavigationItem): void {
       if (item.disabled || item.key === props.modelValue) return;
@@ -74,85 +73,33 @@ export const FluentNavigation = defineComponent({
         if (item) select(item);
       }
     }
-    function updateSelection(): void {
-      const rootEl = root.value;
-      const selected = itemEls.get(props.modelValue);
-      if (!rootEl || !selected) {
-        selection.value = { height: 0, y: 0, visible: false };
-        return;
-      }
-      const rootBox = rootEl.getBoundingClientRect();
-      const itemBox = selected.getBoundingClientRect();
-      selection.value = {
-        height: itemBox.height,
-        y: itemBox.top - rootBox.top + rootEl.scrollTop,
-        visible: true,
-      };
-    }
-    const onScroll = () => updateSelection();
-    watch(
-      () => props.modelValue,
-      () =>
-        void nextTick(() => {
-          const selected = itemEls.get(props.modelValue);
-          selected?.scrollIntoView({ block: "nearest" });
-          updateSelection();
-        }),
-      { immediate: true },
-    );
-    watch(() => props.items, () => void nextTick(updateSelection), { deep: true });
-    onMounted(() => {
-      root.value?.addEventListener("scroll", onScroll);
-      if (typeof ResizeObserver !== "undefined" && root.value) {
-        observer = new ResizeObserver(updateSelection);
-        observer.observe(root.value);
-      }
-      void nextTick(updateSelection);
-    });
-    onBeforeUnmount(() => {
-      root.value?.removeEventListener("scroll", onScroll);
-      observer?.disconnect();
-    });
     return () =>
       h(
         "nav",
         {
-          ref: root,
           class: "fluent-navigation",
           "aria-label": props.label,
           onKeydown,
         },
-        [
-          h("span", {
-            class: "fluent-navigation__selection",
-            "aria-hidden": "true",
-            style: {
-              height: `${selection.value.height}px`,
-              opacity: selection.value.visible ? 1 : 0,
-              transform: `translateY(${selection.value.y}px)`,
+        props.items.map((item) => {
+          const selected = item.key === props.modelValue;
+          return h(
+            "button",
+            {
+              key: item.key,
+              ref: ((element: Element | null) => {
+                if (element instanceof HTMLElement) itemEls.set(item.key, element);
+                else itemEls.delete(item.key);
+              }) as never,
+              type: "button",
+              class: ["fluent-navigation__item", { "is-selected": selected }],
+              disabled: item.disabled,
+              "aria-current": selected ? "page" : undefined,
+              onClick: () => select(item),
             },
-          }),
-          ...props.items.map((item) => {
-            const selected = item.key === props.modelValue;
-            return h(
-              "button",
-              {
-                key: item.key,
-                ref: ((element: Element | null) => {
-                  if (element instanceof HTMLElement)
-                    itemEls.set(item.key, element);
-                  else itemEls.delete(item.key);
-                }) as never,
-                type: "button",
-                class: ["fluent-navigation__item", { "is-selected": selected }],
-                disabled: item.disabled,
-                "aria-current": selected ? "page" : undefined,
-                onClick: () => select(item),
-              },
-              item.label,
-            );
-          }),
-        ],
+            item.label,
+          );
+        }),
       );
   },
 });
