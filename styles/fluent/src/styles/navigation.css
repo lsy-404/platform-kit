@@ -41,6 +41,10 @@
 .fluent-navigation__item.is-selected {
   background: var(--fluent-selection);
 }
+.fluent-navigation__item.is-selected:hover:not(:disabled),
+.fluent-navigation__item.is-selected:active:not(:disabled) {
+  background: var(--fluent-selection);
+}
 .fluent-navigation__item.is-selected::before {
   content: "";
   position: absolute;

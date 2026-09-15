@@ -54,5 +54,10 @@ describe("Fluent control states", () => {
       "forced-colors: active",
     ]) expect(css).toContain(selector);
     expect(css).not.toContain("button:hover {");
+    expect(css).not.toContain(".fluent-button::after");
+    expect(css).not.toContain("scale(1.12)");
+    expect(css).not.toContain("scale(0.9)");
+    expect(css).not.toContain("transform: scale(0.99)");
+    expect(css).toContain('.fluent-checkbox:hover .fluent-checkbox__input:is(:checked, :indeterminate):not(:disabled)');
   });
 });
