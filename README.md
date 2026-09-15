@@ -54,7 +54,7 @@ node test/release-consumer.mjs
 
 See [Fluent](styles/fluent/README.md) and [AI access](model-auth/README.md) for their APIs. Provider authentication and usage queries run in a trusted host; credentials and API keys never belong in this repository.
 
-Pushing a version tag runs the same verification pipeline and publishes `.tgz` archives with SHA-256 checksums. Third-party dependencies retain their own licenses; applicable bundled-code notices ship with the corresponding package.
+Pushing a version tag runs the same verification pipeline and publishes `.tgz` archives with SHA-256 checksums. The generated `release/` directory groups archives as `release/<package-name>/<package-name>-<version>.*`; package archive basenames and GitHub download URLs remain unchanged. Third-party dependencies retain their own licenses; applicable bundled-code notices ship with the corresponding package.
 
 ## License
 
