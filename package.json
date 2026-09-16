@@ -1,6 +1,5 @@
 {
   "name": "platform-kit",
-  "version": "0.6.5",
   "private": true,
   "license": "Apache-2.0",
   "packageManager": "pnpm@10.17.1",

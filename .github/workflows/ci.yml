@@ -2,7 +2,13 @@ name: Build public packages
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    tags:
+      - 'fluent-v*'
+      - 'ui-tokens-v*'
+      - 'model-auth-core-v*'
+      - 'model-auth-providers-v*'
+      - 'model-auth-vue-v*'
+      - 'model-auth-native-v*'
   pull_request:
 permissions:
   contents: read
@@ -43,7 +49,7 @@ jobs:
             release/SHA256SUMS
           if-no-files-found: error
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/')
     needs: check
     runs-on: ubuntu-latest
     permissions:
@@ -59,11 +65,21 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
+          case "$RELEASE_TAG" in
+            fluent-v*) PACKAGE_DIR="platform-kit-fluent"; PACKAGE_LABEL="@platform-kit/fluent" ;;
+            ui-tokens-v*) PACKAGE_DIR="platform-kit-ui-tokens"; PACKAGE_LABEL="@platform-kit/ui-tokens" ;;
+            model-auth-core-v*) PACKAGE_DIR="model-auth-core"; PACKAGE_LABEL="@model-auth/core" ;;
+            model-auth-providers-v*) PACKAGE_DIR="model-auth-providers"; PACKAGE_LABEL="@model-auth/providers" ;;
+            model-auth-vue-v*) PACKAGE_DIR="model-auth-vue"; PACKAGE_LABEL="@model-auth/vue" ;;
+            model-auth-native-v*) PACKAGE_DIR="model-auth-native"; PACKAGE_LABEL="model-auth-native" ;;
+            *) echo "Unsupported package release tag: $RELEASE_TAG" >&2; exit 1 ;;
+          esac
+          archive=$(find "release/$PACKAGE_DIR" -type f \( -name '*.tgz' -o -name '*.crate' \) -print -quit)
+          if [ -z "$archive" ]; then echo "No archive found for $PACKAGE_LABEL" >&2; exit 1; fi
+          grep "^$PACKAGE_DIR/" release/SHA256SUMS > release/SHA256SUMS.selected
+          mv release/SHA256SUMS.selected release/SHA256SUMS
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             echo "Release already exists; keeping published archives unchanged."
           else
-            assets=(release/SHA256SUMS)
-            while IFS= read -r asset; do assets+=("$asset"); done < <(find release -type f \( -name '*.tgz' -o -name '*.crate' \) -print | sort)
-            if [ "${#assets[@]}" -le 1 ]; then echo "No release archives found" >&2; exit 1; fi
-            gh release create "$RELEASE_TAG" "${assets[@]}" --verify-tag --title "$RELEASE_TAG" --notes "Apache-2.0 theme and complete public AI access packages. Install the archives directly from this repository."
+            gh release create "$RELEASE_TAG" release/SHA256SUMS "$archive" --verify-tag --title "$RELEASE_TAG" --notes "Apache-2.0 $PACKAGE_LABEL package archive. Install the archive directly from this repository."
           fi
