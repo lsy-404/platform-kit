@@ -76,10 +76,10 @@ jobs:
           esac
           archive=$(find "release/$PACKAGE_DIR" -type f \( -name '*.tgz' -o -name '*.crate' \) -print -quit)
           if [ -z "$archive" ]; then echo "No archive found for $PACKAGE_LABEL" >&2; exit 1; fi
-          grep "^$PACKAGE_DIR/" release/SHA256SUMS > release/SHA256SUMS.selected
-          mv release/SHA256SUMS.selected release/SHA256SUMS
+          checksum="$(grep "^$PACKAGE_DIR/" release/SHA256SUMS | awk '{print $1}')"
+          if [ -z "$checksum" ]; then echo "No checksum found for $PACKAGE_LABEL" >&2; exit 1; fi
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             echo "Release already exists; keeping published archives unchanged."
           else
-            gh release create "$RELEASE_TAG" release/SHA256SUMS "$archive" --verify-tag --title "$RELEASE_TAG" --notes "Apache-2.0 $PACKAGE_LABEL package archive. Install the archive directly from this repository."
+            gh release create "$RELEASE_TAG" "$archive" --verify-tag --title "$RELEASE_TAG" --notes "Apache-2.0 $PACKAGE_LABEL package archive. SHA-256: $checksum"
           fi
