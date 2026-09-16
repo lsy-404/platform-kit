@@ -16,7 +16,7 @@ const Catalog = defineComponent({
     const native = (label: string, type: string, props: Record<string, unknown> = {}) => h("label", { class: "native-field" }, [h("span", label), h("input", { type, ...props })]);
     const anchor = (target: typeof menuAnchor | typeof popoverAnchor) => (element: Element | ComponentPublicInstance | null) => target.value = element instanceof HTMLElement ? element : null;
     return () => h(FluentTheme, { mode: theme.value, accent: accent.value, class: "catalog-theme" }, { default: () => h("div", { class: "catalog-page" }, [
-      h("header", { class: "catalog-header" }, [h("div", [h("p", { class: "catalog-kicker" }, "@platform-kit/fluent 0.2.3"), h("h1", "Fluent control catalog")]), h("div", { class: "catalog-settings", "aria-label": "Catalog settings" }, [
+      h("header", { class: "catalog-header" }, [h("div", [h("p", { class: "catalog-kicker" }, "@platform-kit/fluent 0.2.5"), h("h1", "Fluent control catalog")]), h("div", { class: "catalog-settings", "aria-label": "Catalog settings" }, [
         h(FluentSelect, { label: "Theme", "data-testid": "theme-mode", modelValue: theme.value, options: [{ value: "light", label: "Light" }, { value: "dark", label: "Dark" }, { value: "system", label: "System" }], "onUpdate:modelValue": (value: string) => theme.value = value as ThemeMode }),
         h(FluentSelect, { label: "Accent", "data-testid": "accent-select", modelValue: accent.value, options: accents.map(value => ({ value, label: value })), "onUpdate:modelValue": (value: string) => accent.value = value })
       ])]),

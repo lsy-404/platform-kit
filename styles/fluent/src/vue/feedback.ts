@@ -1,4 +1,5 @@
 import { defineComponent, h, mergeProps, ref } from "vue";
+import { fluentIcon } from "./icon.js";
 
 export const FluentCheckbox = defineComponent({
   name: "FluentCheckbox",
@@ -8,6 +9,11 @@ export const FluentCheckbox = defineComponent({
   setup(props, { attrs, emit, slots }) {
     return () => {
       const { class: className, style, ...inputAttrs } = attrs;
+      const indicator = props.indeterminate
+        ? h("span", { class: "fluent-checkbox__indeterminate" })
+        : props.modelValue
+          ? fluentIcon("check", "fluent-checkbox__check")
+          : undefined;
       return h("label", { class: ["fluent-checkbox", className], style }, [
         h("input", mergeProps(inputAttrs, {
           class: "fluent-checkbox__input",
@@ -22,6 +28,13 @@ export const FluentCheckbox = defineComponent({
             emit("change", checked);
           },
         })),
+        h("span", {
+          class: ["fluent-checkbox__box", {
+            "fluent-checkbox__box--checked": props.modelValue,
+            "fluent-checkbox__box--indeterminate": props.indeterminate,
+          }],
+          "aria-hidden": "true",
+        }, indicator),
         slots.default || props.label
           ? h("span", { class: "fluent-checkbox__label" }, slots.default?.() ?? props.label)
           : null,

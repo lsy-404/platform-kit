@@ -18,7 +18,7 @@ Use public release archive URLs in `package.json`. No private registry token or 
 ```json
 {
   "dependencies": {
-    "@lsypkg/fluent": "https://github.com/lsy-404/platform-kit/releases/download/fluent-v0.2.4/platform-kit-fluent-0.2.4.tgz",
+    "@lsypkg/fluent": "https://github.com/lsy-404/platform-kit/releases/download/fluent-v0.2.5/platform-kit-fluent-0.2.5.tgz",
     "@model-auth/core": "https://github.com/lsy-404/platform-kit/releases/download/model-auth-core-v0.6.1/model-auth-core-0.6.1.tgz",
     "@model-auth/providers": "https://github.com/lsy-404/platform-kit/releases/download/model-auth-providers-v0.6.1/model-auth-providers-0.6.1.tgz",
     "@model-auth/vue": "https://github.com/lsy-404/platform-kit/releases/download/model-auth-vue-v0.6.1/model-auth-vue-0.6.1.tgz"
@@ -54,7 +54,7 @@ node test/release-consumer.mjs
 
 See [Fluent](styles/fluent/README.md) and [AI access](model-auth/README.md) for their APIs. Provider authentication and usage queries run in a trusted host; credentials and API keys never belong in this repository.
 
-Pushing a package tag such as `fluent-v0.2.4` runs the same verification pipeline and publishes only that package archive with a package-specific SHA-256 checksum. The generated `release/` directory groups archives as `release/<package-name>/<package-name>-<version>.*`; package archive basenames remain unchanged. There is no root `platform-kit` release version or main release tag. Third-party dependencies retain their own licenses; applicable bundled-code notices ship with the corresponding package.
+Pushing a package tag such as `fluent-v0.2.5` runs the same verification pipeline and publishes only that package archive with a package-specific SHA-256 checksum. The generated `release/` directory groups archives as `release/<package-name>/<package-name>-<version>.*`; package archive basenames remain unchanged. There is no root `platform-kit` release version or main release tag. Third-party dependencies retain their own licenses; applicable bundled-code notices ship with the corresponding package.
 
 ## License
 

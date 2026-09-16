@@ -254,12 +254,13 @@
   cursor: pointer;
 }
 .fluent-checkbox__input {
-  flex: none;
-  width: 18px;
-  height: 18px;
-  margin: 0;
-  accent-color: var(--fluent-accent);
-  cursor: inherit;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 .fluent-checkbox:has(:disabled) {
   opacity: 0.55;
@@ -420,7 +421,6 @@ textarea.fluent-field__input {
 .fluent-checkbox,
 .fluent-radio { position: relative; min-height: 20px; }
 .fluent-radio { display: inline-flex; align-items: center; gap: 8px; color: var(--fluent-text); font: inherit; cursor: pointer; }
-.fluent-checkbox__input,
 .fluent-radio__input {
   appearance: none;
   -webkit-appearance: none;
@@ -435,36 +435,38 @@ textarea.fluent-field__input {
   cursor: inherit;
   transition: background var(--fluent-fast) var(--fluent-ease), border-color var(--fluent-fast) var(--fluent-ease);
 }
-.fluent-checkbox__input { border-radius: 3px; }
 .fluent-radio__input { border-radius: 50%; }
-.fluent-checkbox__input::before {
-  width: 9px;
-  height: 5px;
-  content: "";
-  border: solid currentColor;
-  border-width: 0 0 2px 2px;
-  transform: rotate(-45deg) scale(0);
-  transition: transform var(--fluent-fast) var(--fluent-ease);
+.fluent-checkbox__box {
+  display: grid;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 1px solid var(--fluent-border);
+  border-radius: 3px;
+  color: var(--fluent-accent-text);
+  background: var(--fluent-control);
+  transition: background var(--fluent-fast) var(--fluent-ease), border-color var(--fluent-fast) var(--fluent-ease);
 }
 .fluent-radio__input::before { width: 8px; height: 8px; content: ""; border-radius: 50%; background: currentColor; transform: scale(0); transition: transform var(--fluent-fast) var(--fluent-ease); }
-.fluent-checkbox__input:checked,
 .fluent-radio__input:checked { border-color: var(--fluent-accent); background: var(--fluent-accent); }
-.fluent-checkbox__input:checked::before,
 .fluent-radio__input:checked::before { transform: rotate(-45deg) scale(1); }
 .fluent-radio__input:checked::before { transform: scale(1); }
-.fluent-checkbox__input:indeterminate { border-color: var(--fluent-accent); background: var(--fluent-accent); }
-.fluent-checkbox__input:indeterminate::before { height: 0; width: 9px; border-width: 0 0 2px; transform: none; }
-.fluent-checkbox:hover .fluent-checkbox__input:not(:disabled, :checked, :indeterminate),
+.fluent-checkbox__box--checked,
+.fluent-checkbox__box--indeterminate { border-color: var(--fluent-accent); background: var(--fluent-accent); }
+.fluent-checkbox__check { width: 14px; height: 14px; transform: translateY(1px); stroke-width: 2.25px; }
+.fluent-checkbox__indeterminate { width: 9px; height: 2px; border-radius: 999px; background: currentColor; }
+.fluent-checkbox:hover .fluent-checkbox__box:not(.fluent-checkbox__box--checked, .fluent-checkbox__box--indeterminate),
 .fluent-radio:hover .fluent-radio__input:not(:disabled, :checked) {
   border-color: var(--fluent-accent);
   background: var(--fluent-control-hover);
 }
-.fluent-checkbox:hover .fluent-checkbox__input:is(:checked, :indeterminate):not(:disabled),
+.fluent-checkbox:hover .fluent-checkbox__box:is(.fluent-checkbox__box--checked, .fluent-checkbox__box--indeterminate),
 .fluent-radio:hover .fluent-radio__input:checked:not(:disabled) {
   border-color: var(--fluent-accent-hover);
   background: var(--fluent-accent-hover);
 }
-.fluent-checkbox__input:focus-visible,
+.fluent-checkbox__input:focus-visible + .fluent-checkbox__box,
 .fluent-radio__input:focus-visible { outline: 2px solid var(--fluent-accent); outline-offset: 2px; }
 .fluent-checkbox:has(:disabled),
 .fluent-radio:has(:disabled) { color: var(--fluent-muted); opacity: 0.55; cursor: not-allowed; }
@@ -474,7 +476,7 @@ textarea.fluent-field__input {
   .fluent-button,
   .fluent-field__input,
   .fluent-switch__track,
-  .fluent-checkbox__input,
+  .fluent-checkbox__box,
   .fluent-radio__input {
     border-color: ButtonText;
     forced-color-adjust: none;
@@ -483,7 +485,7 @@ textarea.fluent-field__input {
   .fluent-button--primary,
   .fluent-button--danger,
   .fluent-switch--checked .fluent-switch__track,
-  .fluent-checkbox__input:checked,
+  .fluent-checkbox__box--checked,
   .fluent-radio__input:checked { color: HighlightText; background: Highlight; }
   .fluent-field__input[data-invalid],
   .fluent-field__input:invalid { outline: 2px solid Mark; outline-offset: -3px; }
@@ -494,7 +496,7 @@ textarea.fluent-field__input {
   .fluent-button,
   .fluent-switch__track,
   .fluent-switch__thumb,
-  .fluent-checkbox__input,
+  .fluent-checkbox__box,
   .fluent-radio__input { transition-duration: 0ms; }
 }
 

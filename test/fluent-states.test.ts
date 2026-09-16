@@ -48,7 +48,7 @@ describe("Fluent control states", () => {
       ".fluent-field__input[data-invalid]",
       ".fluent-switch--checked:hover",
       ".fluent-slider__input:disabled",
-      ".fluent-checkbox__input:checked",
+      ".fluent-checkbox__box--checked",
       ".fluent-radio__input:checked",
       "prefers-reduced-motion",
       "forced-colors: active",
@@ -58,6 +58,6 @@ describe("Fluent control states", () => {
     expect(css).not.toContain("scale(1.12)");
     expect(css).not.toContain("scale(0.9)");
     expect(css).not.toContain("transform: scale(0.99)");
-    expect(css).toContain('.fluent-checkbox:hover .fluent-checkbox__input:is(:checked, :indeterminate):not(:disabled)');
+    expect(css).toContain('.fluent-checkbox:hover .fluent-checkbox__box:is(.fluent-checkbox__box--checked, .fluent-checkbox__box--indeterminate)');
   });
 });

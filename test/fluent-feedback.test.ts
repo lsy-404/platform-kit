@@ -30,12 +30,32 @@ describe("Fluent feedback controls", () => {
       { onChange, "aria-label": "Remember setting" },
     );
     const input = node.children[0];
+    const box = node.children[1];
     expect(input.type).toBe("input");
     expect(input.props).toMatchObject({ type: "checkbox", checked: false, "aria-label": "Remember setting" });
+    expect(box.props.class).toContain("fluent-checkbox__box");
     trigger(input.props.onChange, { target: { checked: true } } as unknown as Event);
     expect(emit).toHaveBeenCalledWith("update:modelValue", true);
     expect(emit).toHaveBeenCalledWith("change", true);
     expect(onChange).toHaveBeenCalledOnce();
+  });
+
+  it("renders the library SVG check only for the checked state", () => {
+    const checked = render(
+      FluentCheckbox,
+      { modelValue: true, indeterminate: false, disabled: false, label: "Remember" },
+    ).node;
+    const check = checked.children[1].children[0];
+    expect(check.type).toBe("svg");
+    expect(check.props).toMatchObject({ "data-icon": "check" });
+    expect(checked.children[1].props.class).toContain("fluent-checkbox__box--checked");
+
+    const indeterminate = render(
+      FluentCheckbox,
+      { modelValue: false, indeterminate: true, disabled: false, label: "Remember" },
+    ).node;
+    expect(indeterminate.children[1].props.class).toContain("fluent-checkbox__box--indeterminate");
+    expect(indeterminate.children[1].children[0].props.class).toBe("fluent-checkbox__indeterminate");
   });
 
   it("clamps determinate progress and preserves an explicit accessible name", () => {
