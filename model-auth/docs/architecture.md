@@ -4,7 +4,7 @@
 
 ## Core
 
-`@model-auth/core` is framework-neutral. The host fetches a `models.dev` payload and passes it to `parseModelsDevPayload`; the core parser filters unusable providers and models and returns a stable catalog. `CatalogCache` can retain a cached or fallback snapshot while a live refresh runs. The core package does not fetch the source, persist credentials, open browsers, or call provider APIs.
+`@model-auth/core` is framework-neutral. The host fetches a `models.dev` payload and passes it to `parseModelsDevPayload`; the core parser filters unusable providers and models and returns a stable catalog. `CatalogCache` can retain a cached or fallback snapshot while a live refresh runs. `mergeCatalogProviderModels` adds host-discovered models without replacing source catalog metadata. The core package does not fetch the source, persist credentials, open browsers, or call provider APIs.
 
 Usage snapshots expose validated provider windows, balances, and an optional `ProviderUsageEstimate`. The estimate carries observed token/request amounts, configured or learned limit data, confidence, and both a 0..1 `remainingRatio` and an unrounded 0..100 `remainingPercent`. Hosts attach estimates from their own transcript or request history; an unknown limit remains `null`.
 
@@ -24,7 +24,7 @@ The host supplies the catalog, existing metadata, and callbacks. Authentication 
 
 ## Trusted authorization
 
-`@model-auth/providers` contains OpenAI, Anthropic, WorkBuddy, Trae, Grok and Ollama access. OpenAI, Anthropic and Grok share PKCE, bounded loopback callback handling and renewable-token validation. WorkBuddy uses state issuance, a validated browser login URL, a private cookie jar, bounded token polling, profile lookup, and renewable tokens. Ollama opens its first-party sign-in page and polls a host-provided browser session before reading the authenticated settings page. Redirects never receive credential headers, and errors contain only safe codes. Account IDs, encrypted persistence, request transport, and pool routing remain host-owned. Use the same credential ID for renewal, reconnect, request routing, usage queries, and removal.
+`@model-auth/providers` contains OpenAI, Anthropic, WorkBuddy, Trae, Grok and Ollama access. OpenAI, Anthropic and Grok share PKCE, bounded loopback callback handling and renewable-token validation. WorkBuddy uses state issuance, a validated browser login URL, a private cookie jar, bounded token polling, profile lookup, and renewable tokens. Ollama opens its first-party sign-in page and polls a host-provided browser session before reading the authenticated settings page. Its local discovery reads the unauthenticated loopback tags endpoint, is enabled by default, and returns a merged available-model catalog without guessing model capabilities. Redirects never receive credential headers, and errors contain only safe codes. Account IDs, encrypted persistence, request transport, and pool routing remain host-owned. Use the same credential ID for renewal, reconnect, request routing, usage queries, and removal.
 
 The package is not renderer-safe: import it only in the Electron main process or a trusted service. Native hosts use the Rust library in `model-auth/rust` and keep browser opening, encrypted storage and cancellation wiring in their backend.
 

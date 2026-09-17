@@ -21,6 +21,22 @@ if (snapshot.catalog) renderProviders(snapshot.catalog.providers);
 
 The example contains no credential material. A host may keep displaying the previous catalog after a failed refresh and use `snapshot.status`/`sourceStatus` to show that the source is stale.
 
+### Add installed local Ollama models
+
+Run local discovery in the trusted host after obtaining the source catalog. It calls only the default loopback endpoint (`127.0.0.1:11434/api/tags`), is enabled by default, and preserves the source catalog unchanged if Ollama is unavailable or returns no models.
+
+```ts
+import { discoverAndMergeLocalOllamaModels } from "@model-auth/providers/ollama";
+
+const sourceSnapshot = await cache.refresh(loadModelsDev);
+const localOllama = sourceSnapshot.catalog
+  ? await discoverAndMergeLocalOllamaModels(sourceSnapshot.catalog)
+  : null;
+const availableCatalog = localOllama?.catalog ?? sourceSnapshot.catalog;
+```
+
+Use `discoverAndMergeLocalOllamaModels(catalog, { enabled: false })` to disable this behavior. The returned status distinguishes `disabled`, `unavailable`, and an invalid local response; neither unavailable nor invalid discovery changes the existing available-model list. The tags response does not establish tool, vision, or context capabilities, so hosts must not infer them.
+
 ## 2. Implement the host callbacks
 
 The UI calls host-owned actions. The providers package performs actual authorization in that trusted process; neither Vue nor a core adapter factory is a credential vault.

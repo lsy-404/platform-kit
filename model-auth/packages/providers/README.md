@@ -61,6 +61,10 @@ Model discovery returns the account's actual service metadata. `streamTrae` and 
 
 `authorizeOllamaWeb` opens `ollama.com/signin`, waits for the host to observe the authenticated browser cookie, and verifies the session by reading the first-party settings page. `queryOllamaUsage` and `parseOllamaSettings` expose plan and usage information without returning the cookie. The cookie callback and persistence remain host-owned.
 
+## Local Ollama model discovery
+
+`discoverAndMergeLocalOllamaModels(catalog)` runs in the trusted host, queries the unauthenticated loopback endpoint `http://127.0.0.1:11434/api/tags`, and returns the catalog with installed model names added under `ollama`. Discovery is enabled by default; use `{ enabled: false }` to disable it for a refresh. An unavailable service or invalid response preserves the original catalog. The discovery API only reports installed model names and does not claim tool, vision, or context capabilities.
+
 ## Dynamic authentication and generic requests
 
 Hosts may expose `ProviderAuthPrompt` and `ProviderAuthNotice` events through the core adapter interaction to support device codes, browser URLs, selections, and manual codes. The same adapter boundary contains generic `logout`, `request`, `stream`, and `queryUsage` callbacks; provider secrets never appear in `CredentialMetadata`, Vue state, or usage snapshots.

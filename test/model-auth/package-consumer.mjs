@@ -67,29 +67,29 @@ await browser.happyDOM.close();
 writeFileSync(join(consumer, "entry.ts"), `
 import { ModelAuthDialog, type ModelAuthProvider } from "@model-auth/vue";
 import { registerModelAuthElement } from "@model-auth/vue/custom-element";
-import { CredentialRouter, createCredentialMetadata } from "@model-auth/core";
+import { CredentialRouter, createCredentialMetadata, mergeCatalogProviderModels } from "@model-auth/core";
 import { authorizeWorkBuddy, refreshWorkBuddy } from "@model-auth/providers/workbuddy";
 import { authorizeOpenAI, refreshOpenAI } from "@model-auth/providers/openai";
 import { authorizeAnthropic, refreshAnthropic } from "@model-auth/providers/anthropic";
 import { authorizeTrae, refreshTrae, listTraeModels, streamTrae } from "@model-auth/providers/trae";
 import { authorizeGrok, queryGrokUsage } from "@model-auth/providers/grok";
-import { authorizeOllamaWeb, queryOllamaUsage } from "@model-auth/providers/ollama";
+import { authorizeOllamaWeb, discoverLocalOllamaModels, queryOllamaUsage } from "@model-auth/providers/ollama";
 import { queryProviderUsage } from "@model-auth/providers/usage";
 const providers: ModelAuthProvider[] = [];
 const router = new CredentialRouter([createCredentialMetadata({ id: "one", providerId: "sample", authMethod: "api-key", modelIds: ["sample"] })]);
-void [providers, router, ModelAuthDialog, registerModelAuthElement, authorizeWorkBuddy, refreshWorkBuddy, authorizeTrae, refreshTrae, listTraeModels, streamTrae, authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic, authorizeGrok, queryGrokUsage, authorizeOllamaWeb, queryOllamaUsage, queryProviderUsage];
+void [providers, router, ModelAuthDialog, registerModelAuthElement, mergeCatalogProviderModels, authorizeWorkBuddy, refreshWorkBuddy, authorizeTrae, refreshTrae, listTraeModels, streamTrae, authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic, authorizeGrok, queryGrokUsage, authorizeOllamaWeb, discoverLocalOllamaModels, queryOllamaUsage, queryProviderUsage];
 `);
 execFileSync(process.execPath, [join(root, "node_modules/typescript/bin/tsc"), "--noEmit", "--strict", "--skipLibCheck", "--moduleResolution", "bundler", "--module", "esnext", "--target", "es2023", join(consumer, "entry.ts")], { stdio: "pipe", cwd: consumer });
 execFileSync(process.execPath, [join(root, "node_modules/typescript/bin/tsc"), "--noEmit", "--strict", "--skipLibCheck", "--moduleResolution", "node", "--module", "commonjs", "--target", "es2023", join(consumer, "entry.ts")], { stdio: "pipe", cwd: consumer });
 execFileSync(process.execPath, ["--input-type=module", "-e", `
-import { CredentialRouter, createCredentialMetadata } from "@model-auth/core";
+import { CredentialRouter, createCredentialMetadata, mergeCatalogProviderModels } from "@model-auth/core";
 import { authorizeWorkBuddy, refreshWorkBuddy } from "@model-auth/providers/workbuddy";
 import { authorizeOpenAI, refreshOpenAI } from "@model-auth/providers/openai";
 import { authorizeAnthropic, refreshAnthropic } from "@model-auth/providers/anthropic";
 import { authorizeGrok, queryGrokUsage } from "@model-auth/providers/grok";
-import { authorizeOllamaWeb, queryOllamaUsage } from "@model-auth/providers/ollama";
+import { authorizeOllamaWeb, discoverLocalOllamaModels, queryOllamaUsage } from "@model-auth/providers/ollama";
 if (typeof authorizeWorkBuddy !== "function" || typeof refreshWorkBuddy !== "function") throw new Error("Installed providers unavailable");
-for (const provider of [authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic, authorizeGrok, queryGrokUsage, authorizeOllamaWeb, queryOllamaUsage]) {
+for (const provider of [authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic, authorizeGrok, queryGrokUsage, authorizeOllamaWeb, discoverLocalOllamaModels, queryOllamaUsage, mergeCatalogProviderModels]) {
   if (typeof provider !== "function") throw new Error("Installed browser OAuth unavailable");
 }
 const router = new CredentialRouter([createCredentialMetadata({ id: "one", providerId: "sample", authMethod: "api-key", modelIds: ["sample"] })]);

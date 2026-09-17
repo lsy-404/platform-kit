@@ -1,9 +1,37 @@
+import { mergeCatalogProviderModels, normalizeModelId, type ModelDescriptor, type ModelsDevCatalog } from "@model-auth/core";
 import { usageSnapshot, type ProviderUsageData, type ProviderUsageRequestOptions, type ProviderUsageSnapshot, type ProviderUsageWindow } from "./usage.js";
 
 export const OLLAMA_WEB_ENDPOINTS = Object.freeze({
   signIn: "https://ollama.com/signin",
   settings: "https://ollama.com/settings",
 });
+
+export const OLLAMA_LOCAL_ENDPOINTS = Object.freeze({
+  apiBase: "http://127.0.0.1:11434/api",
+  tags: "http://127.0.0.1:11434/api/tags",
+});
+
+export type OllamaLocalDiscoveryStatus = "available" | "disabled" | "unavailable" | "invalid-response";
+
+export interface OllamaLocalDiscoveryOptions {
+  /** Enabled by default. Set false to disable local discovery for this refresh. */
+  readonly enabled?: boolean;
+  readonly fetchImpl?: typeof fetch;
+  readonly signal?: AbortSignal;
+  /** Defaults to one second and is capped at thirty seconds. */
+  readonly timeoutMs?: number;
+}
+
+export interface OllamaLocalDiscoveryResult {
+  readonly enabled: boolean;
+  readonly status: OllamaLocalDiscoveryStatus;
+  readonly models: readonly ModelDescriptor[];
+  readonly error: string | null;
+}
+
+export interface OllamaLocalCatalogResult extends OllamaLocalDiscoveryResult {
+  readonly catalog: ModelsDevCatalog;
+}
 
 export interface OllamaWebSession {
   /** Keep this value in the host credential store; never put it in renderer state. */
@@ -25,6 +53,75 @@ export interface OllamaWebAuthorizationOptions extends ProviderUsageRequestOptio
 
 const MAX_AUTH_TIMEOUT_MS = 600_000;
 const DEFAULT_POLL_MS = 1_500;
+const DEFAULT_LOCAL_DISCOVERY_TIMEOUT_MS = 1_000;
+const MAX_LOCAL_DISCOVERY_TIMEOUT_MS = 30_000;
+
+export function parseLocalOllamaModels(payload: unknown): readonly ModelDescriptor[] {
+  if (!isRecord(payload) || !Array.isArray(payload.models)) throw new Error("Ollama local model list is invalid.");
+  const models = payload.models.flatMap((item) => {
+    if (!isRecord(item) || typeof item.name !== "string") return [];
+    try {
+      const id = normalizeModelId(item.name);
+      return [{ id, name: id }];
+    } catch {
+      return [];
+    }
+  });
+  if (payload.models.length > 0 && models.length === 0) throw new Error("Ollama local model list is invalid.");
+  const seen = new Set<string>();
+  return models.filter((model) => {
+    if (seen.has(model.id)) return false;
+    seen.add(model.id);
+    return true;
+  }).sort((left, right) => left.id.localeCompare(right.id));
+}
+
+export async function discoverLocalOllamaModels(options: OllamaLocalDiscoveryOptions = {}): Promise<OllamaLocalDiscoveryResult> {
+  const enabled = options.enabled ?? true;
+  if (!enabled) return { enabled, status: "disabled", models: [], error: null };
+  const timeout = localDiscoveryTimeout(options.timeoutMs);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+  const signal = options.signal ? AbortSignal.any([options.signal, controller.signal]) : controller.signal;
+  try {
+    const response = await (options.fetchImpl ?? fetch)(OLLAMA_LOCAL_ENDPOINTS.tags, {
+      headers: { accept: "application/json" },
+      signal,
+    });
+    if (!response.ok) return { enabled, status: "unavailable", models: [], error: "Ollama local service is unavailable." };
+    try {
+      return { enabled, status: "available", models: parseLocalOllamaModels(await response.json()), error: null };
+    } catch {
+      return { enabled, status: "invalid-response", models: [], error: "Ollama local model list is invalid." };
+    }
+  } catch {
+    return {
+      enabled,
+      status: "unavailable",
+      models: [],
+      error: "Ollama local service is unavailable.",
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Discovers local models and returns a catalog that can be used as the host's available-model list. */
+export async function discoverAndMergeLocalOllamaModels(catalog: ModelsDevCatalog, options: OllamaLocalDiscoveryOptions = {}): Promise<OllamaLocalCatalogResult> {
+  const discovery = await discoverLocalOllamaModels(options);
+  return {
+    ...discovery,
+    catalog: discovery.status === "available" && discovery.models.length > 0
+      ? mergeCatalogProviderModels(catalog, {
+        providerId: "ollama",
+        providerName: "Ollama",
+        packageName: null,
+        api: OLLAMA_LOCAL_ENDPOINTS.apiBase,
+        models: discovery.models,
+      })
+      : catalog,
+  };
+}
 
 /** Open the first-party sign-in page and wait for a host-provided browser session. */
 export async function authorizeOllamaWeb(options: OllamaWebAuthorizationOptions): Promise<{ session: OllamaWebSession; usage: ProviderUsageSnapshot }> {
@@ -156,6 +253,16 @@ function firstMatch(value: string, ...patterns: RegExp[]): string | null {
 
 function decodeHtml(value: string): string {
   return value.replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&#36;/g, "$");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function localDiscoveryTimeout(value: number | undefined): number {
+  if (value === undefined) return DEFAULT_LOCAL_DISCOVERY_TIMEOUT_MS;
+  if (!Number.isFinite(value) || value <= 0) throw new Error("Ollama local discovery timeout is invalid.");
+  return Math.min(value, MAX_LOCAL_DISCOVERY_TIMEOUT_MS);
 }
 
 function authorizationTimeout(value: number | undefined): number {

@@ -285,6 +285,51 @@ export function agentModelCatalog(catalog: ModelsDevCatalog): ModelsDevCatalog {
   return filterCatalogModels(catalog, (model) => model.status !== "deprecated" && supportsTextToolCalls(model));
 }
 
+export interface CatalogModelAddition {
+  readonly providerId: string;
+  readonly providerName?: string;
+  readonly packageName?: string | null;
+  readonly api?: string;
+  readonly env?: readonly string[];
+  readonly models: readonly ModelDescriptor[];
+}
+
+/** Adds discovered models without replacing metadata already supplied by the catalog source. */
+export function mergeCatalogProviderModels(catalog: ModelsDevCatalog, addition: CatalogModelAddition): ModelsDevCatalog {
+  const providerId = normalizeProviderId(addition.providerId);
+  const providerName = optionalString(addition.providerName) ?? providerId;
+  const models = addition.models.map((model) => ({
+    ...cloneModelDescriptor(model),
+    id: normalizeModelId(model.id),
+    name: requiredString(model.name, `model ${providerId}/${model.id}.name`),
+  }));
+  const seenModels = new Set<string>();
+  const uniqueModels = models.filter((model) => {
+    if (seenModels.has(model.id)) return false;
+    seenModels.add(model.id);
+    return true;
+  });
+  const existing = providerBinding(catalog, providerId);
+  if (existing) {
+    const existingIds = new Set(existing.models.map((model) => model.id));
+    return {
+      providers: catalog.providers.map((provider) => provider.id === providerId
+        ? { ...cloneProviderBinding(provider), models: [...provider.models.map(cloneModelDescriptor), ...uniqueModels.filter((model) => !existingIds.has(model.id)).map(cloneModelDescriptor)] }
+        : cloneProviderBinding(provider)),
+    };
+  }
+  if (uniqueModels.length === 0) return cloneCatalog(catalog);
+  const packageName = addition.packageName === undefined || addition.packageName === null ? null : optionalString(addition.packageName) ?? null;
+  const api = optionalString(addition.api);
+  const env = addition.env === undefined ? undefined : stringList(addition.env);
+  return {
+    providers: [
+      ...catalog.providers.map(cloneProviderBinding),
+      { id: providerId, name: providerName, packageName, ...(api ? { api } : {}), ...(env ? { env } : {}), models: uniqueModels.map(cloneModelDescriptor) },
+    ].sort((left, right) => left.id.localeCompare(right.id)),
+  };
+}
+
 export function bindRuntimeProviders(catalog: ModelsDevCatalog, bindings: readonly RuntimeProviderBindingInput[]): readonly RuntimeProviderBinding[] {
   return bindings.map((binding) => {
     const provider = providerBinding(catalog, binding.catalogProviderId);
@@ -351,14 +396,18 @@ export class CatalogCache {
 
 function cloneCatalog(catalog: ModelsDevCatalog): ModelsDevCatalog {
   return {
-    providers: catalog.providers.map((provider) => ({
-      id: provider.id,
-      name: provider.name,
-      packageName: provider.packageName,
-      ...(provider.api ? { api: provider.api } : {}),
-      ...(provider.env ? { env: [...provider.env] } : {}),
-      models: provider.models.map(cloneModelDescriptor),
-    })),
+    providers: catalog.providers.map(cloneProviderBinding),
+  };
+}
+
+function cloneProviderBinding(provider: ProviderBinding): ProviderBinding {
+  return {
+    id: provider.id,
+    name: provider.name,
+    packageName: provider.packageName,
+    ...(provider.api ? { api: provider.api } : {}),
+    ...(provider.env ? { env: [...provider.env] } : {}),
+    models: provider.models.map(cloneModelDescriptor),
   };
 }
 

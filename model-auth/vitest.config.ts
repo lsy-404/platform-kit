@@ -10,6 +10,7 @@ export default defineConfig({
   resolve: {
     alias: {
       vue: resolve(dirname(fileURLToPath(import.meta.url)), "node_modules/vue"),
+      "@model-auth/core": resolve(dirname(fileURLToPath(import.meta.url)), "packages/core/src/index.ts"),
     },
   },
   plugins: [vue()],
