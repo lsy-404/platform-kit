@@ -31,6 +31,7 @@ jobs:
       - run: cargo fmt --manifest-path model-auth/rust/Cargo.toml -- --check
       - run: cargo test --manifest-path test/rust/Cargo.toml --locked
       - run: node test/public-boundary.mjs
+      - run: node test/release-workflow.mjs
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
@@ -58,7 +59,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: public-packages
-          path: .
+          path: release
       - name: Publish immutable package archives
         env:
           GH_TOKEN: ${{ github.token }}
