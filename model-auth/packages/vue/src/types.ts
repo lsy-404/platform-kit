@@ -119,6 +119,9 @@ export interface ModelAuthProvider {
   oauthEnabled?: boolean;
   loadStrategy?: LoadStrategy;
   mark?: string;
+  api?: string;
+  website?: string;
+  iconUrl?: string;
   authorizeLabel?: string;
   usageEnabled?: boolean;
   logoutEnabled?: boolean;
