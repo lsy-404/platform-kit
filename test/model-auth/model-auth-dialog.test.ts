@@ -107,11 +107,20 @@ describe("authentication dialog", () => {
     expect(get('[data-provider-id="provider-a"] .model-auth-provider-mark').textContent).toBe("P");
   });
 
-  it("uses an explicit provider icon URL before its known website fallback", async () => {
+  it("tries each provider icon candidate before falling back to the mark", async () => {
     const { state } = await mount();
     state.providers[2]!.iconUrl = "https://assets.example.com/workbuddy.svg";
     await click('[data-part="method-oauth"]');
-    expect(get<HTMLImageElement>('[data-provider-id="workbuddy"] img').src).toBe("https://assets.example.com/workbuddy.svg");
+    let icon = get<HTMLImageElement>('[data-provider-id="workbuddy"] img');
+    expect(icon.src).toBe("https://assets.example.com/workbuddy.svg");
+    icon.dispatchEvent(new Event("error"));
+    await nextTick();
+    icon = get<HTMLImageElement>('[data-provider-id="workbuddy"] img');
+    expect(icon.src).toBe("https://copilot.tencent.com/favicon.ico");
+    icon.dispatchEvent(new Event("error"));
+    await nextTick();
+    expect(document.querySelector('[data-provider-id="workbuddy"] img')).toBeNull();
+    expect(get('[data-provider-id="workbuddy"] .model-auth-provider-mark').textContent).toBe("W");
   });
 
   it("keeps failed authorization at detail until authReady, idle, and error-free", async () => {

@@ -4,7 +4,7 @@ import { defaultMessages, type ModelAuthMessages } from "./messages";
 import StrategyPicker from "./StrategyPicker.vue";
 import ModelPicker from "./ModelPicker.vue";
 import { formatPercentage } from "./percentage";
-import { providerIconUrl } from "./provider-icon";
+import { providerIconUrls } from "./provider-icon";
 import type {
   AddApiKeyPayload, AuthMethod, CredentialExtend, CredentialUpdatePayload, CatalogStatus, LoadStrategy,
   ModelAuthProvider, ModelAuthSelection, ModelConnectionTarget, ProviderAuthResponseRequest, ProviderAuthState, ProviderCredential, ProviderAuthNotice, ProviderUpdatePayload, StrategyUpdatePayload, Theme, CredentialUsageEstimate,
@@ -116,18 +116,15 @@ const currentModel = computed(() => props.model?.providerId === selectedProvider
 const activePrompt = computed(() => props.auth?.prompt?.prompt ?? null);
 const activePromptId = computed(() => props.auth?.prompt?.promptId ?? "");
 
-function providerIconKey(provider: ModelAuthProvider): string | null {
-  const url = providerIconUrl(provider);
-  return url ? provider.id + ":" + url : null;
+function providerIconKey(provider: ModelAuthProvider, url: string): string {
+  return provider.id + ":" + url;
 }
 function providerIcon(provider: ModelAuthProvider): string | null {
-  const url = providerIconUrl(provider);
-  const key = url ? provider.id + ":" + url : null;
-  return url && (!key || !failedProviderIcons.value.has(key)) ? url : null;
+  return providerIconUrls(provider).find(url => !failedProviderIcons.value.has(providerIconKey(provider, url))) ?? null;
 }
 function handleProviderIconError(provider: ModelAuthProvider) {
-  const key = providerIconKey(provider);
-  if (key) failedProviderIcons.value = new Set(failedProviderIcons.value).add(key);
+  const url = providerIcon(provider);
+  if (url) failedProviderIcons.value = new Set(failedProviderIcons.value).add(providerIconKey(provider, url));
 }
 
 function activeElement(): Element | null {
