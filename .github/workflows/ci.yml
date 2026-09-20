@@ -75,10 +75,14 @@ jobs:
             model-auth-native-v*) PACKAGE_DIR="model-auth-native"; PACKAGE_LABEL="model-auth-native" ;;
             *) echo "Unsupported package release tag: $RELEASE_TAG" >&2; exit 1 ;;
           esac
-          archive=$(find "release/$PACKAGE_DIR" -type f \( -name '*.tgz' -o -name '*.crate' \) -print -quit)
+          archive=$(find release -type f -path "*/$PACKAGE_DIR/*" \( -name '*.tgz' -o -name '*.crate' \) -print -quit)
           if [ -z "$archive" ]; then echo "No archive found for $PACKAGE_LABEL" >&2; exit 1; fi
-          checksum="$(grep "^$PACKAGE_DIR/" release/SHA256SUMS | awk '{print $1}')"
+          checksum_file=$(find release -type f -name SHA256SUMS -print -quit)
+          if [ -z "$checksum_file" ]; then echo "No checksum manifest found for $PACKAGE_LABEL" >&2; exit 1; fi
+          checksum="$(awk -v package_dir="$PACKAGE_DIR" '$2 ~ ("(^|/)" package_dir "/") { print $1; exit }' "$checksum_file")"
           if [ -z "$checksum" ]; then echo "No checksum found for $PACKAGE_LABEL" >&2; exit 1; fi
+          archive_checksum="$(sha256sum "$archive" | awk '{print $1}')"
+          if [ "$checksum" != "$archive_checksum" ]; then echo "Checksum mismatch for $PACKAGE_LABEL" >&2; exit 1; fi
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             echo "Release already exists; keeping published archives unchanged."
           else

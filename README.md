@@ -21,7 +21,7 @@ Use public release archive URLs in `package.json`. No private registry token or 
     "@lsypkg/fluent": "https://github.com/lsy-404/platform-kit/releases/download/fluent-v0.2.5/platform-kit-fluent-0.2.5.tgz",
     "@model-auth/core": "https://github.com/lsy-404/platform-kit/releases/download/model-auth-core-v0.6.1/model-auth-core-0.6.1.tgz",
     "@model-auth/providers": "https://github.com/lsy-404/platform-kit/releases/download/model-auth-providers-v0.6.1/model-auth-providers-0.6.1.tgz",
-    "@model-auth/vue": "https://github.com/lsy-404/platform-kit/releases/download/model-auth-vue-v0.6.3/model-auth-vue-0.6.3.tgz"
+    "@model-auth/vue": "https://github.com/lsy-404/platform-kit/releases/download/model-auth-vue-v0.6.4/model-auth-vue-0.6.4.tgz"
   }
 }
 ```
