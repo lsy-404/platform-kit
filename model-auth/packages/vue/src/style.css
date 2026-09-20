@@ -130,6 +130,7 @@
 :where(.model-auth-styled) .model-auth-group-label { color: var(--ma-muted); font-size: 11px; font-weight: 600; }
 :where(.model-auth-styled) .model-auth-provider-row { border-radius: 6px; padding: 12px; }
 :where(.model-auth-styled) .model-auth-provider-mark { border: 1px solid var(--ma-line); border-radius: 6px; background: var(--ma-subtle); color: var(--ma-accent); font-weight: 600; }
+:where(.model-auth-styled) .model-auth-provider-mark img { width: 100%; height: 100%; object-fit: contain; }
 :where(.model-auth-styled) .model-auth-badge { font-size: 11px; padding: 3px 7px; border-radius: 4px; color: var(--ma-muted); background: var(--ma-subtle); }
 :where(.model-auth-styled) .unavailable { opacity: .65; }
 :where(.model-auth-styled) button.focused, :where(.model-auth-styled) button[aria-pressed="true"] { border-color: var(--ma-accent); background: color-mix(in srgb,var(--ma-accent) 10%,var(--ma-control)); }

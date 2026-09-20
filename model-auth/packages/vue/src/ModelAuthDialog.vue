@@ -4,6 +4,7 @@ import { defaultMessages, type ModelAuthMessages } from "./messages";
 import StrategyPicker from "./StrategyPicker.vue";
 import ModelPicker from "./ModelPicker.vue";
 import { formatPercentage } from "./percentage";
+import { providerIconUrl } from "./provider-icon";
 import type {
   AddApiKeyPayload, AuthMethod, CredentialExtend, CredentialUpdatePayload, CatalogStatus, LoadStrategy,
   ModelAuthProvider, ModelAuthSelection, ModelConnectionTarget, ProviderAuthResponseRequest, ProviderAuthState, ProviderCredential, ProviderAuthNotice, ProviderUpdatePayload, StrategyUpdatePayload, Theme, CredentialUsageEstimate,
@@ -65,6 +66,7 @@ const apiKeyInput = ref("");
 const revealApiKey = ref(false);
 const localError = ref("");
 const pendingRemoval = ref("");
+const failedProviderIcons = ref(new Set<string>());
 const connectionMode = ref(false);
 let awaitingVerification = false;
 const titleId = "model-auth-" + useId();
@@ -113,6 +115,20 @@ const currentStrategy = computed(() => selectedProvider.value?.loadStrategy ?? p
 const currentModel = computed(() => props.model?.providerId === selectedProviderId.value ? props.model.model : "—");
 const activePrompt = computed(() => props.auth?.prompt?.prompt ?? null);
 const activePromptId = computed(() => props.auth?.prompt?.promptId ?? "");
+
+function providerIconKey(provider: ModelAuthProvider): string | null {
+  const url = providerIconUrl(provider);
+  return url ? provider.id + ":" + url : null;
+}
+function providerIcon(provider: ModelAuthProvider): string | null {
+  const url = providerIconUrl(provider);
+  const key = url ? provider.id + ":" + url : null;
+  return url && (!key || !failedProviderIcons.value.has(key)) ? url : null;
+}
+function handleProviderIconError(provider: ModelAuthProvider) {
+  const key = providerIconKey(provider);
+  if (key) failedProviderIcons.value = new Set(failedProviderIcons.value).add(key);
+}
 
 function activeElement(): Element | null {
   let element: Element | null = document.activeElement;
@@ -411,7 +427,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
               <h3 class="model-auth-group-label">{{ group.label }}</h3>
               <button v-for="provider in group.providers" :key="provider.id" type="button" class="model-auth-provider-row" part="provider-row" :class="{ focused: orderedProviders.indexOf(provider) === focusedProviderIndex, unavailable: !provider.available }" :data-provider-id="provider.id" @click="chooseProvider(provider)">
                 <slot name="provider-row" :provider="provider" :method="method">
-                  <span class="model-auth-provider-mark" :class="'mark-' + provider.id">{{ provider.mark || provider.name.trim().slice(0, 1).toUpperCase() }}</span>
+                  <span class="model-auth-provider-mark" :class="'mark-' + provider.id"><img v-if="providerIcon(provider)" :src="providerIcon(provider)!" alt="" aria-hidden="true" loading="lazy" decoding="async" @error="handleProviderIconError(provider)" /><template v-else>{{ provider.mark || provider.name.trim().slice(0, 1).toUpperCase() }}</template></span>
                   <span class="model-auth-row-main"><strong>{{ provider.name }}</strong><small>{{ provider.available ? provider.id : provider.unavailableReason || text.unavailable }}</small></span>
                   <span class="model-auth-badge">{{ provider.available ? (method === 'oauth' ? (provider.oauthCredentials?.length || 0) + ' ' + text.oauthCount : (provider.apiKeyCredentials?.length || 0) + ' ' + text.apiKeyCount) : text.unavailable }}</span>
                   <span aria-hidden="true">→</span>

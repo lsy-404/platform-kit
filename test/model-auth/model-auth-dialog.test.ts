@@ -95,6 +95,25 @@ describe("authentication dialog", () => {
     expect(events.some(event => event.name === "model")).toBe(false);
   });
 
+  it("uses a provider API favicon and falls back to the mark after an image failure", async () => {
+    const { state } = await mount();
+    state.providers[0]!.api = "https://api.provider.example.com/v1";
+    await click('[data-part="method-oauth"]');
+    const icon = get<HTMLImageElement>('[data-provider-id="provider-a"] img');
+    expect(icon.src).toBe("https://api.provider.example.com/favicon.ico");
+    icon.dispatchEvent(new Event("error"));
+    await nextTick();
+    expect(document.querySelector('[data-provider-id="provider-a"] img')).toBeNull();
+    expect(get('[data-provider-id="provider-a"] .model-auth-provider-mark').textContent).toBe("P");
+  });
+
+  it("uses an explicit provider icon URL before its known website fallback", async () => {
+    const { state } = await mount();
+    state.providers[2]!.iconUrl = "https://assets.example.com/workbuddy.svg";
+    await click('[data-part="method-oauth"]');
+    expect(get<HTMLImageElement>('[data-provider-id="workbuddy"] img').src).toBe("https://assets.example.com/workbuddy.svg");
+  });
+
   it("keeps failed authorization at detail until authReady, idle, and error-free", async () => {
     const { state, events } = await mount();
     state.providers[0]!.apiKeyCredentials = [];
