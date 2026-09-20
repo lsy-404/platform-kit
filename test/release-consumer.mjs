@@ -3,10 +3,12 @@ import {execFileSync} from 'node:child_process';
 import {resolve} from 'node:path';
 await mkdir('test/artifacts',{recursive:true});
 const fluentVersion=JSON.parse(await readFile('styles/fluent/package.json','utf8')).version;
-const modelAuthVersion=JSON.parse(await readFile('model-auth/packages/vue/package.json','utf8')).version;
+const modelAuthVersions=Object.fromEntries(await Promise.all(['core','providers','vue'].map(async name=>[
+  name,JSON.parse(await readFile(`model-auth/packages/${name}/package.json`,'utf8')).version,
+])));
 const fixture=await mkdtemp(resolve('test/artifacts/public-consumer-'));
 try{
- await writeFile(resolve(fixture,'package.json'),JSON.stringify({name:'public-package-consumer',private:true,type:'module',dependencies:{'@lsypkg/fluent':'file:'+resolve(`release/platform-kit-fluent/platform-kit-fluent-${fluentVersion}.tgz`),'@model-auth/core':'file:'+resolve(`release/model-auth-core/model-auth-core-${modelAuthVersion}.tgz`),'@model-auth/providers':'file:'+resolve(`release/model-auth-providers/model-auth-providers-${modelAuthVersion}.tgz`),'@model-auth/vue':'file:'+resolve(`release/model-auth-vue/model-auth-vue-${modelAuthVersion}.tgz`),vue:'^3.5.0'}}));
+ await writeFile(resolve(fixture,'package.json'),JSON.stringify({name:'public-package-consumer',private:true,type:'module',dependencies:{'@lsypkg/fluent':'file:'+resolve(`release/platform-kit-fluent/platform-kit-fluent-${fluentVersion}.tgz`),'@model-auth/core':'file:'+resolve(`release/model-auth-core/model-auth-core-${modelAuthVersions.core}.tgz`),'@model-auth/providers':'file:'+resolve(`release/model-auth-providers/model-auth-providers-${modelAuthVersions.providers}.tgz`),'@model-auth/vue':'file:'+resolve(`release/model-auth-vue/model-auth-vue-${modelAuthVersions.vue}.tgz`),vue:'^3.5.0'}}));
  execFileSync('npm',['install','--prefix',fixture,'--ignore-scripts','--no-audit','--no-fund'],{cwd:fixture,stdio:'pipe'});
  await writeFile(resolve(fixture,'verify.mjs'),`import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
