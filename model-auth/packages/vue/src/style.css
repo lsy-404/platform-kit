@@ -53,7 +53,7 @@
 .model-auth-error, .model-auth-busy { margin: 0 24px 14px; }
 .model-auth-detail > .model-auth-error, .model-auth-provider-step > .model-auth-error { margin: 0; }
 .model-auth-select { position: relative; flex-shrink: 0; }
-.model-auth-select-menu { position: absolute; right: 0; top: calc(100% + 4px); min-width: 164px; z-index: 1; display: grid; padding: 4px; }
+.model-auth-select-menu { position: fixed; min-width: 164px; z-index: 1000; display: grid; padding: 4px; }
 .model-auth-select-menu button { display: flex; justify-content: space-between; text-align: left; padding: 8px 10px; }
 .model-auth-empty { text-align: center; margin: 0; padding: 16px; }
 .model-auth-auth-interaction { display: grid; gap: 10px; margin: 0 24px 14px; padding: 12px; border: 1px solid var(--ma-line, currentColor); border-radius: 6px; }

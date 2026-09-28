@@ -25,23 +25,22 @@ const get = <T extends HTMLElement = HTMLElement>(selector: string) => document.
 async function click(selector: string) { get(selector).click(); await nextTick(); await nextTick(); }
 
 describe("connection detail dialog", () => {
-  it("selects a saved verified model and reflects only host-confirmed active selection without closing", async () => {
+  it("lists saved models and emits selections without maintaining a current-model marker", async () => {
     const { state, events } = await mount({ providerId: "oauth", method: "oauth" });
     state.providers[0]!.oauthCredentials![0]!.models = ["o-model", "second-model"];
     await nextTick();
-    expect(get('[data-model-id="o-model"]').getAttribute("aria-pressed")).toBe("true");
+    expect(get('[data-model-id="o-model"]').getAttribute("aria-pressed")).toBeNull();
     await click('[data-model-id="second-model"]');
     expect(events.at(-1)).toEqual({ name: "model", payload: { providerId: "oauth", model: "second-model" } });
-    expect(get('[data-model-id="second-model"]').getAttribute("aria-pressed")).toBe("false");
     state.model = { providerId: "oauth", model: "second-model" };
     await nextTick();
-    expect(get('[data-model-id="second-model"]').getAttribute("aria-pressed")).toBe("true");
-    expect(get('[data-model-id="o-model"]').getAttribute("aria-pressed")).toBe("false");
+    expect(get('[data-model-id="second-model"]').getAttribute("aria-pressed")).toBeNull();
+    expect(get('[data-model-id="o-model"]').getAttribute("aria-pressed")).toBeNull();
     expect(get<HTMLDialogElement>('[data-part="dialog"]').open).toBe(true);
     expect(events.some(event => event.name === "close")).toBe(false);
   });
 
-  it("keeps unavailable saved model metadata visible but excludes catalog-only and ineligible selection", async () => {
+  it("shows provider catalog models and disables models without eligible credentials", async () => {
     const { state, events } = await mount({ providerId: "oauth", method: "oauth" });
     const provider = state.providers[0]!;
     provider.models = ["catalog-only"];
@@ -54,7 +53,7 @@ describe("connection detail dialog", () => {
       { id: "weight", label: "Invalid weight", enabled: true, healthy: true, weight: 0, models: ["weight-model"] },
     ];
     await nextTick();
-    expect(document.querySelector('[data-model-id="catalog-only"]')).toBeNull();
+    expect(get<HTMLButtonElement>('[data-model-id="catalog-only"]').disabled).toBe(true);
     for (const name of ["disabled", "bad", "cooling", "invalid", "weight"]) {
       const button = get<HTMLButtonElement>('[data-model-id="' + name + '-model"]');
       expect(button.disabled).toBe(true); button.click();
@@ -96,7 +95,7 @@ describe("connection detail dialog", () => {
     expect(get('[data-part="connection-info"]').classList).toContain("model-auth-connection-detail");
     expect(get('[data-part="oauth-credential"]').textContent).toContain("user@example.test");
     expect(get('[data-part="connection-policy"]').textContent).toContain("o-model");
-    expect(get('[data-part="connection-policy"]').textContent).toContain("当前使用");
+    expect(get('[data-part="connection-policy"]').textContent).not.toContain("当前使用");
     expect(document.querySelector('[data-part="continue-confirmation"]')).toBeNull();
     expect(events.some(event => event.name === "model")).toBe(false);
   });

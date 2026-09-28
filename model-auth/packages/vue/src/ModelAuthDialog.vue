@@ -17,7 +17,6 @@ const props = withDefaults(defineProps<{
   theme?: Theme;
   initialMethod?: AuthMethod;
   initialConnection?: ModelConnectionTarget | null;
-  model?: ModelAuthSelection | null;
   loadStrategy?: LoadStrategy;
   catalogStatus?: CatalogStatus;
   messages?: Partial<ModelAuthMessages>;
@@ -96,14 +95,23 @@ const credentials = computed<ProviderCredential[]>(() => {
   const provider = selectedProvider.value;
   return (method.value === "oauth" ? provider?.oauthCredentials : provider?.apiKeyCredentials) ?? [];
 });
-const connectionModels = computed(() => [...new Set(credentials.value.flatMap(credential => credential.models || []).filter(model => model.trim()))]);
+const providerModels = computed(() => {
+  const provider = selectedProvider.value;
+  if (!provider) return [];
+  const methodModels = method.value === "oauth" ? provider.oauthModels : provider.apiKeyModels;
+  return [...new Set([...(methodModels?.length ? methodModels : provider.models),].filter(model => model.trim()))];
+});
+const connectionModels = computed(() => [...new Set([...providerModels.value, ...credentials.value.flatMap(credential => credential.models || [])].filter(model => model.trim()))]);
 const canUseMethod = computed(() => Boolean(selectedProvider.value?.available
   && selectedProvider.value.authMethods.includes(method.value)
   && (method.value !== "oauth" || selectedProvider.value.oauthEnabled !== false)));
 const eligibleCredentials = computed(() => canUseMethod.value ? credentials.value.filter(credential => credential.enabled && credential.healthy
   && Number.isInteger(credential.weight) && credential.weight > 0 && credential.weight <= 100
   && (!credential.cooldownUntilUtc || Date.parse(credential.cooldownUntilUtc) <= Date.now())) : []);
-const availableModels = computed(() => [...new Set(eligibleCredentials.value.flatMap(credential => credential.models || []).filter(model => model.trim()))]);
+const availableModels = computed(() => {
+  const credentialModels = eligibleCredentials.value.flatMap(credential => credential.models || []).filter(model => model.trim());
+  return [...new Set(credentialModels.length ? credentialModels : providerModels.value)];
+});
 const authReady = computed(() => eligibleCredentials.value.length > 0);
 const strategyOptions = computed(() => [
   { value: "round-robin" as const, label: text.value.roundRobin },
@@ -111,7 +119,6 @@ const strategyOptions = computed(() => [
   { value: "failover" as const, label: text.value.failover },
 ]);
 const currentStrategy = computed(() => selectedProvider.value?.loadStrategy ?? props.loadStrategy);
-const currentModel = computed(() => props.model?.providerId === selectedProviderId.value ? props.model.model : "—");
 const activePrompt = computed(() => props.auth?.prompt?.prompt ?? null);
 const activePromptId = computed(() => props.auth?.prompt?.promptId ?? "");
 
@@ -492,8 +499,8 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
             <p v-if="!credentials.length" class="model-auth-empty">{{ connectionMode ? text.noConnections : text.noCredentials }}</p>
           </section>
           <section v-if="connectionMode" class="model-auth-credential-section" data-part="connection-policy">
-            <details class="model-auth-connection-models" open><summary>{{ text.models }} ({{ connectionModels.length }})</summary><ModelPicker :models="connectionModels" :available-models="availableModels" :selected="currentModel" :disabled="busy" :messages="text" @select="selectModel" /></details>
-            <div class="model-auth-section-heading"><div><strong>{{ text.current }}</strong><small>{{ currentModel }}</small></div><StrategyPicker :model-value="currentStrategy" :options="strategyOptions" :label="text.strategy" :disabled="busy" @update:model-value="updateStrategy" /></div>
+            <details class="model-auth-connection-models" open><summary>{{ text.models }} ({{ connectionModels.length }})</summary><ModelPicker :models="connectionModels" :available-models="availableModels" :disabled="busy" :messages="text" @select="selectModel" /></details>
+            <div class="model-auth-section-heading"><strong>{{ text.strategy }}</strong><StrategyPicker :model-value="currentStrategy" :options="strategyOptions" :label="text.strategy" :disabled="busy" @update:model-value="updateStrategy" /></div>
           </section>
 
         </div>
@@ -503,7 +510,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
             <p>{{ text.authorizationComplete }}</p>
             <p>{{ method === 'oauth' ? text.oauth : text.apiKey }} · {{ text.verified }}</p>
           </section>
-          <ModelPicker v-if="connectionModels.length" :models="connectionModels" :available-models="availableModels" :selected="currentModel" :disabled="busy" :messages="text" @select="selectModel" />
+          <ModelPicker v-if="connectionModels.length" :models="connectionModels" :available-models="availableModels" :disabled="busy" :messages="text" @select="selectModel" />
         </div>
         <footer v-if="!connectionMode && step === 'detail' && authReady" class="model-auth-actions">
           <button type="button" class="model-auth-primary" data-part="continue-confirmation" :disabled="busy" @click="advanceToConfirmation">{{ text.continue }}</button>

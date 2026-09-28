@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, useId } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, useId } from "vue";
 import type { LoadStrategy } from "./types";
 const props = defineProps<{ modelValue: LoadStrategy; options: { value: LoadStrategy; label: string }[]; label: string; disabled?: boolean }>();
 const emit = defineEmits<{ "update:modelValue": [value: LoadStrategy] }>();
@@ -7,16 +7,31 @@ const expanded = ref(false);
 const trigger = ref<HTMLButtonElement>();
 const list = ref<HTMLElement>();
 const active = ref(0);
+const menuStyle = ref<Record<string, string>>({});
 const id = useId();
 const current = computed(() => props.options.find(option => option.value === props.modelValue));
+function positionMenu() {
+  const element = trigger.value;
+  if (!element) return;
+  const rect = element.getBoundingClientRect();
+  menuStyle.value = { top: `${rect.bottom + 4}px`, left: `${Math.max(8, rect.right - 164)}px` };
+}
 async function open() {
   if (props.disabled) return;
   expanded.value = true;
   active.value = Math.max(0, props.options.findIndex(option => option.value === props.modelValue));
   await nextTick();
+  positionMenu();
+  window.addEventListener("resize", positionMenu);
+  window.addEventListener("scroll", positionMenu, true);
   list.value?.focus();
 }
-function choose(value: LoadStrategy) { emit("update:modelValue", value); expanded.value = false; trigger.value?.focus(); }
+function close() {
+  expanded.value = false;
+  window.removeEventListener("resize", positionMenu);
+  window.removeEventListener("scroll", positionMenu, true);
+}
+function choose(value: LoadStrategy) { emit("update:modelValue", value); close(); trigger.value?.focus(); }
 function keydown(event: KeyboardEvent) {
   if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
     event.preventDefault();
@@ -29,19 +44,20 @@ function keydown(event: KeyboardEvent) {
     if (!expanded.value) void open();
     else if (props.options[active.value]) choose(props.options[active.value]!.value);
   } else if (event.key === "Escape" && expanded.value) {
-    event.stopPropagation(); event.preventDefault(); expanded.value = false; trigger.value?.focus();
-  } else if (event.key === "Tab") expanded.value = false;
+    event.stopPropagation(); event.preventDefault(); close(); trigger.value?.focus();
+  } else if (event.key === "Tab") close();
 }
 function focusout(event: FocusEvent) {
-  if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) expanded.value = false;
+  if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) close();
 }
+onBeforeUnmount(close);
 </script>
 <template>
   <div class="model-auth-select" part="strategy" @keydown="keydown" @focusout="focusout">
     <button ref="trigger" type="button" class="model-auth-secondary" :disabled="disabled" :aria-label="label" aria-haspopup="listbox" :aria-expanded="expanded" :aria-controls="id" @click="expanded ? expanded = false : open()">
       {{ current?.label }} <svg class="model-auth-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
     </button>
-    <div v-if="expanded" :id="id" ref="list" role="listbox" :aria-label="label" :aria-activedescendant="id + '-' + active" tabindex="-1" class="model-auth-select-menu" part="strategy-menu">
+    <div v-if="expanded" :id="id" ref="list" role="listbox" :aria-label="label" :aria-activedescendant="id + '-' + active" tabindex="-1" class="model-auth-select-menu" part="strategy-menu" :style="menuStyle">
       <button v-for="(option, index) in options" :id="id + '-' + index" :key="option.value" type="button" role="option" :aria-selected="modelValue === option.value" :class="{ focused: active === index }" tabindex="-1" @click="choose(option.value)">
         {{ option.label }} <svg v-if="modelValue === option.value" class="model-auth-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4 10-10" /></svg>
       </button>

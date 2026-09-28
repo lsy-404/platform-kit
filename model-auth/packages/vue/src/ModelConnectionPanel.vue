@@ -2,17 +2,16 @@
 import { computed } from "vue";
 import { defaultMessages, type ModelAuthMessages } from "./messages";
 import ProviderMark from "./ProviderMark.vue";
-import type { AuthMethod, ModelAuthProvider, ModelAuthSelection, ModelConnectionTarget, ProviderCredential, Theme } from "./types";
+import type { AuthMethod, ModelAuthProvider, ModelConnectionTarget, ProviderCredential, Theme } from "./types";
 
 const props = withDefaults(defineProps<{
   providers?: ModelAuthProvider[];
-  model?: ModelAuthSelection | null;
   busy?: boolean;
   error?: string | null;
   styled?: boolean;
   theme?: Theme;
   messages?: Partial<ModelAuthMessages>;
-}>(), { providers: () => [], model: null, busy: false, error: null, styled: true, theme: "system", messages: () => ({}) });
+}>(), { providers: () => [], busy: false, error: null, styled: true, theme: "system", messages: () => ({}) });
 const emit = defineEmits<{ manage: [target: ModelConnectionTarget]; add: []; refresh: [] }>();
 const text = computed(() => ({ ...defaultMessages, ...props.messages }));
 const groups = computed(() => props.providers.flatMap(provider => (["oauth", "api-key"] as AuthMethod[]).flatMap(method => {
@@ -29,6 +28,11 @@ function strategy(provider: ModelAuthProvider) {
   if (provider.loadStrategy === "failover") return text.value.failover;
   if (provider.loadStrategy === "weighted-round-robin") return text.value.weightedRoundRobin;
   return provider.loadStrategy === "round-robin" ? text.value.roundRobin : "—";
+}
+function modelCount(provider: ModelAuthProvider, method: AuthMethod, credential: ProviderCredential) {
+  if (credential.models?.length) return credential.models.length;
+  const models = method === "oauth" ? provider.oauthModels : provider.apiKeyModels;
+  return (models?.length ? models : provider.models).length;
 }
 </script>
 
@@ -54,10 +58,9 @@ function strategy(provider: ModelAuthProvider) {
         <li v-for="credential in group.credentials" :key="credential.id" data-part="connection-account">
           <div><strong>{{ credential.label }}</strong><small v-if="credential.account && credential.account !== credential.label">{{ text.account }}：{{ credential.account }}</small></div>
           <span>{{ status(credential) }}</span>
-          <span class="model-auth-connection-meta">{{ text.weight }} {{ credential.weight }} · {{ credential.models?.length ?? '—' }} {{ text.modelCount }}</span>
+          <span class="model-auth-connection-meta">{{ text.weight }} {{ credential.weight }} · {{ modelCount(group.provider, group.method, credential) }} {{ text.modelCount }}</span>
         </li>
       </ul>
-      <p v-if="model?.providerId === group.provider.id" class="model-auth-connection-meta" data-part="connection-current-model">{{ text.current }}：{{ model.model }}</p>
     </article>
   </section>
 </template>

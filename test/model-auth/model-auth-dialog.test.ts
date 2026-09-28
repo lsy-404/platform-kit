@@ -97,8 +97,7 @@ describe("authentication dialog", () => {
     expectStage("确认", "3/3", ["100%", "100%", "100%"]);
     expect(get('[data-part="confirmation-step"]')).toBeTruthy();
     expect(get('[data-part="authorization-result"]').textContent).toContain("凭据已验证并保存");
-    expect(document.querySelector('[part="model-search"]')).toBeNull();
-    expect(document.querySelector('[part="model-row"]')).toBeNull();
+    expect(get('[data-model-id="test-model"]')).toBeTruthy();
     expect(events.some(event => event.name === "model")).toBe(false);
     await click('[data-part="confirm"]');
     expect(events.at(-1)).toEqual({ name: "close", payload: null });
@@ -246,6 +245,7 @@ describe("authentication dialog", () => {
   const stylesheet = readFileSync(resolve(import.meta.dirname, "../../model-auth/packages/vue/src/style.css"), "utf8");
     expect(stylesheet).toContain(".model-auth-provider-step { grid-template-rows: auto auto minmax(0, 1fr); overflow: hidden; padding-top: 4px; }");
     expect(stylesheet).toContain(".model-auth-provider-list { min-height: 0; overflow: auto; padding: 2px; margin: -2px; }");
+    expect(stylesheet).toContain(".model-auth-select-menu { position: fixed;");
     expect(step.contains(search)).toBe(true);
     expect(list).toBeTruthy();
     search.focus();

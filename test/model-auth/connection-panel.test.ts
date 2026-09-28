@@ -44,7 +44,7 @@ describe("model connection panel", () => {
     expect(get('[data-provider-id="oauth"]').textContent).toContain("已停用");
     expect(get('[data-provider-id="key"]').textContent).toContain("需要重新连接");
     expect(get('[data-provider-id="offline"]').textContent).toContain("Host integration unavailable");
-    expect(get('[data-part="connection-current-model"]').textContent).toContain("o-model");
+    expect(document.querySelector('[data-part="connection-current-model"]')).toBeNull();
   });
 
   it("renders only credential metadata and never adds a secret input or fixture secret", async () => {
