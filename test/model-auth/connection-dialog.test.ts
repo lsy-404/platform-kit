@@ -14,7 +14,7 @@ afterEach(() => { apps.forEach(app => app.unmount()); apps = []; document.body.r
 
 async function mount(initialConnection: { providerId: string; method: "oauth" | "api-key" } | null, extra: Record<string, unknown> = {}) {
   const host = document.body.appendChild(document.createElement("div"));
-  const state = reactive({ open: true, providers: providers(), initialConnection, model: { providerId: "oauth", model: "o-model" }, busy: false, ...extra });
+  const state = reactive({ open: true, providers: providers(), initialConnection, busy: false, ...extra });
   const events: { name: string; payload: unknown }[] = [];
   const on = (name: string) => (...payload: unknown[]) => events.push({ name, payload: payload.length === 1 ? payload[0] : payload });
   const app = createApp(() => h(ModelAuthDialog, { ...state, onClose: on("close"), onSelectModel: on("model"), onReconnectOauth: on("reconnect"), onUpdateCredential: on("credential"), onRemoveOauth: on("remove-oauth"), onRemoveApiKey: on("remove-key"), onUpdateProviderStrategy: on("strategy"), onRefreshCatalog: on("refresh") }));
@@ -32,8 +32,6 @@ describe("connection detail dialog", () => {
     expect(get('[data-model-id="o-model"]').getAttribute("aria-pressed")).toBeNull();
     await click('[data-model-id="second-model"]');
     expect(events.at(-1)).toEqual({ name: "model", payload: { providerId: "oauth", model: "second-model" } });
-    state.model = { providerId: "oauth", model: "second-model" };
-    await nextTick();
     expect(get('[data-model-id="second-model"]').getAttribute("aria-pressed")).toBeNull();
     expect(get('[data-model-id="o-model"]').getAttribute("aria-pressed")).toBeNull();
     expect(get<HTMLDialogElement>('[data-part="dialog"]').open).toBe(true);
@@ -67,6 +65,27 @@ describe("connection detail dialog", () => {
     expect(get('[data-part="connection-info"]').textContent).toContain("ready-model");
     provider.available = true; state.busy = true; await nextTick();
     expect(get<HTMLButtonElement>('[data-model-id="ready-model"]').disabled).toBe(true);
+  });
+
+  it("does not make provider catalog models selectable without an eligible credential", async () => {
+    const { state } = await mount({ providerId: "oauth", method: "oauth" });
+    const provider = state.providers[0]!;
+    provider.models = ["catalog-only"];
+    provider.oauthCredentials = [{ id: "disabled", label: "Disabled", enabled: false, healthy: true, weight: 1, models: [] }];
+    await nextTick();
+    expect(get<HTMLButtonElement>('[data-model-id="catalog-only"]').disabled).toBe(true);
+  });
+
+  it("closes the strategy overlay from its trigger and keeps it out of layout flow", async () => {
+    await mount({ providerId: "oauth", method: "oauth" });
+    const trigger = get<HTMLButtonElement>('[part="strategy"] > button');
+    await click('[part="strategy"] > button');
+    const menu = get<HTMLElement>('[part="strategy-menu"]');
+    expect(menu.style.top).toBeTruthy();
+    expect(menu.style.left).toBeTruthy();
+    await click('[part="strategy"] > button');
+    expect(document.querySelector('[part="strategy-menu"]')).toBeNull();
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
   });
 
   it("selects only the current authentication method and preserves explicit four-stage confirmation", async () => {

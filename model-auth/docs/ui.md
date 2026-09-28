@@ -4,7 +4,7 @@ Import `ModelAuthDialog` from `@model-auth/vue`; its default stylesheet is loade
 
 ## Shared processing
 
-`useModelAuth(host)` owns busy/error state, prevents duplicate mutations and reloads the host snapshot after each successful action. Implement two host methods: `getState()` returns providers, selected model and catalog status; `execute(action)` performs the requested operation. Hosts that support dynamic authentication may additionally implement `subscribeAuthEvents`, `respondAuth`, `cancelAuth`, and `openAuthUrl`. Its action union is exported as `ModelAuthAction`.
+`useModelAuth(host)` owns busy/error state, prevents duplicate mutations and reloads the host snapshot after each successful action. Implement two host methods: `getState()` returns providers and catalog status; `execute(action)` performs the requested operation. Hosts that support dynamic authentication may additionally implement `subscribeAuthEvents`, `respondAuth`, `cancelAuth`, and `openAuthUrl`. Its action union is exported as `ModelAuthAction`.
 
 ```vue
 <script setup lang="ts">
@@ -29,7 +29,6 @@ The same composable can be used in each Vue host. It never logs action payloads 
 | `providers` | [] | Available methods, models and credential metadata |
 | `styled` | true | Enable default WinUI appearance |
 | `theme` | system | system, light or dark |
-| `model` | null | Selected providerId and model |
 | `loadStrategy` | round-robin | Default strategy; each provider may override it |
 | `catalogStatus` | loading | state, source, checkedAt and error |
 | `busy` | false | Lock mutation controls while a host operation runs |
@@ -37,7 +36,7 @@ The same composable can be used in each Vue host. It never logs action payloads 
 | `auth` | idle state | Dynamic authentication notices and current prompt |
 | `messages` | Chinese defaults | Override any visible string |
 
-An available provider can support browser authentication, API keys or both. `oauthEnabled=false` disables the provider's browser authentication independently of its individual credential preferences. Set `usageEnabled` or `logoutEnabled` only when the host handles those actions. Each credential has `enabled`, `weight`, health state, optional `usage`, and optional scalar `extend` metadata. Supply discovered `models` on credentials to restrict eligibility; only explicitly healthy and enabled credentials can expose models for selection.
+An available provider can support browser authentication, API keys or both. `oauthEnabled=false` disables the provider's browser authentication independently of its individual credential preferences. Set `usageEnabled` or `logoutEnabled` only when the host handles those actions. Each credential has `enabled`, `weight`, health state, optional `usage`, and optional scalar `extend` metadata. Supply discovered `models` on credentials to restrict eligibility; when eligible credentials have no model list, the provider catalog is used. Only explicitly healthy and enabled credentials can expose models for selection.
 
 ## Events
 

@@ -207,7 +207,6 @@
 .model-auth-models { max-height: 240px; overflow: auto; padding: 2px; margin: -2px; }
 .model-auth-model-row > span { min-width: 0; }
 .model-auth-model-row > small { flex-shrink: 0; }
-.model-auth-styled .model-auth-model-row[aria-pressed="true"] { border-color: var(--ma-accent); background: var(--ma-subtle); }
 .model-auth-connection-models summary:focus-visible { outline: 2px solid var(--ma-accent); outline-offset: 2px; }
 
 .model-auth-connections.model-auth-styled { padding: 16px; border: 1px solid var(--ma-line); border-radius: 8px; background: var(--ma-surface); }

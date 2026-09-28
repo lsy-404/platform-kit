@@ -7,7 +7,6 @@ import type {
 
 export interface ModelAuthState {
   providers: ModelAuthProvider[];
-  model: ModelAuthSelection | null;
   catalogStatus: CatalogStatus;
   auth?: ProviderAuthState;
 }
@@ -36,7 +35,7 @@ export function useModelAuth(host: ModelAuthHost, options: { errorMessage?: stri
   const open = ref(false);
   const busy = ref(false);
   const error = ref<string | null>(null);
-  const state = shallowRef<ModelAuthState>({ providers: [], model: null, catalogStatus: { state: "loading" } });
+  const state = shallowRef<ModelAuthState>({ providers: [], catalogStatus: { state: "loading" } });
   const auth = shallowRef<ProviderAuthState>({ status: "idle", loginId: null, notices: [], prompt: null, error: null });
   let pending: Promise<boolean> | null = null;
   let authorization: AbortController | null = null;

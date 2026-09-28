@@ -26,7 +26,7 @@ const props = withDefaults(defineProps<{
   auth?: ProviderAuthState;
 }>(), {
   open: false, providers: () => [], styled: true, theme: "system", initialMethod: "oauth", initialConnection: null,
-  model: null, loadStrategy: "round-robin", catalogStatus: () => ({ state: "loading" }),
+  loadStrategy: "round-robin", catalogStatus: () => ({ state: "loading" }),
   messages: () => ({}), busy: false, error: null,
   percentagePrecision: 2,
   auth: () => ({ status: "idle", loginId: null, notices: [], prompt: null, error: null }),
@@ -109,6 +109,7 @@ const eligibleCredentials = computed(() => canUseMethod.value ? credentials.valu
   && Number.isInteger(credential.weight) && credential.weight > 0 && credential.weight <= 100
   && (!credential.cooldownUntilUtc || Date.parse(credential.cooldownUntilUtc) <= Date.now())) : []);
 const availableModels = computed(() => {
+  if (!eligibleCredentials.value.length) return [];
   const credentialModels = eligibleCredentials.value.flatMap(credential => credential.models || []).filter(model => model.trim());
   return [...new Set(credentialModels.length ? credentialModels : providerModels.value)];
 });

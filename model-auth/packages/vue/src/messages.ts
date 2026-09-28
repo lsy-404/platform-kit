@@ -19,7 +19,7 @@ export const defaultMessages = {
   credentialHint: "每份凭据可独立启停并设置权重。", keyHint: "密钥由宿主安全保存，提交后立即清空输入。",
   credentials: "已保存凭据", oauthEnabled: "启用此提供商的 OAuth", ready: "可用", needsReconnect: "需要重新连接",
   cooling: "冷却至", modelCount: "个模型", oauthCount: "个 OAuth 账号", apiKeyCount: "个 API Key",
-  working: "正在处理…", current: "当前使用", weightInvalid: "权重必须是 1–100 的整数。",
+  working: "正在处理…", weightInvalid: "权重必须是 1–100 的整数。",
   queryUsage: "查询用量", refreshUsage: "刷新用量", usageEstimate: "估算窗口：{tokens} tokens · 剩余 {remaining}", remainingUnknown: "未知", logout: "退出登录", extend: "附加信息", extendHint: "仅填写非敏感的标量 JSON 字段。", extendInvalid: "附加信息必须是标量 JSON 对象。",
   authOpenBrowser: "打开认证页面", authChooseOption: "请选择", authSubmit: "提交", authCancel: "取消认证", authDeviceCode: "设备码",
   modelSearch: "搜索模型", select: "选择", emptyModels: "没有可用模型", enabledState: "开", disabledState: "关",

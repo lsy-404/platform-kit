@@ -20,7 +20,6 @@ createApp({
   setup() {
     const open = ref(false), styled = ref(true), theme = ref<Theme>("dark");
     const providers = ref(initial), status = ref("本页为组件演示。凭据只保留于内存，请勿输入真实密钥。");
-    const selected = ref<{ providerId: string; model: string } | null>(null);
     const busy = ref(false);
     return () => h("main", { style: "font:15px system-ui;padding:48px;max-width:1100px;margin:auto" }, [
       h("h1", "model-auth"),
@@ -33,7 +32,7 @@ createApp({
       ]),
       h(ModelAuthDialog, {
         open: open.value, providers: providers.value, styled: styled.value, theme: theme.value, busy: busy.value,
-        catalogStatus: { state: "ready", source: "cached" }, model: selected.value,
+        catalogStatus: { state: "ready", source: "cached" },
         onClose: () => { open.value = false; },
         onAuthorizeOauth: (providerId: string) => {
           const provider = providers.value.find(item => item.id === providerId)!;
@@ -63,7 +62,7 @@ createApp({
           const provider = providers.value.find(item => item.id === id)!;
           provider.apiKeyCredentials = provider.apiKeyCredentials?.filter(item => item.id !== credentialId) ?? [];
         },
-        onSelectModel: (value) => { selected.value = value; status.value = value.providerId + " / " + value.model; },
+        onSelectModel: (value: { providerId: string; model: string }) => { status.value = value.providerId + " / " + value.model; },
       }),
     ]);
   },

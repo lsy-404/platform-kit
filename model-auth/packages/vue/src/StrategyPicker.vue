@@ -14,7 +14,14 @@ function positionMenu() {
   const element = trigger.value;
   if (!element) return;
   const rect = element.getBoundingClientRect();
-  menuStyle.value = { top: `${rect.bottom + 4}px`, left: `${Math.max(8, rect.right - 164)}px` };
+  const menuHeight = Math.max(list.value?.offsetHeight ?? 0, props.options.length * 40 + 8);
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+  const below = rect.bottom + 4;
+  const top = below + menuHeight <= viewportHeight - 8 ? below : Math.max(8, rect.top - menuHeight - 4);
+  const maxLeft = Math.max(8, viewportWidth - 164 - 8);
+  const left = Math.min(Math.max(8, rect.right - 164), maxLeft);
+  menuStyle.value = { top: `${top}px`, left: `${left}px` };
 }
 async function open() {
   if (props.disabled) return;
@@ -54,7 +61,7 @@ onBeforeUnmount(close);
 </script>
 <template>
   <div class="model-auth-select" part="strategy" @keydown="keydown" @focusout="focusout">
-    <button ref="trigger" type="button" class="model-auth-secondary" :disabled="disabled" :aria-label="label" aria-haspopup="listbox" :aria-expanded="expanded" :aria-controls="id" @click="expanded ? expanded = false : open()">
+    <button ref="trigger" type="button" class="model-auth-secondary" :disabled="disabled" :aria-label="label" aria-haspopup="listbox" :aria-expanded="expanded" :aria-controls="id" @click="expanded ? close() : open()">
       {{ current?.label }} <svg class="model-auth-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
     </button>
     <div v-if="expanded" :id="id" ref="list" role="listbox" :aria-label="label" :aria-activedescendant="id + '-' + active" tabindex="-1" class="model-auth-select-menu" part="strategy-menu" :style="menuStyle">

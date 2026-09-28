@@ -7,7 +7,7 @@ import { ModelConnectionPanel, ModelAuthDialog, useModelAuth } from "@model-auth
 import { registerModelConnectionPanelElement, registerModelAuthElement } from "@model-auth/vue/custom-element";
 ```
 
-Pass the host state to `ModelConnectionPanel` (`providers`, `model`, `busy`, `error`). Its `manage` event carries `{ providerId, method }`; pass that value as `ModelAuthDialog.initialConnection` to open the saved connection directly. The `add` event opens the dialog with `initialConnection: null`. Handle `refresh` by reloading host state. Custom-element events carry Vue argument arrays in `event.detail`.
+Pass the host state to `ModelConnectionPanel` (`providers`, `busy`, `error`). Its `manage` event carries `{ providerId, method }`; pass that value as `ModelAuthDialog.initialConnection` to open the saved connection directly. The `add` event opens the dialog with `initialConnection: null`. Handle `refresh` by reloading host state. Custom-element events carry Vue argument arrays in `event.detail`.
 
 Load saved state when the host page mounts and update it after account operations. The panel keeps disabled, unhealthy and temporarily unavailable connections visible. The information dialog exposes safe account metadata, models, status, weights and routing strategy; management actions remain in this view instead of advancing through the authorization wizard.
 
@@ -19,4 +19,4 @@ The Vue entry includes styles. The standalone entry bundles Vue and Shadow DOM s
 
 Licensed under Apache-2.0. The standalone custom-element bundle includes Vue; see THIRD-PARTY.md.
 
-Saved connection details and the final authorization step offer models from saved credentials. Selection emits `select-model` and reflects the host-confirmed `model` prop. Disabled, unhealthy, cooling, and unavailable connections remain visible but cannot be selected. `useModelAuth` keeps the dialog open after a successful selection; Confirm and Close finish the dialog explicitly.
+Saved connection details and the final authorization step offer models from the provider catalog and saved credentials. Selection emits `select-model`; the host owns selected model state and persistence. Disabled, unhealthy, cooling, and unavailable connections remain visible but cannot be selected. `useModelAuth` keeps the dialog open after a successful selection; Confirm and Close finish the dialog explicitly.

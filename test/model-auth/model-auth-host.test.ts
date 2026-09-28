@@ -5,7 +5,7 @@ import type { ModelAuthAction, ModelAuthState } from "../../model-auth/packages/
 it("keeps model selection open after the host saves and refreshes successfully", async () => {
   let fail = true;
   const binding = useModelAuth({
-    async getState() { return { providers: [], model: null, catalogStatus: { state: "ready" } }; },
+    async getState() { return { providers: [], catalogStatus: { state: "ready" } }; },
     async execute() { if (fail) throw new Error("failed"); },
   });
   binding.open.value = true;
@@ -19,7 +19,7 @@ it("keeps model selection open after the host saves and refreshes successfully",
 it("a late confirmation cannot close a newly opened dialog", async () => {
   let finish: (() => void) | undefined;
   const binding = useModelAuth({
-    async getState() { return { providers: [], model: null, catalogStatus: { state: "ready" } }; },
+    async getState() { return { providers: [], catalogStatus: { state: "ready" } }; },
     async execute() { await new Promise<void>(resolve => { finish = resolve; }); },
   });
   binding.open.value = true;
@@ -34,14 +34,13 @@ it("a late confirmation cannot close a newly opened dialog", async () => {
 
 it("dispatches a host operation and refreshes controlled state without storing its secret payload", async () => {
   const actions: ModelAuthAction[] = [];
-  const state: ModelAuthState = { providers: [], model: null, catalogStatus: { state: "ready" } };
+  const state: ModelAuthState = { providers: [], catalogStatus: { state: "ready" } };
   const binding = useModelAuth({
     async getState() { return state; },
-    async execute(action) { actions.push(action); state.model = { providerId: "sample", model: "sample" }; },
+    async execute(action) { actions.push(action); },
   });
   await binding.listeners["add-api-key"]({ providerId: "sample", label: "test", apiKey: "fake-test-key" });
   expect(actions[0]?.type).toBe("add-api-key");
-  expect(binding.props.value.model).toEqual(state.model);
   expect(JSON.stringify(binding.state.value)).not.toContain("fake-test-key");
   expect(binding.busy.value).toBe(false);
 });
@@ -51,7 +50,7 @@ it("coalesces state loads, blocks duplicate mutations and recovers from host fai
   let calls = 0;
   let fail = true;
   const binding = useModelAuth({
-    async getState() { return { providers: [], model: null, catalogStatus: { state: "ready" } }; },
+    async getState() { return { providers: [], catalogStatus: { state: "ready" } }; },
     async execute() {
       calls += 1;
       if (fail) throw new Error("secret-bearing internal failure");
@@ -73,7 +72,7 @@ it("coalesces state loads, blocks duplicate mutations and recovers from host fai
 it("cancels browser authorization on close and can be reopened without an error", async () => {
   let signal: AbortSignal | undefined;
   const binding = useModelAuth({
-    async getState() { return { providers: [], model: null, catalogStatus: { state: "ready" } }; },
+    async getState() { return { providers: [], catalogStatus: { state: "ready" } }; },
     async execute(_action, context) {
       signal = context.signal;
       await new Promise((_resolve, reject) => signal?.addEventListener("abort", () => reject(new Error("cancelled")), { once: true }));
@@ -93,7 +92,7 @@ it("cancels browser authorization on close and can be reopened without an error"
 it("does not start a host mutation after the dialog was already closed", async () => {
   let mutations = 0;
   const binding = useModelAuth({
-    async getState() { return { providers: [], model: null, catalogStatus: { state: "ready" } }; },
+    async getState() { return { providers: [], catalogStatus: { state: "ready" } }; },
     async execute() { mutations++; },
   });
   const pending = binding.listeners["authorize-oauth"]("workbuddy");
@@ -108,7 +107,7 @@ it("forwards Pine-style authentication prompts, notices and cancellation through
   let response: unknown;
   let cancelled = "";
   const binding = useModelAuth({
-    async getState() { return { providers: [], model: null, catalogStatus: { state: "ready" } }; },
+    async getState() { return { providers: [], catalogStatus: { state: "ready" } }; },
     async execute() {},
     subscribeAuthEvents(listener) { receive = listener; return () => { receive = undefined; }; },
     async respondAuth(value) { response = value; },

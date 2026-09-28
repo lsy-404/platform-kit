@@ -20,7 +20,7 @@ let apps: App[] = [];
 afterEach(() => { apps.forEach(app => app.unmount()); apps = []; document.body.replaceChildren(); });
 
 async function mount() {
-  const state = reactive({ providers: fixture(), model: { providerId: "oauth", model: "o-model" }, busy: false, error: null as string | null });
+  const state = reactive({ providers: fixture(), busy: false, error: null as string | null });
   const events: { name: string; payload?: unknown }[] = [];
   const host = document.body.appendChild(document.createElement("div"));
   const app = createApp(() => h(ModelConnectionPanel, {
