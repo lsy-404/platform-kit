@@ -21,6 +21,9 @@ export type {
   FluentNoticeTone,
   FluentSelectOption,
   FluentFile,
+  FluentSliderSnap,
+  FluentSliderOrientation,
+  FluentSliderTickPlacement,
 } from "./controls.js";
 export type { FluentNavigationItem } from "./navigation.js";
 

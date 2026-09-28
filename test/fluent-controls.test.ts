@@ -67,38 +67,103 @@ describe("Fluent controls", () => {
         modelValue: 25,
         min: 0,
         max: 100,
-        step: 5,
+        snap: "none",
         label: "Volume",
         disabled: false,
       },
       emit,
       { style: { color: "red" }, onInput, onChange },
     );
-    const input = node.children[1];
+    const input = node.children[1].children[0];
     expect(input.type).toBe("input");
     expect(input.props).toMatchObject({
       type: "range",
       min: 0,
       max: 100,
-      step: 5,
+      step: "any",
       "aria-label": "Volume",
     });
     expect(input.props.style["--fluent-slider-position"]).toBe("25%");
     expect(input.props.style.color).toBe("red");
     trigger(input.props.onInput, {
-      target: { value: "40" },
+      target: { value: "40.25" },
     } as unknown as Event);
     trigger(input.props.onChange, {
-      target: { value: "40" },
+      target: { value: "40.25" },
     } as unknown as Event);
-    expect(emit).toHaveBeenCalledWith("update:modelValue", 40);
-    expect(emit).toHaveBeenCalledWith("change", 40);
+    expect(emit).toHaveBeenCalledWith("update:modelValue", 40.25);
+    expect(emit).toHaveBeenCalledWith("change", 40.25);
     expect(onInput).toHaveBeenCalledOnce();
     expect(onChange).toHaveBeenCalledOnce();
     expect(sliderPercentage(150, 0, 100)).toBe(100);
     expect(sliderPercentage(Number.NaN, 0, 100)).toBe(0);
     expect(sliderPercentage(50, Number.NEGATIVE_INFINITY, 100)).toBe(0);
     expect(sliderPercentage(50, 100, 0)).toBe(0);
+  });
+
+  it("keeps an existing numeric step unless snapping is explicitly disabled", () => {
+    const props = { modelValue: 2.3, min: 0, max: 10, step: 0.1, label: "Position", disabled: false };
+    const stepped = render(FluentSlider, props).children[1].children[0];
+    const free = render(FluentSlider, { ...props, snap: "none" }).children[1].children[0];
+    expect(stepped.props.step).toBe(0.1);
+    expect(free.props.step).toBe("any");
+  });
+
+  it("draws small and large marks alongside available values without snapping", () => {
+    const node = render(FluentSlider, {
+      modelValue: 42.5, min: 0, max: 100, snap: "none", label: "Level",
+      tickFrequency: 5, majorTickFrequency: 20,
+      availableValues: [60, 25, 120, Number.NaN, 60],
+      orientation: "horizontal", tickPlacement: "outside", disabled: false,
+    });
+    const rail = node.children[1];
+    const input = rail.children[0];
+    const startTicks = rail.children[1].children;
+    const endTicks = rail.children[2].children;
+    expect(input.props.value).toBe(42.5);
+    expect(startTicks.map((tick: { props: { "data-value": number } }) => tick.props["data-value"])).toEqual(
+      Array.from({ length: 21 }, (_, index) => index * 5),
+    );
+    expect(endTicks).toHaveLength(startTicks.length);
+    expect(startTicks.filter((tick: { props: { class: string } }) => tick.props.class.includes("fluent-slider__tick--major"))
+      .map((tick: { props: { "data-value": number } }) => tick.props["data-value"])).toEqual([0, 20, 40, 60, 80, 100]);
+    expect(rail.children).toHaveLength(3);
+  });
+
+  it("snaps pointer input and keyboard navigation to available values", () => {
+    const emit = vi.fn();
+    const node = render(FluentSlider, {
+      modelValue: 25, min: 0, max: 100, snap: "available", label: "Level",
+      availableValues: [0, 25, 60, 100], orientation: "horizontal", tickPlacement: "end", disabled: false,
+    }, emit);
+    const input = node.children[1].children[0];
+    const target = { value: "48" };
+    trigger(input.props.onInput, { target } as unknown as Event);
+    expect(target.value).toBe("60");
+    expect(emit).toHaveBeenCalledWith("update:modelValue", 60);
+    vi.stubGlobal("getComputedStyle", () => ({ direction: "ltr" }));
+    const preventDefault = vi.fn();
+    const keyboardTarget = { value: "25" };
+    input.props.onKeydown({ key: "ArrowRight", target: keyboardTarget, preventDefault });
+    expect(keyboardTarget.value).toBe("60");
+    expect(preventDefault).toHaveBeenCalledOnce();
+    expect(emit).toHaveBeenCalledWith("change", 60);
+    vi.unstubAllGlobals();
+  });
+
+  it("snaps to whole numbers inside a fractional range and exposes vertical semantics", () => {
+    const emit = vi.fn();
+    const node = render(FluentSlider, {
+      modelValue: 1.6, min: -2.5, max: 2.5, snap: "integer", label: "Offset",
+      availableValues: [], orientation: "vertical", tickFrequency: 1, tickPlacement: "start", disabled: false,
+    }, emit);
+    const input = node.children[1].children[0];
+    expect(input.props.value).toBe(2);
+    expect(input.props["aria-orientation"]).toBe("vertical");
+    const target = { value: "-1.6" };
+    input.props.onInput({ target });
+    expect(target.value).toBe("-2");
+    expect(emit).toHaveBeenCalledWith("update:modelValue", -2);
   });
 
   it("keeps caller input listeners while updating a field model", () => {
