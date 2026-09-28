@@ -5,7 +5,7 @@ describe("model-auth provider capabilities", () => {
   it("declares every shipped provider exactly once", () => {
     expect(MODEL_AUTH_PROVIDER_CAPABILITIES.map((item) => item.id)).toEqual([
       "anthropic", "openai-codex", "workbuddy", "traecode", "grok", "ollama-cloud",
-      "github-copilot", "kimi-coding", "openrouter",
+      "github-copilot", "kimi-coding", "openrouter", "xai", "meta", "radius",
     ]);
     expect(new Set(MODEL_AUTH_PROVIDER_CAPABILITIES.map((item) => item.id)).size).toBe(MODEL_AUTH_PROVIDER_CAPABILITIES.length);
   });
@@ -22,7 +22,9 @@ describe("model-auth provider capabilities", () => {
       access: { inference: false, modelCatalog: false, usage: true },
     });
     expect(modelAuthProviderCapability("missing")).toBeNull();
-    expect(modelAuthProviderCapability("kimi-coding")?.catalogProviderId).toBe("kimi-for-coding");
+    expect(modelAuthProviderCapability("kimi-coding")?.catalogProviderId).toBe("kimi-code-plan-cn");
     expect(modelAuthProviderCapability("openrouter")?.authorization.renewable).toBe(false);
+    expect(modelAuthProviderCapability("meta")?.catalogProviderId).toBe("meta");
+    expect(modelAuthProviderCapability("radius")?.catalogProviderId).toBeNull();
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createPiOAuthAdapter, discoverPiOAuthProvider, listPiOAuthProviders, type PiOAuthProvider } from "../../model-auth/packages/providers/src/pi.js";
+import { createPiOAuthAdapter, discoverPiOAuthProvider, listPiOAuthProviders, PI_OAUTH_PROVIDER_IDS, type PiOAuthProvider } from "../../model-auth/packages/providers/src/pi.js";
 import type { ProviderAuthInteraction } from "../../model-auth/packages/core/src/index.js";
 
 const provider = (id = "github-copilot"): PiOAuthProvider => ({
@@ -33,6 +33,36 @@ describe("Pi OAuth provider bridge", () => {
     await expect(adapter.refresh({ ...credential, providerId: "openrouter" } as never)).rejects.toThrow(/another provider/);
     await expect(adapter.refresh(credential)).resolves.toMatchObject({ credential: { access: "renewed", enterpriseDomain: "github.example" } });
     await expect(adapter.toAuth(credential)).resolves.toEqual({ apiKey: "access", headers: { authorization: "Bearer access", "x-github": null }, baseUrl: "https://api.githubcopilot.com" });
+  });
+
+  it("adapts Pi's OAuth providers and leaves Radius model discovery to its runtime", async () => {
+    expect(PI_OAUTH_PROVIDER_IDS).toEqual([
+      "anthropic", "openai-codex", "github-copilot", "kimi-coding", "openrouter", "xai", "meta", "radius",
+    ]);
+    const descriptors = listPiOAuthProviders(PI_OAUTH_PROVIDER_IDS.map(id => provider(id)));
+    expect(descriptors.map(item => item.providerId)).toEqual(PI_OAUTH_PROVIDER_IDS);
+    expect(descriptors.find(item => item.providerId === "openai-codex")?.catalogProviderId).toBe("openai");
+    expect(descriptors.find(item => item.providerId === "kimi-coding")?.catalogProviderId).toBe("kimi-code-plan-cn");
+    expect(descriptors.find(item => item.providerId === "meta")?.catalogProviderId).toBe("meta");
+    expect(descriptors.find(item => item.providerId === "radius")?.catalogProviderId).toBeNull();
+
+    const meta = createPiOAuthAdapter(provider("meta"));
+    const grant = await meta.authorize(interaction({ providerId: "meta" }));
+    await expect(meta.refresh(grant)).resolves.toMatchObject({ providerId: "meta", credential: { access: "renewed" } });
+    await expect(meta.toAuth({ ...grant, providerId: "xai" } as never)).rejects.toThrow(/another provider/);
+  });
+
+  it("uses Pi's credential-specific model filter for available model IDs", async () => {
+    const source: PiOAuthProvider<{ id: string; name: string }> = {
+      ...provider(),
+      getModels: () => [{ id: "visible", name: "Visible" }, { id: "unavailable", name: "Unavailable" }],
+      filterModels: (models, credential) => models.filter(model => (credential?.availableModelIds as string[]).includes(model.id)),
+    };
+    const adapter = createPiOAuthAdapter(source);
+    const grant = { providerId: "github-copilot" as const, credential: { type: "oauth" as const, access: "access", refresh: "refresh", expires: 1000, availableModelIds: ["visible"] } };
+    expect(adapter.availableModelIds(grant)).toEqual(["visible"]);
+    expect(() => adapter.availableModelIds({ ...grant, providerId: "meta" })).toThrow(/another provider/);
+    expect(() => createPiOAuthAdapter(provider()).availableModelIds(grant)).toThrow(/catalog is unavailable/);
   });
 
   it("rejects a cancelled prompt and cleans its abort listener after a callback failure", async () => {

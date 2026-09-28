@@ -1,9 +1,10 @@
 import type { ProviderAuthInteraction, ProviderAuthNotice, ProviderAuthPrompt } from "@model-auth/core";
-import { MODEL_AUTH_PROVIDER_CAPABILITIES, modelAuthProviderCapability } from "./capabilities.js";
+import { modelAuthProviderCapability } from "./capabilities.js";
 
-export type PiOAuthProviderId = "github-copilot" | "kimi-coding" | "openrouter";
-export const PI_OAUTH_PROVIDER_IDS: readonly PiOAuthProviderId[] = Object.freeze(MODEL_AUTH_PROVIDER_CAPABILITIES
-  .filter(entry => entry.authorization.kind === "runtime-oauth").map(entry => entry.id as PiOAuthProviderId));
+export type PiOAuthProviderId = "anthropic" | "openai-codex" | "github-copilot" | "kimi-coding" | "openrouter" | "xai" | "meta" | "radius";
+export const PI_OAUTH_PROVIDER_IDS: readonly PiOAuthProviderId[] = Object.freeze([
+  "anthropic", "openai-codex", "github-copilot", "kimi-coding", "openrouter", "xai", "meta", "radius",
+]);
 export interface PiOAuthCredential extends Readonly<Record<string, unknown>> { readonly type: "oauth"; readonly access: string; readonly refresh: string; readonly expires: number; }
 export interface PiOAuthCredentialEnvelope { readonly providerId: PiOAuthProviderId; readonly credential: PiOAuthCredential; }
 export interface PiRequestAuth { readonly apiKey?: string; readonly headers?: Readonly<Record<string, string | null>>; readonly baseUrl?: string; }
@@ -15,13 +16,21 @@ export interface PiOAuthAuth {
   refresh(credential: PiOAuthCredential, signal: AbortSignal): Promise<PiOAuthCredential>;
   toAuth(credential: PiOAuthCredential): Promise<PiRequestAuth>;
 }
-export interface PiOAuthProvider { readonly id: string; readonly name?: string; readonly auth?: { readonly oauth?: PiOAuthAuth }; }
-export interface PiOAuthProviderDescriptor { readonly providerId: PiOAuthProviderId; readonly name: string; readonly catalogProviderId: string; readonly loginLabel?: string; readonly isSubscription?: boolean; }
+export interface PiOAuthModel { readonly id: string; }
+export interface PiOAuthProvider<TModel extends PiOAuthModel = PiOAuthModel> {
+  readonly id: string;
+  readonly name?: string;
+  readonly auth?: { readonly oauth?: PiOAuthAuth };
+  getModels?(): readonly TModel[];
+  filterModels?(models: readonly TModel[], credential: PiOAuthCredential | undefined): readonly TModel[];
+}
+export interface PiOAuthProviderDescriptor { readonly providerId: PiOAuthProviderId; readonly name: string; readonly catalogProviderId: string | null; readonly loginLabel?: string; readonly isSubscription?: boolean; }
 export interface PiOAuthAdapter {
   readonly descriptor: PiOAuthProviderDescriptor;
   authorize(interaction: ProviderAuthInteraction): Promise<PiOAuthCredentialEnvelope>;
   refresh(credential: PiOAuthCredentialEnvelope, signal?: AbortSignal): Promise<PiOAuthCredentialEnvelope>;
   toAuth(credential: PiOAuthCredentialEnvelope): Promise<PiRequestAuth>;
+  availableModelIds(credential: PiOAuthCredentialEnvelope): readonly string[];
 }
 export class PiOAuthBridgeError extends Error { public constructor(message: string) { super(message); this.name = "PiOAuthBridgeError"; } }
 
@@ -30,7 +39,7 @@ export function discoverPiOAuthProvider(providers: Iterable<PiOAuthProvider>, pr
   for (const provider of providers) if (provider.id === providerId) { try { return descriptor(provider); } catch { return null; } }
   return null;
 }
-export function createPiOAuthAdapter(provider: PiOAuthProvider): PiOAuthAdapter {
+export function createPiOAuthAdapter<TModel extends PiOAuthModel>(provider: PiOAuthProvider<TModel>): PiOAuthAdapter {
   const bridgeDescriptor = descriptor(provider), oauth = provider.auth!.oauth!;
   return {
     descriptor: bridgeDescriptor,
@@ -49,6 +58,14 @@ export function createPiOAuthAdapter(provider: PiOAuthProvider): PiOAuthAdapter 
       return envelope(bridgeDescriptor.providerId, renewed);
     },
     async toAuth(value) { return requestAuth(await oauth.toAuth(envelopeCredential(value, bridgeDescriptor.providerId))); },
+    availableModelIds(value) {
+      const stored = envelopeCredential(value, bridgeDescriptor.providerId);
+      if (!provider.getModels) throw new PiOAuthBridgeError("Pi OAuth model catalog is unavailable.");
+      const models = provider.getModels();
+      const available = provider.filterModels?.(models, stored) ?? models;
+      if (!Array.isArray(available)) throw new PiOAuthBridgeError("Pi OAuth model catalog is invalid.");
+      return [...new Set(available.map(model => requiredText(model.id)))];
+    },
   };
 }
 function descriptor(provider: PiOAuthProvider): PiOAuthProviderDescriptor {
@@ -56,7 +73,9 @@ function descriptor(provider: PiOAuthProvider): PiOAuthProviderDescriptor {
   const oauth = provider.auth?.oauth;
   if (!oauth || !text(oauth.name) || typeof oauth.login !== "function" || typeof oauth.refresh !== "function" || typeof oauth.toAuth !== "function") throw new PiOAuthBridgeError("Pi OAuth provider is unavailable.");
   const loginLabel = text(oauth.loginLabel);
-  return { providerId: provider.id as PiOAuthProviderId, name: oauth.name.trim(), catalogProviderId: modelAuthProviderCapability(provider.id)!.catalogProviderId!, ...(loginLabel ? { loginLabel } : {}), ...(typeof oauth.isSubscription === "boolean" ? { isSubscription: oauth.isSubscription } : {}) };
+  const capability = modelAuthProviderCapability(provider.id);
+  if (!capability) throw new PiOAuthBridgeError("Pi OAuth provider is unsupported.");
+  return { providerId: provider.id as PiOAuthProviderId, name: oauth.name.trim(), catalogProviderId: capability.catalogProviderId, ...(loginLabel ? { loginLabel } : {}), ...(typeof oauth.isSubscription === "boolean" ? { isSubscription: oauth.isSubscription } : {}) };
 }
 function noticeFromPi(notice: PiAuthNotice): ProviderAuthNotice {
   if (notice.type !== "info") return notice;
