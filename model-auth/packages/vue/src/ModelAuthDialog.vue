@@ -3,8 +3,8 @@ import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from "vue";
 import { defaultMessages, type ModelAuthMessages } from "./messages";
 import StrategyPicker from "./StrategyPicker.vue";
 import ModelPicker from "./ModelPicker.vue";
+import ProviderMark from "./ProviderMark.vue";
 import { formatPercentage } from "./percentage";
-import { providerIconUrls } from "./provider-icon";
 import type {
   AddApiKeyPayload, AuthMethod, CredentialExtend, CredentialUpdatePayload, CatalogStatus, LoadStrategy,
   ModelAuthProvider, ModelAuthSelection, ModelConnectionTarget, ProviderAuthResponseRequest, ProviderAuthState, ProviderCredential, ProviderAuthNotice, ProviderUpdatePayload, StrategyUpdatePayload, Theme, CredentialUsageEstimate,
@@ -66,7 +66,6 @@ const apiKeyInput = ref("");
 const revealApiKey = ref(false);
 const localError = ref("");
 const pendingRemoval = ref("");
-const failedProviderIcons = ref(new Set<string>());
 const connectionMode = ref(false);
 let awaitingVerification = false;
 const titleId = "model-auth-" + useId();
@@ -115,17 +114,6 @@ const currentStrategy = computed(() => selectedProvider.value?.loadStrategy ?? p
 const currentModel = computed(() => props.model?.providerId === selectedProviderId.value ? props.model.model : "—");
 const activePrompt = computed(() => props.auth?.prompt?.prompt ?? null);
 const activePromptId = computed(() => props.auth?.prompt?.promptId ?? "");
-
-function providerIconKey(provider: ModelAuthProvider, url: string): string {
-  return provider.id + ":" + url;
-}
-function providerIcon(provider: ModelAuthProvider): string | null {
-  return providerIconUrls(provider).find(url => !failedProviderIcons.value.has(providerIconKey(provider, url))) ?? null;
-}
-function handleProviderIconError(provider: ModelAuthProvider) {
-  const url = providerIcon(provider);
-  if (url) failedProviderIcons.value = new Set(failedProviderIcons.value).add(providerIconKey(provider, url));
-}
 
 function activeElement(): Element | null {
   let element: Element | null = document.activeElement;
@@ -370,9 +358,9 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
     <div class="model-auth-root">
       <section class="model-auth-dialog" role="document" tabindex="-1">
         <header class="model-auth-header" part="header" data-part="navigation">
-          <button v-if="step !== 'method' && !connectionMode" type="button" class="model-auth-back" part="back" data-part="back" :aria-label="text.back" @click="back"><span aria-hidden="true">←</span></button>
+          <button v-if="step !== 'method' && !connectionMode" type="button" class="model-auth-back" part="back" data-part="back" :aria-label="text.back" @click="back"><svg class="model-auth-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg></button>
           <h2 :id="titleId" ref="heading" class="model-auth-title" tabindex="-1">{{ connectionMode ? text.connectionInfo : pageTitles[stepIndex] }}</h2>
-          <button type="button" class="model-auth-close" part="close" data-part="close" :aria-label="text.close" @click="close">×</button>
+          <button type="button" class="model-auth-close" part="close" data-part="close" :aria-label="text.close" @click="close"><svg class="model-auth-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
         </header>
         <div v-if="!connectionMode" class="model-auth-progress" part="progress" role="progressbar" :aria-label="text.progress" :aria-valuemin="0" :aria-valuemax="3" :aria-valuenow="stepIndex" :aria-valuetext="pageTitles[stepIndex]">
           <div v-for="segment in 3" :key="segment" class="model-auth-progress-segment"><div class="model-auth-progress-fill" :style="{ width: (segment <= stepIndex ? 100 : 0) + '%' }" /></div>
@@ -406,9 +394,12 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
         <div v-if="step === 'method'" key="method" :class="['model-auth-methods', transitionName]" part="method-list" data-part="method-list">
           <button v-for="choice in (['oauth', 'api-key'] as const)" :key="choice" type="button" class="model-auth-method-card" part="method-card" :data-part="'method-' + choice" @click="chooseMethod(choice)">
             <slot name="method-card" :method="choice" :choose="() => chooseMethod(choice)">
-              <span class="model-auth-method-icon" aria-hidden="true">{{ choice === 'oauth' ? '◎' : '⌘' }}</span>
+              <span class="model-auth-method-icon" aria-hidden="true">
+                <svg v-if="choice === 'oauth'" class="model-auth-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3" /></svg>
+                <svg v-else class="model-auth-icon" viewBox="0 0 24 24"><circle cx="8" cy="15" r="3" /><path d="m10.5 12.5 8-8 2 2-2 2 1.5 1.5-2 2-1.5-1.5-3 3" /></svg>
+              </span>
               <span><strong>{{ choice === 'oauth' ? text.oauth : text.apiKey }}</strong><small>{{ choice === 'oauth' ? text.oauthDescription : text.apiKeyDescription }}</small></span>
-              <span aria-hidden="true">→</span>
+              <svg class="model-auth-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" /></svg>
             </slot>
           </button>
         </div>
@@ -424,10 +415,10 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
               <h3 class="model-auth-group-label">{{ group.label }}</h3>
               <button v-for="provider in group.providers" :key="provider.id" type="button" class="model-auth-provider-row" part="provider-row" :class="{ focused: orderedProviders.indexOf(provider) === focusedProviderIndex, unavailable: !provider.available }" :data-provider-id="provider.id" @click="chooseProvider(provider)">
                 <slot name="provider-row" :provider="provider" :method="method">
-                  <span class="model-auth-provider-mark" :class="'mark-' + provider.id"><img v-if="providerIcon(provider)" :src="providerIcon(provider)!" alt="" aria-hidden="true" loading="lazy" decoding="async" @error="handleProviderIconError(provider)" /><template v-else>{{ provider.mark || provider.name.trim().slice(0, 1).toUpperCase() }}</template></span>
+                  <ProviderMark :provider="provider" />
                   <span class="model-auth-row-main"><strong>{{ provider.name }}</strong><small>{{ provider.available ? provider.id : provider.unavailableReason || text.unavailable }}</small></span>
                   <span class="model-auth-badge">{{ provider.available ? (method === 'oauth' ? (provider.oauthCredentials?.length || 0) + ' ' + text.oauthCount : (provider.apiKeyCredentials?.length || 0) + ' ' + text.apiKeyCount) : text.unavailable }}</span>
-                  <span aria-hidden="true">→</span>
+                  <svg class="model-auth-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" /></svg>
                 </slot>
               </button>
             </section>

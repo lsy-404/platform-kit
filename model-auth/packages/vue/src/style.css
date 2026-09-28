@@ -30,6 +30,9 @@
 .model-auth-group-label { margin: 8px 0 2px; }
 .model-auth-provider-row { width: 100%; display: grid; grid-template-columns: auto minmax(0,1fr) auto auto; gap: 12px; align-items: center; text-align: left; }
 .model-auth-provider-mark, .model-auth-method-icon { display: grid; place-items: center; flex-shrink: 0; width: 36px; height: 36px; }
+.model-auth-icon { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.model-auth-method-icon .model-auth-icon { width: 24px; height: 24px; }
+.model-auth-connection-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .model-auth-row-main { min-width: 0; overflow-wrap: anywhere; }
 .model-auth-row-main strong { overflow: hidden; text-overflow: ellipsis; }
 .model-auth-badge { white-space: nowrap; }

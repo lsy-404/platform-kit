@@ -4,7 +4,7 @@ import ModelConnectionPanel from "../../model-auth/packages/vue/src/ModelConnect
 import type { ModelAuthProvider } from "../../model-auth/packages/vue/src/types";
 
 const fixture = (): ModelAuthProvider[] => [
-  { id: "oauth", name: "OAuth service", description: "OAuth", authMethods: ["oauth"], available: true, models: ["o-model"], loadStrategy: "weighted-round-robin", oauthCredentials: [
+  { id: "oauth", name: "OAuth service", description: "OAuth", iconUrl: "https://assets.example.test/oauth.svg", authMethods: ["oauth"], available: true, models: ["o-model"], loadStrategy: "weighted-round-robin", oauthCredentials: [
     { id: "oauth-healthy", label: "Primary", account: "person@example.test", enabled: true, healthy: true, weight: 2, models: ["o-model"] },
     { id: "oauth-disabled", label: "Paused", enabled: false, healthy: false, weight: 3, models: ["o-model"] },
   ] },
@@ -39,6 +39,7 @@ describe("model connection panel", () => {
   it("lists saved OAuth and API-key accounts, including disabled, unhealthy and unavailable entries", async () => {
     await mount();
     expect(document.querySelectorAll('[data-part="connection-card"]')).toHaveLength(3);
+    expect(get<HTMLImageElement>('[data-provider-id="oauth"] img').src).toBe("https://assets.example.test/oauth.svg");
     expect(get('[data-provider-id="oauth"]').textContent).toContain("Primary");
     expect(get('[data-provider-id="oauth"]').textContent).toContain("已停用");
     expect(get('[data-provider-id="key"]').textContent).toContain("需要重新连接");

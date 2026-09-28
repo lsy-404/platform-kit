@@ -39,11 +39,11 @@ function focusout(event: FocusEvent) {
 <template>
   <div class="model-auth-select" part="strategy" @keydown="keydown" @focusout="focusout">
     <button ref="trigger" type="button" class="model-auth-secondary" :disabled="disabled" :aria-label="label" aria-haspopup="listbox" :aria-expanded="expanded" :aria-controls="id" @click="expanded ? expanded = false : open()">
-      {{ current?.label }} <span aria-hidden="true">⌄</span>
+      {{ current?.label }} <svg class="model-auth-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
     </button>
     <div v-if="expanded" :id="id" ref="list" role="listbox" :aria-label="label" :aria-activedescendant="id + '-' + active" tabindex="-1" class="model-auth-select-menu" part="strategy-menu">
       <button v-for="(option, index) in options" :id="id + '-' + index" :key="option.value" type="button" role="option" :aria-selected="modelValue === option.value" :class="{ focused: active === index }" tabindex="-1" @click="choose(option.value)">
-        {{ option.label }} <span v-if="modelValue === option.value" aria-hidden="true">✓</span>
+        {{ option.label }} <svg v-if="modelValue === option.value" class="model-auth-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4 10-10" /></svg>
       </button>
     </div>
   </div>

@@ -34,13 +34,26 @@ function parseWebAddress(value: string | undefined): URL | null {
   }
 }
 
+function parseIconAddress(value: string | undefined, baseUrl?: string): URL | null {
+  if (!value?.trim()) return null;
+  try {
+    const url = new URL(value.trim(), baseUrl);
+    if (url.protocol === "http:" || url.protocol === "https:") return url;
+    if (!baseUrl) return null;
+    const base = new URL(baseUrl);
+    return base.protocol !== "file:" && base.host !== "" && url.protocol === base.protocol && url.host === base.host ? url : null;
+  } catch {
+    return null;
+  }
+}
+
 function faviconUrl(address: string | undefined): string | null {
   const url = parseWebAddress(address);
   return url ? new URL("/favicon.ico", url.origin).href : null;
 }
 
-export function providerIconUrls(provider: Pick<ModelAuthProvider, "id" | "api" | "website" | "iconUrl">): string[] {
-  const directIcon = parseWebAddress(provider.iconUrl);
+export function providerIconUrls(provider: Pick<ModelAuthProvider, "id" | "api" | "website" | "iconUrl">, baseUrl = typeof document === "undefined" ? undefined : document.baseURI): string[] {
+  const directIcon = parseIconAddress(provider.iconUrl, baseUrl);
   return [...new Set([
     directIcon?.href ?? null,
     faviconUrl(provider.api),

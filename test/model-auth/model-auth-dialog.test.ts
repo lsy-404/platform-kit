@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createApp, h, nextTick, reactive, type App } from "vue";
 import ModelAuthDialog from "../../model-auth/packages/vue/src/ModelAuthDialog.vue";
+import { providerIconUrls } from "../../model-auth/packages/vue/src/provider-icon";
 import { registerModelAuthElement } from "../../model-auth/packages/vue/src/custom-element";
 import type { ModelAuthProvider } from "../../model-auth/packages/vue/src/types";
 
@@ -58,6 +59,15 @@ function expectStage(title: string, caption: string, widths: string[]) {
 }
 
 describe("authentication dialog", () => {
+  it("accepts bundled same-origin app icons without trusting another app host", () => {
+    const provider = { id: "openai-codex", iconUrl: "iris-ui://app/assets/codex.svg" };
+    const urls = providerIconUrls(provider, "iris-ui://app/index.html");
+    expect(urls[0]).toBe(provider.iconUrl);
+    expect(providerIconUrls({ ...provider, iconUrl: "./assets/codex.svg" }, "iris-ui://app/index.html")[0]).toBe(provider.iconUrl);
+    expect(providerIconUrls({ ...provider, iconUrl: "iris-ui://other/assets/codex.svg" }, "iris-ui://app/index.html")).not.toContain("iris-ui://other/assets/codex.svg");
+    expect(providerIconUrls({ ...provider, iconUrl: "data:image/svg+xml,<svg/>" }, "iris-ui://app/index.html")).not.toContain("data:image/svg+xml,<svg/>");
+  });
+
   it("confirms verified authorization without any discovered models", async () => {
     const { state, events } = await mount();
     await details("oauth", "workbuddy");

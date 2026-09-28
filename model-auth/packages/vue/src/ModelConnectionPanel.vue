@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { defaultMessages, type ModelAuthMessages } from "./messages";
+import ProviderMark from "./ProviderMark.vue";
 import type { AuthMethod, ModelAuthProvider, ModelAuthSelection, ModelConnectionTarget, ProviderCredential, Theme } from "./types";
 
 const props = withDefaults(defineProps<{
@@ -45,7 +46,7 @@ function strategy(provider: ModelAuthProvider) {
     <p v-if="!busy && !groups.length" class="model-auth-empty" data-part="no-connections">{{ text.noConnections }}</p>
     <article v-for="group in groups" :key="group.provider.id + '/' + group.method" class="model-auth-connection-card" data-part="connection-card" :data-provider-id="group.provider.id" :data-auth-method="group.method">
       <header class="model-auth-connections-heading">
-        <div><h4>{{ group.provider.name }}</h4><span class="model-auth-connection-meta">{{ methodLabel(group.method) }} · {{ text.strategy }}：{{ strategy(group.provider) }}</span></div>
+        <div class="model-auth-connection-title"><ProviderMark :provider="group.provider" /><div><h4>{{ group.provider.name }}</h4><span class="model-auth-connection-meta">{{ methodLabel(group.method) }} · {{ text.strategy }}：{{ strategy(group.provider) }}</span></div></div>
         <button type="button" class="model-auth-secondary" :disabled="busy" :aria-label="text.viewConnection + ' · ' + group.provider.name + ' · ' + methodLabel(group.method)" data-part="view-connection" @click="emit('manage', { providerId: group.provider.id, method: group.method })">{{ text.viewConnection }}</button>
       </header>
       <p v-if="!group.provider.available && group.provider.unavailableReason" class="model-auth-connection-warning" role="status">{{ group.provider.unavailableReason }}</p>
