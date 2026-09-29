@@ -26,7 +26,6 @@ function status(credential: ProviderCredential) {
 }
 function strategy(provider: ModelAuthProvider) {
   if (provider.loadStrategy === "failover") return text.value.failover;
-  if (provider.loadStrategy === "weighted-round-robin") return text.value.weightedRoundRobin;
   return provider.loadStrategy === "round-robin" ? text.value.roundRobin : "—";
 }
 function modelCount(provider: ModelAuthProvider, method: AuthMethod, credential: ProviderCredential) {
@@ -55,10 +54,10 @@ function modelCount(provider: ModelAuthProvider, method: AuthMethod, credential:
       </header>
       <p v-if="!group.provider.available && group.provider.unavailableReason" class="model-auth-connection-warning" role="status">{{ group.provider.unavailableReason }}</p>
       <ul class="model-auth-connection-accounts">
-        <li v-for="credential in group.credentials" :key="credential.id" data-part="connection-account">
+        <li v-for="(credential, index) in group.credentials" :key="credential.id" data-part="connection-account">
           <div><strong>{{ credential.label }}</strong><small v-if="credential.account && credential.account !== credential.label">{{ text.account }}：{{ credential.account }}</small></div>
           <span>{{ status(credential) }}</span>
-          <span class="model-auth-connection-meta">{{ text.weight }} {{ credential.weight }} · {{ modelCount(group.provider, group.method, credential) }} {{ text.modelCount }}</span>
+          <span class="model-auth-connection-meta">{{ text.position }} {{ index + 1 }} · {{ modelCount(group.provider, group.method, credential) }} {{ text.modelCount }}</span>
         </li>
       </ul>
     </article>

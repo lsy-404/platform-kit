@@ -2,7 +2,7 @@ export type AuthMethod = "oauth" | "api-key";
 export type ProviderAuthType = "oauth" | "api_key";
 export type CredentialKind = AuthMethod;
 export interface ModelConnectionTarget { providerId: string; method: AuthMethod }
-export type LoadStrategy = "round-robin" | "weighted-round-robin" | "failover";
+export type LoadStrategy = "round-robin" | "failover";
 export type Theme = "system" | "light" | "dark";
 
 export type CredentialExtendValue = string | number | boolean | null;
@@ -97,7 +97,6 @@ export interface ProviderCredential {
   label: string;
   healthy: boolean;
   enabled: boolean;
-  weight: number;
   account?: string;
   models?: string[];
   cooldownUntilUtc?: string | null;
@@ -134,6 +133,7 @@ export interface ModelAuthProvider {
 
 export interface ModelAuthSelection { providerId: string; model: string }
 export interface AddApiKeyPayload { providerId: string; label: string; apiKey: string; extend?: CredentialExtend }
-export interface CredentialUpdatePayload { providerId: string; credentialId: string; enabled: boolean; weight: number; extend?: CredentialExtend }
+export interface CredentialUpdatePayload { providerId: string; credentialId: string; enabled: boolean; extend?: CredentialExtend }
+export interface CredentialReorderPayload { providerId: string; method: AuthMethod; credentialIds: string[] }
 export interface ProviderUpdatePayload { providerId: string; oauthEnabled: boolean }
 export interface StrategyUpdatePayload { providerId: string; strategy: LoadStrategy }

@@ -18,7 +18,6 @@ const workBuddyHost: ProviderAdapterHost = {
       authMethod: "oauth",
       modelIds: ["glm-5.2", "glm-5.1"],
       enabled: true,
-      weight: 2,
     });
   },
   remove: (credentialId) => secureCredentialStore.remove(credentialId),

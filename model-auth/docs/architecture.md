@@ -8,7 +8,7 @@
 
 Usage snapshots expose validated provider windows, balances, and an optional `ProviderUsageEstimate`. The estimate carries observed token/request amounts, configured or learned limit data, confidence, and both a 0..1 `remainingRatio` and an unrounded 0..100 `remainingPercent`. Hosts attach estimates from their own transcript or request history; an unknown limit remains `null`.
 
-Credentials are non-secret metadata: an opaque host-owned ID, provider and authentication method, enabled state, independent weight, allowed model IDs, health state, and a validated scalar `extend` object for non-sensitive per-key context. `CredentialRouter` selects eligible credentials by provider and model using `round-robin`, `weighted-round-robin`, or stable-order `failover`. Enabled state and weight are independent: disabling a credential does not change its weight, and changing weight does not enable it.
+Credentials are non-secret metadata: an opaque host-owned ID, provider and authentication method, enabled state, allowed model IDs, health state, and a validated scalar `extend` object for non-sensitive per-key context. `CredentialRouter` selects eligible credentials by provider and model using sequential `round-robin` or stable-order `failover`. Credential order is the priority order and is changed only through `setOrder`; enabled state is independent of order.
 
 Use an explicit runtime binding when a host provider is not named exactly like its `models.dev` provider. `bindRuntimeProviders` accepts a catalog provider ID and an optional `includeModel` predicate, so one catalog entry can safely serve several host-specific runtime providers.
 
@@ -18,7 +18,7 @@ Use an explicit runtime binding when a host provider is not named exactly like i
 
 1. Two entry cards: browser authentication or API key.
 2. A searchable, single-column provider list filtered by the selected method.
-3. Provider credential and model configuration, with enabled and weight controlled independently.
+3. Provider credential and model configuration, with enabled state and order controlled independently.
 
 The host supplies the catalog, existing metadata, and callbacks. Authentication actions invoke the shared provider implementation in a trusted host, store secrets securely, and return only non-secret metadata. Dynamic provider flows use `ProviderAuthPrompt`/`ProviderAuthNotice` events, so device codes, URLs, selections, and manual codes do not require a provider-specific UI. API-key actions likewise validate and store the key in the host boundary. Closing the dialog aborts an active authorization through `execute(action, { signal })`; host IPC must propagate cancellation.
 

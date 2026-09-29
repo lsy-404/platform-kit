@@ -93,7 +93,7 @@ WorkBuddy and TraeCode are adapter capabilities, not fabricated `models.dev` pro
 import { CredentialRouter } from "@model-auth/core";
 
 const router = new CredentialRouter(savedCredentialMetadata, {
-  strategy: "weighted-round-robin",
+  strategy: "round-robin",
 });
 const candidates = router.candidates({ providerId: "openai-codex", modelId: "selected-model" });
 const selected = candidates[0];
@@ -106,7 +106,7 @@ try {
 }
 ```
 
-Use `setEnabled` for an independent on/off control and `setWeight` for traffic share. `401`/`403` permanently isolate a credential; `429`, server errors, and transport errors use bounded cooling. `failover` preserves registration order, while the round-robin modes rotate among eligible credentials.
+Use `setEnabled` for an independent on/off control and `setOrder(credentialIds)` to set priority; credentials are ordered by registration unless reordered. `401`/`403` permanently isolate a credential; `429`, server errors, and transport errors use bounded cooling. `failover` always tries eligible credentials in that order, while `round-robin` rotates over them starting from that order.
 
 ## Presentation contract
 

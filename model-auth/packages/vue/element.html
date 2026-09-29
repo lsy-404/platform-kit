@@ -13,7 +13,7 @@ registerModelAuthElement();
 const dialog = document.querySelector("model-auth-dialog");
 dialog.theme = "dark";
 dialog.catalogStatus = { state: "ready", source: "models.dev" };
-dialog.providers = [{ id: "example", name: "Example Provider", description: "由宿主提供运行时", available: true, authMethods: ["oauth", "api-key"], models: ["model-standard"], oauthCredentials: [{ id: "one", label: "演示账号", enabled: true, healthy: true, weight: 1 }], apiKeyCredentials: [] }];
+dialog.providers = [{ id: "example", name: "Example Provider", description: "由宿主提供运行时", available: true, authMethods: ["oauth", "api-key"], models: ["model-standard"], oauthCredentials: [{ id: "one", label: "演示账号", enabled: true, healthy: true }], apiKeyCredentials: [] }];
 document.querySelector("#open").onclick = () => { dialog.open = true; };
 document.querySelector("#unstyled").onclick = () => { dialog.styled = dialog.styled === false; dialog.open = true; };
 document.querySelector("#brand").onclick = () => { dialog.style.setProperty("--model-auth-accent", "#da7aff"); dialog.open = true; };

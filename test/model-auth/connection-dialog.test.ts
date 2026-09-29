@@ -4,9 +4,9 @@ import ModelAuthDialog from "../../model-auth/packages/vue/src/ModelAuthDialog.v
 import type { ModelAuthProvider } from "../../model-auth/packages/vue/src/types";
 
 const providers = (): ModelAuthProvider[] => [
-  { id: "oauth", name: "OAuth provider", description: "OAuth", authMethods: ["oauth"], available: true, models: ["o-model"], loadStrategy: "weighted-round-robin", oauthCredentials: [{ id: "account", label: "Primary", account: "user@example.test", enabled: true, healthy: true, weight: 2, models: ["o-model"] }] },
-  { id: "key", name: "Key provider", description: "API key", authMethods: ["api-key"], available: true, models: ["k-model"], apiKeyCredentials: [{ id: "key-1", label: "Service key", enabled: false, healthy: false, weight: 1, models: ["k-model"] }] },
-  { id: "offline", name: "Offline", description: "Unavailable", authMethods: ["oauth"], available: false, unavailableReason: "Host unavailable", models: [], oauthCredentials: [{ id: "offline-1", label: "Offline account", enabled: true, healthy: false, weight: 1 }] },
+  { id: "oauth", name: "OAuth provider", description: "OAuth", authMethods: ["oauth"], available: true, models: ["o-model"], loadStrategy: "round-robin", oauthCredentials: [{ id: "account", label: "Primary", account: "user@example.test", enabled: true, healthy: true, models: ["o-model"] }] },
+  { id: "key", name: "Key provider", description: "API key", authMethods: ["api-key"], available: true, models: ["k-model"], apiKeyCredentials: [{ id: "key-1", label: "Service key", enabled: false, healthy: false, models: ["k-model"] }] },
+  { id: "offline", name: "Offline", description: "Unavailable", authMethods: ["oauth"], available: false, unavailableReason: "Host unavailable", models: [], oauthCredentials: [{ id: "offline-1", label: "Offline account", enabled: true, healthy: false }] },
 ];
 
 let apps: App[] = [];
@@ -43,16 +43,15 @@ describe("connection detail dialog", () => {
     const provider = state.providers[0]!;
     provider.models = ["catalog-only"];
     provider.oauthCredentials = [
-      { id: "ok", label: "Ready", enabled: true, healthy: true, weight: 1, models: ["ready-model"] },
-      { id: "disabled", label: "Disabled", enabled: false, healthy: true, weight: 1, models: ["disabled-model"] },
-      { id: "bad", label: "Unhealthy", enabled: true, healthy: false, weight: 1, models: ["bad-model"] },
-      { id: "cooling", label: "Cooling", enabled: true, healthy: true, weight: 1, models: ["cooling-model"], cooldownUntilUtc: "2999-01-01T00:00:00Z" },
-      { id: "invalid", label: "Invalid cooldown", enabled: true, healthy: true, weight: 1, models: ["invalid-model"], cooldownUntilUtc: "invalid" },
-      { id: "weight", label: "Invalid weight", enabled: true, healthy: true, weight: 0, models: ["weight-model"] },
+      { id: "ok", label: "Ready", enabled: true, healthy: true, models: ["ready-model"] },
+      { id: "disabled", label: "Disabled", enabled: false, healthy: true, models: ["disabled-model"] },
+      { id: "bad", label: "Unhealthy", enabled: true, healthy: false, models: ["bad-model"] },
+      { id: "cooling", label: "Cooling", enabled: true, healthy: true, models: ["cooling-model"], cooldownUntilUtc: "2999-01-01T00:00:00Z" },
+      { id: "invalid", label: "Invalid cooldown", enabled: true, healthy: true, models: ["invalid-model"], cooldownUntilUtc: "invalid" },
     ];
     await nextTick();
     expect(get<HTMLButtonElement>('[data-model-id="catalog-only"]').disabled).toBe(true);
-    for (const name of ["disabled", "bad", "cooling", "invalid", "weight"]) {
+    for (const name of ["disabled", "bad", "cooling", "invalid"]) {
       const button = get<HTMLButtonElement>('[data-model-id="' + name + '-model"]');
       expect(button.disabled).toBe(true); button.click();
     }
@@ -71,7 +70,7 @@ describe("connection detail dialog", () => {
     const { state } = await mount({ providerId: "oauth", method: "oauth" });
     const provider = state.providers[0]!;
     provider.models = ["catalog-only"];
-    provider.oauthCredentials = [{ id: "disabled", label: "Disabled", enabled: false, healthy: true, weight: 1, models: [] }];
+    provider.oauthCredentials = [{ id: "disabled", label: "Disabled", enabled: false, healthy: true, models: [] }];
     await nextTick();
     expect(get<HTMLButtonElement>('[data-model-id="catalog-only"]').disabled).toBe(true);
   });
@@ -92,7 +91,7 @@ describe("connection detail dialog", () => {
     const { state, events } = await mount(null);
     const provider = state.providers[0]!;
     provider.authMethods = ["oauth", "api-key"];
-    provider.apiKeyCredentials = [{ id: "api", label: "Key", enabled: true, healthy: true, weight: 1, models: ["key-only"] }];
+    provider.apiKeyCredentials = [{ id: "api", label: "Key", enabled: true, healthy: true, models: ["key-only"] }];
     await click('[data-part="method-oauth"]');
     await click('[data-provider-id="oauth"]');
     expect(document.querySelector('[data-part="models"]')).toBeNull();
@@ -121,7 +120,7 @@ describe("connection detail dialog", () => {
 
   it("keeps reconnect in detail after a successful host refresh", async () => {
     const { state, events } = await mount({ providerId: "oauth", method: "oauth" });
-    await click('[data-part="oauth-credential"] .model-auth-secondary');
+    await click('[data-part="oauth-credential"] [data-part="reconnect"]');
     expect(events.at(-1)).toEqual({ name: "reconnect", payload: ["oauth", "account"] });
     state.providers[0]!.oauthCredentials![0]!.healthy = true;
     await nextTick();
@@ -133,12 +132,12 @@ describe("connection detail dialog", () => {
     const { events } = await mount({ providerId: "key", method: "api-key" });
     const toggle = get<HTMLInputElement>('[data-part="api-key-credential"] input[role="switch"]');
     toggle.checked = true; toggle.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(events.at(-1)).toEqual({ name: "credential", payload: { providerId: "key", credentialId: "key-1", enabled: true, weight: 1 } });
+    expect(events.at(-1)).toEqual({ name: "credential", payload: { providerId: "key", credentialId: "key-1", enabled: true } });
     await click('[data-part="api-key-credential"] .model-auth-danger');
     await click('[data-part="api-key-credential"] .model-auth-danger');
     expect(events.at(-1)).toEqual({ name: "remove-key", payload: ["key", "key-1"] });
     await click('[part="strategy"] button');
-    await click('[part="strategy-menu"] button:nth-child(3)');
+    await click('[part="strategy-menu"] button:nth-child(2)');
     expect(events.at(-1)).toEqual({ name: "strategy", payload: { providerId: "key", strategy: "failover" } });
   });
 

@@ -33,7 +33,7 @@ await secureStore.set(accountId, renewed);
 
 Credentials contain `access`, `refresh`, `expires` (Unix milliseconds), and optional `accountId`, `userId`, `enterpriseId`, `domain`, and `label`. Store them in an OS credential store or encrypted host storage. Give every new account its own host credential ID; reauthorization replaces only the selected ID. Refresh before expiry and persist rotated tokens before inference. `workBuddyHeaders` and `WORKBUDDY_ENDPOINTS.chatBase` provide the native request binding.
 
-The host owns model availability, secret persistence, account removal and routing policy. OAuth switches, independent credential weights, and cooldowns are handled by `@model-auth/core`. Removing a local credential is not a claim of vendor-side revocation.
+The host owns model availability, secret persistence, account removal and routing policy. OAuth switches, credential ordering, and cooldowns are handled by `@model-auth/core`. Removing a local credential is not a claim of vendor-side revocation.
 
 ## Trae browser authorization
 

@@ -6,7 +6,7 @@ import ModelPicker from "./ModelPicker.vue";
 import ProviderMark from "./ProviderMark.vue";
 import { formatPercentage } from "./percentage";
 import type {
-  AddApiKeyPayload, AuthMethod, CredentialExtend, CredentialUpdatePayload, CatalogStatus, LoadStrategy,
+  AddApiKeyPayload, AuthMethod, CredentialExtend, CredentialReorderPayload, CredentialUpdatePayload, CatalogStatus, LoadStrategy,
   ModelAuthProvider, ModelAuthSelection, ModelConnectionTarget, ProviderAuthResponseRequest, ProviderAuthState, ProviderCredential, ProviderAuthNotice, ProviderUpdatePayload, StrategyUpdatePayload, Theme, CredentialUsageEstimate,
 } from "./types";
 
@@ -37,6 +37,7 @@ const emit = defineEmits<{
   "reconnect-oauth": [providerId: string, credentialId: string];
   "remove-oauth": [providerId: string, credentialId: string];
   "update-credential": [payload: CredentialUpdatePayload];
+  "reorder-credentials": [payload: CredentialReorderPayload];
   "update-provider": [payload: ProviderUpdatePayload];
   "add-api-key": [payload: AddApiKeyPayload];
   "remove-api-key": [providerId: string, credentialId: string];
@@ -106,7 +107,6 @@ const canUseMethod = computed(() => Boolean(selectedProvider.value?.available
   && selectedProvider.value.authMethods.includes(method.value)
   && (method.value !== "oauth" || selectedProvider.value.oauthEnabled !== false)));
 const eligibleCredentials = computed(() => canUseMethod.value ? credentials.value.filter(credential => credential.enabled && credential.healthy
-  && Number.isInteger(credential.weight) && credential.weight > 0 && credential.weight <= 100
   && (!credential.cooldownUntilUtc || Date.parse(credential.cooldownUntilUtc) <= Date.now())) : []);
 const availableModels = computed(() => {
   if (!eligibleCredentials.value.length) return [];
@@ -116,7 +116,6 @@ const availableModels = computed(() => {
 const authReady = computed(() => eligibleCredentials.value.length > 0);
 const strategyOptions = computed(() => [
   { value: "round-robin" as const, label: text.value.roundRobin },
-  { value: "weighted-round-robin" as const, label: text.value.weightedRoundRobin },
   { value: "failover" as const, label: text.value.failover },
 ]);
 const currentStrategy = computed(() => selectedProvider.value?.loadStrategy ?? props.loadStrategy);
@@ -224,12 +223,19 @@ function handleDialogKeydown(event: KeyboardEvent) {
     event.preventDefault(); first.focus();
   }
 }
-function updateCredential(credential: ProviderCredential, enabled: boolean, weight: number, extend?: CredentialExtend) {
+function updateCredential(credential: ProviderCredential, enabled: boolean, extend?: CredentialExtend) {
   const provider = selectedProvider.value;
   if (!provider || props.busy) return;
-  if (!Number.isInteger(weight) || weight < 1 || weight > 100) { localError.value = text.value.weightInvalid; return; }
   localError.value = "";
-  emit("update-credential", { providerId: provider.id, credentialId: credential.id, enabled, weight, ...(extend ? { extend } : {}) });
+  emit("update-credential", { providerId: provider.id, credentialId: credential.id, enabled, ...(extend ? { extend } : {}) });
+}
+function moveCredential(index: number, offset: -1 | 1) {
+  const provider = selectedProvider.value;
+  const target = index + offset;
+  if (!provider || props.busy || target < 0 || target >= credentials.value.length) return;
+  const credentialIds = credentials.value.map(credential => credential.id);
+  [credentialIds[index], credentialIds[target]] = [credentialIds[target]!, credentialIds[index]!];
+  emit("reorder-credentials", { providerId: provider.id, method: method.value, credentialIds });
 }
 function extendText(credential: ProviderCredential): string {
   return JSON.stringify(credential.extend ?? {}, null, 2);
@@ -243,7 +249,7 @@ function updateExtend(credential: ProviderCredential, value: string) {
       if (typeof item !== "string" && typeof item !== "number" && typeof item !== "boolean" && item !== null) throw new Error();
       extend[key] = item;
     }
-    updateCredential(credential, credential.enabled, credential.weight, extend);
+    updateCredential(credential, credential.enabled, extend);
   } catch {
     localError.value = text.value.extendInvalid;
   }
@@ -466,19 +472,21 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
           </section>
 
           <section class="model-auth-credentials" :aria-label="text.credentials">
-            <article v-for="credential in credentials" :key="credential.id" class="model-auth-credential-row" part="credential-row" :data-part="method === 'oauth' ? 'oauth-credential' : 'api-key-credential'">
-              <slot name="credential-row" :credential="credential" :provider="selectedProvider" :method="method" :update="(enabled: boolean, weight: number) => updateCredential(credential, enabled, weight)" :remove="() => removeCredential(credential)">
+            <article v-for="(credential, index) in credentials" :key="credential.id" class="model-auth-credential-row" part="credential-row" :data-part="method === 'oauth' ? 'oauth-credential' : 'api-key-credential'">
+              <slot name="credential-row" :credential="credential" :provider="selectedProvider" :method="method" :update="(enabled: boolean) => updateCredential(credential, enabled)" :remove="() => removeCredential(credential)">
                 <div class="model-auth-credential-summary">
                   <span class="model-auth-health" :class="{ healthy: credential.enabled && credential.healthy }" aria-hidden="true"></span>
                   <span class="model-auth-row-main"><strong>{{ credential.label }}</strong><small>{{ connectionMode && credential.account ? text.account + ' · ' + credential.account + ' · ' : '' }}{{ credentialStatus(credential) }}</small></span>
                   <label class="model-auth-toggle">
-                    <input :checked="credential.enabled" :disabled="busy" type="checkbox" role="switch" :aria-label="text.enable + ' ' + credential.label" @change="updateCredential(credential, ($event.target as HTMLInputElement).checked, credential.weight)" />
+                    <input :checked="credential.enabled" :disabled="busy" type="checkbox" role="switch" :aria-label="text.enable + ' ' + credential.label" @change="updateCredential(credential, ($event.target as HTMLInputElement).checked)" />
                     <span class="model-auth-switch-track" aria-hidden="true"></span>{{ text.enable }}
                   </label>
                 </div>
                 <div class="model-auth-credential-actions">
-                  <label class="model-auth-weight">{{ text.weight }}<input :value="credential.weight" :disabled="busy" type="number" min="1" max="100" step="1" :aria-label="text.weight + ' ' + credential.label" @change="updateCredential(credential, credential.enabled, Number(($event.target as HTMLInputElement).value))" /></label>
-                  <button v-if="method === 'oauth'" type="button" class="model-auth-secondary" :disabled="busy || !canUseMethod" @click="authorize(credential.id)">{{ text.reconnect }}</button>
+                  <span class="model-auth-position" data-part="credential-position">{{ text.position }} {{ index + 1 }}</span>
+                  <button type="button" class="model-auth-secondary" data-part="move-up" :disabled="busy || index === 0" :aria-label="text.moveUp + ' ' + credential.label" @click="moveCredential(index, -1)">{{ text.moveUp }}</button>
+                  <button type="button" class="model-auth-secondary" data-part="move-down" :disabled="busy || index === credentials.length - 1" :aria-label="text.moveDown + ' ' + credential.label" @click="moveCredential(index, 1)">{{ text.moveDown }}</button>
+                  <button v-if="method === 'oauth'" type="button" class="model-auth-secondary" data-part="reconnect" :disabled="busy || !canUseMethod" @click="authorize(credential.id)">{{ text.reconnect }}</button>
                   <button v-if="selectedProvider.usageEnabled || credential.usage" type="button" class="model-auth-secondary" data-part="query-usage" :disabled="busy" @click="queryUsage(credential)">{{ credential.usage ? text.refreshUsage : text.queryUsage }}</button>
                   <button v-if="method === 'oauth' && selectedProvider.logoutEnabled" type="button" class="model-auth-secondary" data-part="logout" :disabled="busy" @click="emit('logout', selectedProvider!.id, credential.id)">{{ text.logout }}</button>
                   <button type="button" class="model-auth-danger" :disabled="busy" :data-confirmed="pendingRemoval === credential.id" @click="removeCredential(credential)">{{ pendingRemoval === credential.id ? text.confirmRemove : text.remove }}</button>
@@ -501,7 +509,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
           </section>
           <section v-if="connectionMode" class="model-auth-credential-section" data-part="connection-policy">
             <details class="model-auth-connection-models" open><summary>{{ text.models }} ({{ connectionModels.length }})</summary><ModelPicker :models="connectionModels" :available-models="availableModels" :disabled="busy" :messages="text" @select="selectModel" /></details>
-            <div class="model-auth-section-heading"><strong>{{ text.strategy }}</strong><StrategyPicker :model-value="currentStrategy" :options="strategyOptions" :label="text.strategy" :disabled="busy" @update:model-value="updateStrategy" /></div>
+            <div class="model-auth-section-heading"><strong>{{ text.strategy }}</strong><small>{{ text.strategyHint }}</small><StrategyPicker :model-value="currentStrategy" :options="strategyOptions" :label="text.strategy" :disabled="busy" @update:model-value="updateStrategy" /></div>
           </section>
 
         </div>

@@ -31,12 +31,11 @@ const oauth = (id: string, models = ["shared"]): CredentialMetadata => createCre
   modelIds: models,
 });
 
-const apiKey = (id: string, models = ["shared"], weight = 1, enabled = true): CredentialMetadata => createCredentialMetadata({
+const apiKey = (id: string, models = ["shared"], enabled = true): CredentialMetadata => createCredentialMetadata({
   id,
   providerId: "provider-a",
   authMethod: "api-key",
   modelIds: models,
-  weight,
   enabled,
 });
 
@@ -158,20 +157,22 @@ describe("model-auth core", () => {
     const router = new CredentialRouter([
       oauth("oauth"),
       apiKey("api"),
-      apiKey("disabled", ["shared"], 1, false),
+      apiKey("disabled", ["shared"], false),
       createCredentialMetadata({ id: "other-provider", providerId: "provider-b", authMethod: "api-key", modelIds: ["shared"] }),
       oauth("other-model", ["other"]),
     ]);
-    expect(router.candidates({ providerId: "provider-a", modelId: "shared" }).map((item) => item.id)).toEqual(["api", "oauth"]);
     expect(router.candidates({ providerId: "provider-a", modelId: "shared" }).map((item) => item.id)).toEqual(["oauth", "api"]);
+    expect(router.candidates({ providerId: "provider-a", modelId: "shared" }).map((item) => item.id)).toEqual(["api", "oauth"]);
   });
 
-  it("supports weighted and failover strategies", () => {
-    const weighted = new CredentialRouter([apiKey("a", ["m"], 3), apiKey("b", ["m"], 1)], { strategy: "weighted-round-robin" });
-    expect(weighted.candidates({ providerId: "provider-a", modelId: "m" }).map((item) => item.id)).toEqual(["a", "b"]);
-    expect(weighted.candidates({ providerId: "provider-a", modelId: "m" }).map((item) => item.id)).toEqual(["a", "b"]);
-    expect(weighted.candidates({ providerId: "provider-a", modelId: "m" }).map((item) => item.id)).toEqual(["a", "b"]);
-    expect(weighted.candidates({ providerId: "provider-a", modelId: "m" }).map((item) => item.id)).toEqual(["b", "a"]);
+  it("orders round-robin and failover by credential order", () => {
+    const rotating = new CredentialRouter([apiKey("b", ["m"]), apiKey("a", ["m"]), apiKey("c", ["m"])], { strategy: "round-robin" });
+    const ids = () => rotating.candidates({ providerId: "provider-a", modelId: "m" }).map((item) => item.id);
+    expect(ids()).toEqual(["b", "a", "c"]);
+    expect(ids()).toEqual(["a", "c", "b"]);
+    rotating.setOrder(["c", "b"]);
+    expect(rotating.snapshot().map((item) => item.id)).toEqual(["c", "a", "b"]);
+    expect(ids()).toEqual(["c", "a", "b"]);
     const failover = new CredentialRouter([apiKey("b", ["m"]), apiKey("a", ["m"])], { strategy: "failover" });
     expect(failover.candidates({ providerId: "provider-a", modelId: "m" }).map((item) => item.id)).toEqual(["b", "a"]);
   });
@@ -199,10 +200,9 @@ describe("model-auth core", () => {
     const initial = apiKey("key");
     const router = new CredentialRouter([initial], { now: () => now, transientCooldownMs: 100 });
     router.reportError("key", { kind: "http", status: 503 });
-    router.upsert({ ...initial, enabled: false, weight: 7 });
+    router.upsert({ ...initial, enabled: false });
     expect(router.health("key")?.health).toBe("cooling-down");
     router.setEnabled("key", true);
-    router.setWeight("key", 9);
     now += 100;
     router.resetHealth("key");
     expect(router.health("key")).toEqual({ health: "healthy", cooldownUntilUtc: null });

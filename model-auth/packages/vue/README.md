@@ -9,7 +9,7 @@ import { registerModelConnectionPanelElement, registerModelAuthElement } from "@
 
 Pass the host state to `ModelConnectionPanel` (`providers`, `busy`, `error`). Its `manage` event carries `{ providerId, method }`; pass that value as `ModelAuthDialog.initialConnection` to open the saved connection directly. The `add` event opens the dialog with `initialConnection: null`. Handle `refresh` by reloading host state. Custom-element events carry Vue argument arrays in `event.detail`.
 
-Load saved state when the host page mounts and update it after account operations. The panel keeps disabled, unhealthy and temporarily unavailable connections visible. The information dialog exposes safe account metadata, models, status, weights and routing strategy; management actions remain in this view instead of advancing through the authorization wizard.
+Load saved state when the host page mounts and update it after account operations. The panel keeps disabled, unhealthy and temporarily unavailable connections visible. The information dialog exposes safe account metadata, models, status, order and routing strategy; management actions remain in this view instead of advancing through the authorization wizard.
 
 Credentials remain in the host. Handle authentication/API-key events and update controlled provider data after operations succeed. Dynamic provider prompts and notices are exposed through `auth` state and the `respond-auth`/`cancel-auth` events. Never pass tokens, cookies, or API-key values as connection metadata; use `extend` only for non-sensitive scalar context.
 
