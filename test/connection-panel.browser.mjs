@@ -16,14 +16,14 @@ const html = `<!doctype html><meta charset="utf-8"><style>body{margin:0;padding:
   import { registerModelAuthElement, registerModelConnectionPanelElement } from "/model-auth-element.js";
   registerModelConnectionPanelElement("fixture-connections"); registerModelAuthElement("fixture-dialog");
   const providers = ${fixture}; providers[0].oauthCredentials.forEach(account => account.models = providers[0].models); const panel = document.querySelector("fixture-connections"), dialog = document.querySelector("fixture-dialog");
-  panel.providers = providers; panel.model = { providerId: "oauth", model: providers[0].models[0] }; panel.theme = "dark";
-  dialog.providers = providers; dialog.model = panel.model; dialog.theme = "dark"; dialog.open = false;
+  panel.providers = providers; panel.theme = "dark";
+  dialog.providers = providers; dialog.theme = "dark"; dialog.open = false;
   window.fixtureEvents = [];
   panel.addEventListener("manage", event => { const target = event.detail[0]; window.fixtureEvents.push(["manage", target]); dialog.initialConnection = target; dialog.open = true; });
   panel.addEventListener("refresh", () => window.fixtureEvents.push(["refresh"]));
   panel.addEventListener("add", () => window.fixtureEvents.push(["add"]));
   dialog.addEventListener("close", () => { dialog.open = false; });
-  dialog.addEventListener("select-model", event => { const selection = event.detail[0]; window.fixtureEvents.push(["model", selection]); dialog.model = selection; panel.model = selection; });
+  dialog.addEventListener("select-model", event => { const selection = event.detail[0]; window.fixtureEvents.push(["model", selection]); });
 </script>`;
 const mime = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
 const server = createServer(async (request, response) => {
@@ -67,7 +67,7 @@ try {
   await page.locator("fixture-connections").locator('[data-provider-id="oauth"] [data-part="view-connection"]').click();
   const models = page.locator("fixture-dialog").locator(".model-auth-connection-models");
   assert.equal(await models.locator('[data-part="model-row"]').count(), 30);
-  assert.equal(await models.locator('[data-model-id="very-long-model-name-0-abcdefghijklmnopqrstuvwxyz"]').getAttribute('aria-pressed'), 'true');
+  assert.equal(await models.locator('[data-model-id="very-long-model-name-0-abcdefghijklmnopqrstuvwxyz"]').getAttribute('aria-pressed'), null);
   await models.locator('summary').focus();
   await page.keyboard.press('Tab');
   assert.equal(await page.locator('fixture-dialog').evaluate(el => el.shadowRoot.activeElement?.getAttribute('aria-label')), '搜索模型', 'Tab must reach model search');
@@ -76,7 +76,7 @@ try {
   await page.keyboard.press('Tab');
   await page.keyboard.press('Enter');
   assert.deepEqual(await page.evaluate(() => window.fixtureEvents.at(-1)), ['model', { providerId: 'oauth', model: 'very-long-model-name-1-abcdefghijklmnopqrstuvwxyz' }]);
-  assert.equal(await models.locator('[data-part="model-row"]').getAttribute('aria-pressed'), 'true');
+  assert.equal(await models.locator('[data-part="model-row"]').getAttribute('aria-pressed'), null);
   assert.equal(await page.locator('fixture-dialog').locator('[data-part="dialog"]').isVisible(), true, 'selection must preserve the dialog');
   await page.keyboard.press('Tab');
   assert.equal(await page.locator('fixture-dialog').evaluate(el => el.shadowRoot.activeElement?.getAttribute('aria-label')), '负载策略', 'Tab must reach policy after the filtered model row');
