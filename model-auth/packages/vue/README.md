@@ -11,7 +11,7 @@ Pass the host state to `ModelConnectionPanel` (`providers`, `busy`, `error`). It
 
 Load saved state when the host page mounts and update it after account operations. The panel keeps disabled, unhealthy and temporarily unavailable connections visible. The information dialog exposes safe account metadata, models, status, order and routing strategy; management actions remain in this view instead of advancing through the authorization wizard.
 
-Credentials remain in the host. Handle authentication/API-key events and update controlled provider data after operations succeed. Dynamic provider prompts and notices are exposed through `auth` state and the `respond-auth`/`cancel-auth` events. Never pass tokens, cookies, or API-key values as connection metadata; use `extend` only for non-sensitive scalar context.
+Credentials remain in the host. Handle authentication/API-key events and update controlled provider data after operations succeed. Dynamic provider prompts and notices are exposed through `auth` state and the `respond-auth`/`cancel-auth` events. `ProviderCredential.secret` is optional host-supplied text (an API key, or the host's serialised OAuth token information) that the dialog shows masked, with a reveal toggle and a Save button that emits `update-credential` with the new `secret`. The host owns persistence and chooses whether to supply it; never render it elsewhere, log it, or place it in `extend`, which is for non-sensitive scalar context. `ModelConnectionPanel` never shows secrets.
 
 The Vue entry includes styles. The standalone entry bundles Vue and Shadow DOM styles. Pass `styled=false` to disable the theme, or override CSS variables, `::part()` and Vue slots.
 
@@ -19,6 +19,6 @@ The Vue entry includes styles. The standalone entry bundles Vue and Shadow DOM s
 
 Licensed under Apache-2.0. The standalone custom-element bundle includes Vue and both bundles include provider icons; see THIRD-PARTY.md.
 
-Saved connection details and the final authorization step offer models from the provider catalog and saved credentials. Selection emits `select-model`; the host owns selected model state and persistence. Disabled, unhealthy, cooling, and unavailable connections remain visible but cannot be selected. `useModelAuth` keeps the dialog open after a successful selection; Confirm and Close finish the dialog explicitly.
+Each connection card in the panel expands to list its models, and the connection details show the same list: the union of the provider's method models (or catalog models) and the models of its saved credentials. The list is read-only with a search field for long lists; there is no selected or current model, so hosts choose models themselves.
 
 Provider icons for known ids are bundled as inline SVG and never fetched. `ModelAuthProvider.iconUrl` overrides the built-in icon (http(s) or same-origin only); unknown providers show a letter mark.

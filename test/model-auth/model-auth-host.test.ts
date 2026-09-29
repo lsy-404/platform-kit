@@ -2,17 +2,17 @@ import { expect, it } from "vitest";
 import { useModelAuth } from "../../model-auth/packages/vue/src/useModelAuth";
 import type { ModelAuthAction, ModelAuthState } from "../../model-auth/packages/vue/src/useModelAuth";
 
-it("keeps model selection open after the host saves and refreshes successfully", async () => {
+it("keeps the dialog open after the host saves and refreshes successfully", async () => {
   let fail = true;
   const binding = useModelAuth({
     async getState() { return { providers: [], catalogStatus: { state: "ready" } }; },
     async execute() { if (fail) throw new Error("failed"); },
   });
   binding.open.value = true;
-  expect(await binding.listeners["select-model"]({ providerId: "sample", model: "sample" })).toBe(false);
+  expect(await binding.listeners["update-provider"]({ providerId: "sample", oauthEnabled: true })).toBe(false);
   expect(binding.open.value).toBe(true);
   fail = false;
-  expect(await binding.listeners["select-model"]({ providerId: "sample", model: "sample" })).toBe(true);
+  expect(await binding.listeners["update-provider"]({ providerId: "sample", oauthEnabled: true })).toBe(true);
   expect(binding.open.value).toBe(true);
 });
 
@@ -23,7 +23,7 @@ it("a late confirmation cannot close a newly opened dialog", async () => {
     async execute() { await new Promise<void>(resolve => { finish = resolve; }); },
   });
   binding.open.value = true;
-  const pending = binding.listeners["select-model"]({ providerId: "sample", model: "sample" });
+  const pending = binding.listeners["update-provider"]({ providerId: "sample", oauthEnabled: true });
   await Promise.resolve();
   binding.listeners.close();
   binding.open.value = true;

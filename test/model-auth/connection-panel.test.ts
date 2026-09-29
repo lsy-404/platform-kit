@@ -52,7 +52,24 @@ describe("model connection panel", () => {
     Object.assign(state.providers[1]!.apiKeyCredentials![0] as object, { apiKey: "fixture-secret-must-not-render" });
     await nextTick();
     expect(document.body.textContent).not.toContain("fixture-secret-must-not-render");
+    Object.assign(state.providers[1]!.apiKeyCredentials![0] as object, { secret: "fixture-secret-must-not-render" });
+    await nextTick();
+    expect(document.body.textContent).not.toContain("fixture-secret-must-not-render");
     expect(document.querySelector('[data-part="connections-panel"] input')).toBeNull();
+  });
+
+  it("expands each card to a read-only model list, collapsed by default", async () => {
+    const { state } = await mount();
+    const details = get<HTMLDetailsElement>('[data-provider-id="oauth"] [data-part="connection-models"]');
+    expect(details.open).toBe(false);
+    expect(details.querySelector("summary")!.textContent).toContain("(1)");
+    expect([...details.querySelectorAll('[data-part="model-row"]')].map(row => row.textContent)).toEqual(["o-model"]);
+    expect(details.querySelector("button")).toBeNull();
+    expect(get('[data-provider-id="offline"] [data-part="models"]').textContent).toContain("没有可用模型");
+    state.providers[1]!.models = Array.from({ length: 9 }, (_, index) => "m-" + index);
+    await nextTick();
+    expect(get('[data-provider-id="key"] [data-part="model-search"]')).toBeTruthy();
+    expect(document.querySelector('[data-provider-id="oauth"] [data-part="model-search"]')).toBeNull();
   });
 
   it("emits an exact management target plus add and refresh commands", async () => {

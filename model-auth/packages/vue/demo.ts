@@ -6,7 +6,7 @@ const initial: ModelAuthProvider[] = [
   { id: "anthropic", name: "Anthropic", description: "连接已有账号，或使用平台 API Key。", available: true,
     authMethods: ["oauth", "api-key"], models: ["model-standard", "model-fast"],
     oauthCredentials: [
-      { id: "account-a", label: "主账号", enabled: true, healthy: true },
+      { id: "account-a", label: "主账号", enabled: true, healthy: true, secret: "demo-oauth-token-a" },
       { id: "account-b", label: "备用账号", enabled: false, healthy: true },
     ], apiKeyCredentials: [] },
   { id: "openai", name: "OpenAI", description: "使用平台 API Key 连接模型。", available: true,
@@ -36,19 +36,20 @@ createApp({
         onClose: () => { open.value = false; },
         onAuthorizeOauth: (providerId: string) => {
           const provider = providers.value.find(item => item.id === providerId)!;
-          (provider.oauthCredentials ??= []).push({ id: crypto.randomUUID(), label: "演示账号", enabled: true, healthy: true });
+          (provider.oauthCredentials ??= []).push({ id: crypto.randomUUID(), label: "演示账号", enabled: true, healthy: true, secret: "demo-oauth-token" });
           status.value = "演示授权已完成。真实授权由宿主适配器执行。";
         },
         onReconnectOauth: () => { status.value = "宿主收到重新授权请求。"; },
-        onAddApiKey: (payload: { providerId: string; label: string }) => {
+        onAddApiKey: (payload: { providerId: string; label: string; apiKey: string }) => {
           const provider = providers.value.find(item => item.id === payload.providerId)!;
-          (provider.apiKeyCredentials ??= []).push({ id: crypto.randomUUID(), label: payload.label || "演示密钥", enabled: true, healthy: true, models: [...provider.models] });
-          status.value = "演示元数据已添加，输入的密钥未保存。";
+          (provider.apiKeyCredentials ??= []).push({ id: crypto.randomUUID(), label: payload.label || "演示密钥", enabled: true, healthy: true, models: [...provider.models], secret: payload.apiKey });
+          status.value = "演示凭据已添加，密钥仅保留于内存。";
         },
-        onUpdateCredential: (payload: { providerId: string; credentialId: string; enabled: boolean }) => {
+        onUpdateCredential: (payload: { providerId: string; credentialId: string; enabled: boolean; secret?: string }) => {
           const provider = providers.value.find(item => item.id === payload.providerId)!;
           const credential = [...provider.oauthCredentials ?? [], ...provider.apiKeyCredentials ?? []].find(item => item.id === payload.credentialId)!;
           credential.enabled = payload.enabled;
+          if (payload.secret !== undefined) credential.secret = payload.secret;
         },
         onReorderCredentials: (payload: { providerId: string; method: "oauth" | "api-key"; credentialIds: string[] }) => {
           const provider = providers.value.find(item => item.id === payload.providerId)!;
@@ -68,7 +69,6 @@ createApp({
           const provider = providers.value.find(item => item.id === id)!;
           provider.apiKeyCredentials = provider.apiKeyCredentials?.filter(item => item.id !== credentialId) ?? [];
         },
-        onSelectModel: (value: { providerId: string; model: string }) => { status.value = value.providerId + " / " + value.model; },
       }),
     ]);
   },

@@ -17,7 +17,7 @@ async function mount(initialConnection: { providerId: string; method: "oauth" | 
   const state = reactive({ open: true, providers: providers(), initialConnection, busy: false, ...extra });
   const events: { name: string; payload: unknown }[] = [];
   const on = (name: string) => (...payload: unknown[]) => events.push({ name, payload: payload.length === 1 ? payload[0] : payload });
-  const app = createApp(() => h(ModelAuthDialog, { ...state, onClose: on("close"), onSelectModel: on("model"), onReconnectOauth: on("reconnect"), onUpdateCredential: on("credential"), onRemoveOauth: on("remove-oauth"), onRemoveApiKey: on("remove-key"), onUpdateProviderStrategy: on("strategy"), onRefreshCatalog: on("refresh") }));
+  const app = createApp(() => h(ModelAuthDialog, { ...state, onClose: on("close"), onReconnectOauth: on("reconnect"), onUpdateCredential: on("credential"), onRemoveOauth: on("remove-oauth"), onRemoveApiKey: on("remove-key"), onUpdateProviderStrategy: on("strategy"), onRefreshCatalog: on("refresh") }));
   apps.push(app); app.mount(host); await nextTick(); await nextTick();
   return { state, events };
 }
@@ -25,54 +25,56 @@ const get = <T extends HTMLElement = HTMLElement>(selector: string) => document.
 async function click(selector: string) { get(selector).click(); await nextTick(); await nextTick(); }
 
 describe("connection detail dialog", () => {
-  it("lists saved models and emits selections without maintaining a current-model marker", async () => {
+  it("lists saved models as a read-only list without any current-model marker", async () => {
     const { state, events } = await mount({ providerId: "oauth", method: "oauth" });
     state.providers[0]!.oauthCredentials![0]!.models = ["o-model", "second-model"];
     await nextTick();
-    expect(get('[data-model-id="o-model"]').getAttribute("aria-pressed")).toBeNull();
-    await click('[data-model-id="second-model"]');
-    expect(events.at(-1)).toEqual({ name: "model", payload: { providerId: "oauth", model: "second-model" } });
-    expect(get('[data-model-id="second-model"]').getAttribute("aria-pressed")).toBeNull();
-    expect(get('[data-model-id="o-model"]').getAttribute("aria-pressed")).toBeNull();
+    const row = get('[data-model-id="second-model"]');
+    expect(row.tagName).toBe("LI");
+    expect(row.getAttribute("aria-pressed")).toBeNull();
+    row.click(); await nextTick();
+    expect(document.querySelector('[data-part="connection-policy"] button[data-model-id]')).toBeNull();
+    expect(events.some(event => event.name !== "close" && event.name !== "refresh")).toBe(false);
     expect(get<HTMLDialogElement>('[data-part="dialog"]').open).toBe(true);
-    expect(events.some(event => event.name === "close")).toBe(false);
   });
 
-  it("shows provider catalog models and disables models without eligible credentials", async () => {
-    const { state, events } = await mount({ providerId: "oauth", method: "oauth" });
+  it("falls back to provider models without eligible credentials and unions credential models", async () => {
+    const { state } = await mount({ providerId: "oauth", method: "oauth" });
     const provider = state.providers[0]!;
     provider.models = ["catalog-only"];
     provider.oauthCredentials = [
       { id: "ok", label: "Ready", enabled: true, healthy: true, models: ["ready-model"] },
-      { id: "disabled", label: "Disabled", enabled: false, healthy: true, models: ["disabled-model"] },
-      { id: "bad", label: "Unhealthy", enabled: true, healthy: false, models: ["bad-model"] },
-      { id: "cooling", label: "Cooling", enabled: true, healthy: true, models: ["cooling-model"], cooldownUntilUtc: "2999-01-01T00:00:00Z" },
-      { id: "invalid", label: "Invalid cooldown", enabled: true, healthy: true, models: ["invalid-model"], cooldownUntilUtc: "invalid" },
+      { id: "disabled", label: "Disabled", enabled: false, healthy: true, models: ["disabled-model", "ready-model"] },
+      { id: "bad", label: "Unhealthy", enabled: true, healthy: false },
     ];
     await nextTick();
-    expect(get<HTMLButtonElement>('[data-model-id="catalog-only"]').disabled).toBe(true);
-    for (const name of ["disabled", "bad", "cooling", "invalid"]) {
-      const button = get<HTMLButtonElement>('[data-model-id="' + name + '-model"]');
-      expect(button.disabled).toBe(true); button.click();
-    }
-    expect(events.some(event => event.name === "model")).toBe(false);
-    expect(get<HTMLButtonElement>('[data-model-id="ready-model"]').disabled).toBe(false);
-    provider.oauthEnabled = false; await nextTick();
-    expect(get<HTMLButtonElement>('[data-model-id="ready-model"]').disabled).toBe(true);
-    provider.oauthEnabled = true; provider.available = false; await nextTick();
-    expect(get<HTMLButtonElement>('[data-model-id="ready-model"]').disabled).toBe(true);
-    expect(get('[data-part="connection-info"]').textContent).toContain("ready-model");
-    provider.available = true; state.busy = true; await nextTick();
-    expect(get<HTMLButtonElement>('[data-model-id="ready-model"]').disabled).toBe(true);
+    const ids = [...document.querySelectorAll('[data-part="model-row"]')].map(row => row.getAttribute("data-model-id"));
+    expect(ids).toEqual(["catalog-only", "ready-model", "disabled-model"]);
+    provider.oauthCredentials = [{ id: "disabled", label: "Disabled", enabled: false, healthy: true }];
+    provider.available = false; await nextTick();
+    expect(get('[data-part="connection-policy"]').textContent).toContain("catalog-only");
   });
 
-  it("does not make provider catalog models selectable without an eligible credential", async () => {
+  it("uses method models over the catalog and shows an empty state", async () => {
     const { state } = await mount({ providerId: "oauth", method: "oauth" });
     const provider = state.providers[0]!;
-    provider.models = ["catalog-only"];
-    provider.oauthCredentials = [{ id: "disabled", label: "Disabled", enabled: false, healthy: true, models: [] }];
+    provider.oauthModels = ["method-model"];
     await nextTick();
-    expect(get<HTMLButtonElement>('[data-model-id="catalog-only"]').disabled).toBe(true);
+    expect([...document.querySelectorAll('[data-part="model-row"]')].map(row => row.textContent)).toEqual(["method-model", "o-model"]);
+    provider.oauthModels = []; provider.models = []; provider.oauthCredentials![0]!.models = [];
+    await nextTick();
+    expect(document.querySelector('[data-part="model-row"]')).toBeNull();
+    expect(get('[data-part="models"]').textContent).toContain("没有可用模型");
+  });
+
+  it("searches long model lists only when there are more than eight models", async () => {
+    const { state } = await mount({ providerId: "oauth", method: "oauth" });
+    expect(document.querySelector('[data-part="model-search"]')).toBeNull();
+    state.providers[0]!.models = Array.from({ length: 12 }, (_, index) => "model-" + index);
+    await nextTick();
+    const input = get<HTMLInputElement>('[data-part="model-search"]');
+    input.value = "model-1"; input.dispatchEvent(new Event("input", { bubbles: true })); await nextTick();
+    expect(document.querySelectorAll('[data-part="model-row"]')).toHaveLength(3);
   });
 
   it("closes the strategy overlay from its trigger and keeps it out of layout flow", async () => {
@@ -87,7 +89,7 @@ describe("connection detail dialog", () => {
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("selects only the current authentication method and preserves explicit four-stage confirmation", async () => {
+  it("uses only the current authentication method and preserves explicit four-stage confirmation", async () => {
     const { state, events } = await mount(null);
     const provider = state.providers[0]!;
     provider.authMethods = ["oauth", "api-key"];
@@ -97,16 +99,14 @@ describe("connection detail dialog", () => {
     expect(document.querySelector('[data-part="models"]')).toBeNull();
     await click('[data-part="continue-confirmation"]');
     expect(document.querySelector('[data-part="confirmation-step"]')).toBeTruthy();
-    expect(document.querySelector('[data-model-id="key-only"]')).toBeNull();
-    await click('[data-model-id="o-model"]');
-    expect(events.at(-1)).toEqual({ name: "model", payload: { providerId: "oauth", model: "o-model" } });
+    expect(document.querySelector('[data-part="models"]')).toBeNull();
     expect(events.some(event => event.name === "close")).toBe(false);
     await click('[data-part="confirm"]');
     expect(events.at(-1)?.name).toBe("close");
   });
 
-  it("opens OAuth metadata and policy directly, without wizard progress and without automatically selecting a model", async () => {
-    const { events } = await mount({ providerId: "oauth", method: "oauth" });
+  it("opens OAuth metadata and policy directly, without wizard progress or a current model", async () => {
+    await mount({ providerId: "oauth", method: "oauth" });
     expect(get("h2").textContent).toBe("接入信息");
     expect(document.querySelector('[part="progress"]')).toBeNull();
     expect(document.querySelector('[data-part="back"]')).toBeNull();
@@ -115,7 +115,6 @@ describe("connection detail dialog", () => {
     expect(get('[data-part="connection-policy"]').textContent).toContain("o-model");
     expect(get('[data-part="connection-policy"]').textContent).not.toContain("当前使用");
     expect(document.querySelector('[data-part="continue-confirmation"]')).toBeNull();
-    expect(events.some(event => event.name === "model")).toBe(false);
   });
 
   it("keeps reconnect in detail after a successful host refresh", async () => {

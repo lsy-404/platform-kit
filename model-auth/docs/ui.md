@@ -36,7 +36,7 @@ The same composable can be used in each Vue host. It never logs action payloads 
 | `auth` | idle state | Dynamic authentication notices and current prompt |
 | `messages` | Chinese defaults | Override any visible string |
 
-An available provider can support browser authentication, API keys or both. `oauthEnabled=false` disables the provider's browser authentication independently of its individual credential preferences. Set `usageEnabled` or `logoutEnabled` only when the host handles those actions. Credential order is the array order supplied by the host and is the priority order; each credential has `enabled`, health state, optional `usage`, and optional scalar `extend` metadata. Supply discovered `models` on credentials to restrict eligibility; when eligible credentials have no model list, the provider catalog is used. Only explicitly healthy and enabled credentials can expose models for selection.
+An available provider can support browser authentication, API keys or both. `oauthEnabled=false` disables the provider's browser authentication independently of its individual credential preferences. Set `usageEnabled` or `logoutEnabled` only when the host handles those actions. Credential order is the array order supplied by the host and is the priority order; each credential has `enabled`, health state, optional `usage`, and optional scalar `extend` metadata. The models listed for a connection are the deduplicated union of the provider's method models (or catalog `models`) and every credential's `models`. The list is read-only and there is no current-model state; the host decides which model is used. Set `secret` on a credential to show its API key or serialised OAuth token in the credential row; the dialog masks it by default, lets the user reveal and edit it, and reports the change through `update-credential`. `@model-auth/core` stays metadata-only: the host owns secret persistence and decides whether to supply `secret` at all. Credentials without `secret` show no field.
 
 ## Events
 
@@ -48,7 +48,7 @@ An available provider can support browser authentication, API keys or both. `oau
 | `reconnect-oauth` | providerId, credentialId |
 | `remove-oauth` / `remove-api-key` | providerId, credentialId |
 | `add-api-key` | { providerId, label, apiKey } |
-| `update-credential` | { providerId, credentialId, enabled, extend? } |
+| `update-credential` | { providerId, credentialId, enabled, extend?, secret? }; `extend` and `secret` are present only when changed |
 | `reorder-credentials` | { providerId, method, credentialIds }; the full new order |
 | `query-usage` | providerId, credentialId |
 | `logout` | providerId, credentialId |
@@ -56,13 +56,12 @@ An available provider can support browser authentication, API keys or both. `oau
 | `cancel-auth` | loginId |
 | `open-auth-url` | url; host validates and opens it |
 | `update-provider` | { providerId, oauthEnabled } |
-| `select-model` | { providerId, model } |
 | `update-provider-strategy` | { providerId, strategy } |
 | `update-strategy` | strategy; use for hosts with one shared strategy |
 
 Use either strategy event according to your host's settings model. For provider-specific preferences, persist the result and pass `provider.loadStrategy` back. Apply the same preference with `router.setStrategy(strategy, providerId)`. Apply OAuth policy with `router.setProviderOAuthEnabled(providerId, enabled)`.
 
-The API-key payload is emitted once; the input is cleared before emission. Do not log payloads. Map the event to the host's existing secure validation/storage action. Pass sanitized error text and set `busy=false` when the operation settles. The `extend` editor emits only scalar JSON metadata; the host must validate it again before persisting.
+The API-key payload is emitted once and the new-key input is cleared before emission; return the stored key as `secret` on the new credential if it should stay visible. Do not log payloads: they contain secrets. Map the event to the host's existing secure validation/storage action. Pass sanitized error text and set `busy=false` when the operation settles. The `extend` editor emits only scalar JSON metadata; the host must validate it again before persisting.
 
 `auth` notices support informational text, browser URLs, device codes, progress, and dynamic text/secret/select/manual-code prompts. The component emits `respond-auth` and `cancel-auth`; the host owns login correlation and cancellation.
 
@@ -100,14 +99,13 @@ Custom Element events carry the Vue event arguments as an array in `event.detail
 
 Public CSS variables: `--model-auth-accent`, `--model-auth-accent-text`, `--model-auth-text`, `--model-auth-muted`, `--model-auth-surface`, `--model-auth-control`, `--model-auth-subtle`, `--model-auth-line`, `--model-auth-danger`, `--model-auth-success`, `--model-auth-radius`, `--model-auth-z-index`.
 
-Shadow parts include `backdrop`, `dialog`, `header`, `back`, `close`, `method-card`, `search`, `catalog-status`, `provider-row`, `credential-row`, `api-key-form`, `strategy`, `strategy-menu`, `models` and `model-row`.
+Shadow parts include `backdrop`, `dialog`, `header`, `back`, `close`, `method-card`, `search`, `catalog-status`, `provider-row`, `credential-row`, `api-key-form`, `strategy`, `strategy-menu`, `models`, `model-search` and `model-row`.
 
 Vue scoped slots:
 
 - `method-card`: method and choose; rendered inside the navigation button.
 - `provider-row`: provider and method; rendered inside the provider button.
 - `credential-row`: credential, provider, method, update(enabled), remove; replaces the complete row content.
-- `model-row`: model and provider; rendered inside the model button.
 - `footer`: step and close.
 
 Do not place nested buttons inside button-content slots. For an entirely different UI, consume `@model-auth/core` directly.

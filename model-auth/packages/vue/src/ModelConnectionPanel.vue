@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { defaultMessages, type ModelAuthMessages } from "./messages";
+import ModelList from "./ModelList.vue";
 import ProviderMark from "./ProviderMark.vue";
+import { connectionModels } from "./models";
 import type { AuthMethod, ModelAuthProvider, ModelConnectionTarget, ProviderCredential, Theme } from "./types";
 
 const props = withDefaults(defineProps<{
@@ -16,7 +18,7 @@ const emit = defineEmits<{ manage: [target: ModelConnectionTarget]; add: []; ref
 const text = computed(() => ({ ...defaultMessages, ...props.messages }));
 const groups = computed(() => props.providers.flatMap(provider => (["oauth", "api-key"] as AuthMethod[]).flatMap(method => {
   const credentials = (method === "oauth" ? provider.oauthCredentials : provider.apiKeyCredentials) ?? [];
-  return credentials.length ? [{ provider, method, credentials }] : [];
+  return credentials.length ? [{ provider, method, credentials, models: connectionModels(provider, method) }] : [];
 })));
 const methodLabel = (method: AuthMethod) => method === "oauth" ? text.value.oauth : text.value.apiKey;
 function status(credential: ProviderCredential) {
@@ -60,6 +62,10 @@ function modelCount(provider: ModelAuthProvider, method: AuthMethod, credential:
           <span class="model-auth-connection-meta">{{ text.position }} {{ index + 1 }} · {{ modelCount(group.provider, group.method, credential) }} {{ text.modelCount }}</span>
         </li>
       </ul>
+      <details class="model-auth-connection-models" data-part="connection-models">
+        <summary>{{ text.models }} ({{ group.models.length }})</summary>
+        <ModelList :models="group.models" :messages="text" />
+      </details>
     </article>
   </section>
 </template>

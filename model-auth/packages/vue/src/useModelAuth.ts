@@ -1,7 +1,7 @@
 import { computed, onBeforeUnmount, ref, shallowRef } from "vue";
 import type {
   AddApiKeyPayload, AuthMethod, CatalogStatus, CredentialReorderPayload, CredentialUpdatePayload, ModelAuthProvider,
-  ModelAuthSelection, ProviderAuthEvent, ProviderAuthResponseRequest, ProviderAuthState,
+  ProviderAuthEvent, ProviderAuthResponseRequest, ProviderAuthState,
   ProviderUpdatePayload, StrategyUpdatePayload,
 } from "./types";
 
@@ -19,7 +19,6 @@ export type ModelAuthAction =
   | { type: "update-credential"; payload: CredentialUpdatePayload }
   | { type: "reorder-credentials"; providerId: string; method: AuthMethod; credentialIds: string[] }
   | { type: "update-provider"; payload: ProviderUpdatePayload }
-  | { type: "select-model"; payload: ModelAuthSelection }
   | { type: "update-strategy"; payload: StrategyUpdatePayload }
   | { type: "refresh-catalog" };
 
@@ -93,7 +92,6 @@ export function useModelAuth(host: ModelAuthHost, options: { errorMessage?: stri
     "update-credential": (payload: CredentialUpdatePayload) => run({ type: "update-credential", payload }),
     "reorder-credentials": (payload: CredentialReorderPayload) => run({ type: "reorder-credentials", ...payload }),
     "update-provider": (payload: ProviderUpdatePayload) => run({ type: "update-provider", payload }),
-    "select-model": (payload: ModelAuthSelection) => run({ type: "select-model", payload }),
     "update-provider-strategy": (payload: StrategyUpdatePayload) => run({ type: "update-strategy", payload }),
     "refresh-catalog": () => run({ type: "refresh-catalog" }),
     "respond-auth": (response: ProviderAuthResponseRequest) => host.respondAuth ? host.respondAuth(response).then(() => true, () => false) : Promise.resolve(false),

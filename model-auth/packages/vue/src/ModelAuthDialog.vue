@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, reactive, ref, useId, watch } from "vue";
 import { defaultMessages, type ModelAuthMessages } from "./messages";
 import StrategyPicker from "./StrategyPicker.vue";
-import ModelPicker from "./ModelPicker.vue";
+import ModelList from "./ModelList.vue";
+import { connectionModels } from "./models";
 import ProviderMark from "./ProviderMark.vue";
 import { formatPercentage } from "./percentage";
 import type {
   AddApiKeyPayload, AuthMethod, CredentialExtend, CredentialReorderPayload, CredentialUpdatePayload, CatalogStatus, LoadStrategy,
-  ModelAuthProvider, ModelAuthSelection, ModelConnectionTarget, ProviderAuthResponseRequest, ProviderAuthState, ProviderCredential, ProviderAuthNotice, ProviderUpdatePayload, StrategyUpdatePayload, Theme, CredentialUsageEstimate,
+  ModelAuthProvider, ModelConnectionTarget, ProviderAuthResponseRequest, ProviderAuthState, ProviderCredential, ProviderAuthNotice, ProviderUpdatePayload, StrategyUpdatePayload, Theme, CredentialUsageEstimate,
 } from "./types";
 
 const props = withDefaults(defineProps<{
@@ -41,7 +42,6 @@ const emit = defineEmits<{
   "update-provider": [payload: ProviderUpdatePayload];
   "add-api-key": [payload: AddApiKeyPayload];
   "remove-api-key": [providerId: string, credentialId: string];
-  "select-model": [selection: ModelAuthSelection];
   "update-strategy": [strategy: LoadStrategy];
   "update-provider-strategy": [payload: StrategyUpdatePayload];
   "refresh-catalog": [];
@@ -64,6 +64,8 @@ const heading = ref<HTMLElement>();
 const labelInput = ref("");
 const apiKeyInput = ref("");
 const revealApiKey = ref(false);
+const secretDrafts = reactive<Record<string, string>>({});
+const revealedSecrets = reactive<Record<string, boolean>>({});
 const localError = ref("");
 const pendingRemoval = ref("");
 const connectionMode = ref(false);
@@ -96,23 +98,12 @@ const credentials = computed<ProviderCredential[]>(() => {
   const provider = selectedProvider.value;
   return (method.value === "oauth" ? provider?.oauthCredentials : provider?.apiKeyCredentials) ?? [];
 });
-const providerModels = computed(() => {
-  const provider = selectedProvider.value;
-  if (!provider) return [];
-  const methodModels = method.value === "oauth" ? provider.oauthModels : provider.apiKeyModels;
-  return [...new Set([...(methodModels?.length ? methodModels : provider.models),].filter(model => model.trim()))];
-});
-const connectionModels = computed(() => [...new Set([...providerModels.value, ...credentials.value.flatMap(credential => credential.models || [])].filter(model => model.trim()))]);
+const models = computed(() => selectedProvider.value ? connectionModels(selectedProvider.value, method.value) : []);
 const canUseMethod = computed(() => Boolean(selectedProvider.value?.available
   && selectedProvider.value.authMethods.includes(method.value)
   && (method.value !== "oauth" || selectedProvider.value.oauthEnabled !== false)));
 const eligibleCredentials = computed(() => canUseMethod.value ? credentials.value.filter(credential => credential.enabled && credential.healthy
   && (!credential.cooldownUntilUtc || Date.parse(credential.cooldownUntilUtc) <= Date.now())) : []);
-const availableModels = computed(() => {
-  if (!eligibleCredentials.value.length) return [];
-  const credentialModels = eligibleCredentials.value.flatMap(credential => credential.models || []).filter(model => model.trim());
-  return [...new Set(credentialModels.length ? credentialModels : providerModels.value)];
-});
 const authReady = computed(() => eligibleCredentials.value.length > 0);
 const strategyOptions = computed(() => [
   { value: "round-robin" as const, label: text.value.roundRobin },
@@ -127,7 +118,12 @@ function activeElement(): Element | null {
   while (element?.shadowRoot?.activeElement) element = element.shadowRoot.activeElement;
   return element;
 }
-function clearSecret() { labelInput.value = ""; apiKeyInput.value = ""; revealApiKey.value = false; }
+function clearNewKey() { labelInput.value = ""; apiKeyInput.value = ""; revealApiKey.value = false; }
+function clearSecret() {
+  clearNewKey();
+  for (const id of Object.keys(secretDrafts)) delete secretDrafts[id];
+  for (const id of Object.keys(revealedSecrets)) delete revealedSecrets[id];
+}
 function resetState() {
   awaitingVerification = false;
   connectionMode.value = Boolean(props.initialConnection);
@@ -223,11 +219,20 @@ function handleDialogKeydown(event: KeyboardEvent) {
     event.preventDefault(); first.focus();
   }
 }
-function updateCredential(credential: ProviderCredential, enabled: boolean, extend?: CredentialExtend) {
+function updateCredential(credential: ProviderCredential, enabled: boolean, patch: { extend?: CredentialExtend; secret?: string } = {}) {
   const provider = selectedProvider.value;
   if (!provider || props.busy) return;
   localError.value = "";
-  emit("update-credential", { providerId: provider.id, credentialId: credential.id, enabled, ...(extend ? { extend } : {}) });
+  emit("update-credential", { providerId: provider.id, credentialId: credential.id, enabled, ...(patch.extend ? { extend: patch.extend } : {}), ...(patch.secret !== undefined ? { secret: patch.secret } : {}) });
+}
+function secretValue(credential: ProviderCredential): string {
+  return secretDrafts[credential.id] ?? credential.secret ?? "";
+}
+function secretChanged(credential: ProviderCredential): boolean {
+  return secretValue(credential) !== (credential.secret ?? "");
+}
+function saveSecret(credential: ProviderCredential) {
+  if (secretChanged(credential)) updateCredential(credential, credential.enabled, { secret: secretValue(credential) });
 }
 function moveCredential(index: number, offset: -1 | 1) {
   const provider = selectedProvider.value;
@@ -249,7 +254,7 @@ function updateExtend(credential: ProviderCredential, value: string) {
       if (typeof item !== "string" && typeof item !== "number" && typeof item !== "boolean" && item !== null) throw new Error();
       extend[key] = item;
     }
-    updateCredential(credential, credential.enabled, extend);
+    updateCredential(credential, credential.enabled, { extend });
   } catch {
     localError.value = text.value.extendInvalid;
   }
@@ -297,7 +302,7 @@ function addApiKey() {
   const provider = selectedProvider.value;
   if (!provider || !canUseMethod.value || props.busy || !apiKeyInput.value.trim()) return;
   const payload = { providerId: provider.id, label: labelInput.value.trim(), apiKey: apiKeyInput.value.trim() };
-  clearSecret(); awaitingVerification = true; emit("add-api-key", payload); void nextTick(checkVerification);
+  clearNewKey(); awaitingVerification = true; emit("add-api-key", payload); void nextTick(checkVerification);
 }
 function authorize(credentialId?: string) {
   if (!selectedProvider.value || props.busy || !canUseMethod.value) return;
@@ -311,11 +316,6 @@ function startNewConnection() {
   transitionName.value = "model-auth-step-forward";
   step.value = "method"; selectedProviderId.value = ""; search.value = "";
   pendingRemoval.value = ""; localError.value = ""; clearSecret(); void focusHeading();
-}
-function selectModel(model: string) {
-  const provider = selectedProvider.value;
-  if (!provider || props.busy || !availableModels.value.includes(model)) return;
-  emit("select-model", { providerId: provider.id, model });
 }
 function updateStrategy(value: LoadStrategy) {
   const provider = selectedProvider.value;
@@ -491,6 +491,13 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                   <button v-if="method === 'oauth' && selectedProvider.logoutEnabled" type="button" class="model-auth-secondary" data-part="logout" :disabled="busy" @click="emit('logout', selectedProvider!.id, credential.id)">{{ text.logout }}</button>
                   <button type="button" class="model-auth-danger" :disabled="busy" :data-confirmed="pendingRemoval === credential.id" @click="removeCredential(credential)">{{ pendingRemoval === credential.id ? text.confirmRemove : text.remove }}</button>
                 </div>
+                <div v-if="credential.secret !== undefined" class="model-auth-credential-secret" data-part="credential-secret">
+                  <label class="model-auth-key-input">
+                    <input :value="secretValue(credential)" :disabled="busy" :type="revealedSecrets[credential.id] ? 'text' : 'password'" autocomplete="off" :spellcheck="false" :aria-label="text.secret + ' ' + credential.label" @input="secretDrafts[credential.id] = ($event.target as HTMLInputElement).value" />
+                    <button type="button" class="model-auth-subtle" data-part="toggle-secret" :aria-pressed="!!revealedSecrets[credential.id]" @click="revealedSecrets[credential.id] = !revealedSecrets[credential.id]">{{ revealedSecrets[credential.id] ? text.hide : text.show }}</button>
+                  </label>
+                  <button type="button" class="model-auth-secondary" data-part="save-secret" :disabled="busy || !secretChanged(credential)" @click="saveSecret(credential)">{{ text.saveSecret }}</button>
+                </div>
                 <details class="model-auth-credential-extend" data-part="credential-extend">
                   <summary>{{ text.extend }}</summary>
                   <textarea :value="extendText(credential)" :disabled="busy" :aria-label="text.extend" spellcheck="false" @change="updateExtend(credential, ($event.target as HTMLTextAreaElement).value)" />
@@ -508,7 +515,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
             <p v-if="!credentials.length" class="model-auth-empty">{{ connectionMode ? text.noConnections : text.noCredentials }}</p>
           </section>
           <section v-if="connectionMode" class="model-auth-credential-section" data-part="connection-policy">
-            <details class="model-auth-connection-models" open><summary>{{ text.models }} ({{ connectionModels.length }})</summary><ModelPicker :models="connectionModels" :available-models="availableModels" :disabled="busy" :messages="text" @select="selectModel" /></details>
+            <details class="model-auth-connection-models" open><summary>{{ text.models }} ({{ models.length }})</summary><ModelList :models="models" :messages="text" /></details>
             <div class="model-auth-section-heading"><strong>{{ text.strategy }}</strong><small>{{ text.strategyHint }}</small><StrategyPicker :model-value="currentStrategy" :options="strategyOptions" :label="text.strategy" :disabled="busy" @update:model-value="updateStrategy" /></div>
           </section>
 
@@ -519,7 +526,6 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
             <p>{{ text.authorizationComplete }}</p>
             <p>{{ method === 'oauth' ? text.oauth : text.apiKey }} · {{ text.verified }}</p>
           </section>
-          <ModelPicker v-if="connectionModels.length" :models="connectionModels" :available-models="availableModels" :disabled="busy" :messages="text" @select="selectModel" />
         </div>
         <footer v-if="!connectionMode && step === 'detail' && authReady" class="model-auth-actions">
           <button type="button" class="model-auth-primary" data-part="continue-confirmation" :disabled="busy" @click="advanceToConfirmation">{{ text.continue }}</button>

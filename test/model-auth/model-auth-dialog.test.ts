@@ -29,7 +29,7 @@ async function mount(extra: Record<string, unknown> = {}, slots?: Record<string,
     ...state, onClose: () => { events.push({ name: "close", payload: null }); state.open = false; },
     onAddApiKey: on("key"), onUpdateCredential: on("credential"), onReorderCredentials: on("reorder"), onUpdateProvider: on("provider"),
     onUpdateProviderStrategy: on("strategy"), onRefreshCatalog: on("refresh"),
-    onRemoveApiKey: on("remove"), onSelectModel: on("model"),
+    onRemoveApiKey: on("remove"),
     onQueryUsage: on("usage"), onRespondAuth: on("respond-auth"), onCancelAuth: on("cancel-auth"), onOpenAuthUrl: on("open-auth-url"),
     onReconnectOauth: (...payload: unknown[]) => { state.busy = true; on("reconnect-oauth")(...payload); },
     catalogStatus: { state: "ready", source: "models.dev", checkedAt: "2000-01-01T00:00:00.000Z" },
@@ -78,7 +78,6 @@ describe("authentication dialog", () => {
     expect(get<HTMLButtonElement>('[data-part="confirm"]').disabled).toBe(false);
     await click('[data-part="confirm"]');
     expect(events.at(-1)?.name).toBe("close");
-    expect(events.some(event => event.name === "model")).toBe(false);
   });
   it("exposes four states and only confirms from the final state", async () => {
     const { state, events } = await mount();
@@ -96,11 +95,9 @@ describe("authentication dialog", () => {
     expectStage("确认", "3/3", ["100%", "100%", "100%"]);
     expect(get('[data-part="confirmation-step"]')).toBeTruthy();
     expect(get('[data-part="authorization-result"]').textContent).toContain("凭据已验证并保存");
-    expect(get('[data-model-id="test-model"]')).toBeTruthy();
-    expect(events.some(event => event.name === "model")).toBe(false);
+    expect(document.querySelector('[data-part="models"]')).toBeNull();
     await click('[data-part="confirm"]');
     expect(events.at(-1)).toEqual({ name: "close", payload: null });
-    expect(events.some(event => event.name === "model")).toBe(false);
   });
 
   it("renders built-in inline icons for mapped ids without any image request", async () => {
@@ -159,7 +156,6 @@ describe("authentication dialog", () => {
     state.error = null;
     await nextTick();
     expectStage("确认", "3/3", ["100%", "100%", "100%"]);
-    expect(events.some(event => event.name === "model")).toBe(false);
     await click('[data-part="confirm"]');
     expect(events.at(-1)?.name).toBe("close");
   });
@@ -307,6 +303,45 @@ describe("authentication dialog", () => {
     expect(events.at(-1)).toEqual({ name: "credential", payload: { providerId: "provider-a", credentialId: "key-1", enabled: true, extend: { region: "us", priority: 2 } } });
     await click('[data-part="query-usage"]');
     expect(events.at(-1)).toEqual({ name: "usage", payload: ["provider-a", "key-1"] });
+  });
+
+  it("shows the credential secret masked, reveals it on demand and saves only a changed value", async () => {
+    const { events, state } = await mount();
+    state.providers[0]!.apiKeyCredentials![0]!.secret = "sk-test-value";
+    state.providers[0]!.oauthCredentials![0]!.secret = '{"access":"tok"}';
+    await details("api-key");
+    const input = get<HTMLInputElement>('[data-part="credential-secret"] input');
+    const save = get<HTMLButtonElement>('[data-part="save-secret"]');
+    expect(input.type).toBe("password");
+    expect(input.value).toBe("sk-test-value");
+    expect(save.disabled).toBe(true);
+    await click('[data-part="toggle-secret"]');
+    expect(input.type).toBe("text");
+    expect(get('[data-part="toggle-secret"]').getAttribute("aria-pressed")).toBe("true");
+    await fill('[data-part="credential-secret"] input', "sk-test-changed");
+    expect(save.disabled).toBe(false);
+    await fill('[data-part="credential-secret"] input', "sk-test-value");
+    expect(save.disabled).toBe(true);
+    await fill('[data-part="credential-secret"] input', "sk-test-changed");
+    await click('[data-part="save-secret"]');
+    expect(events.at(-1)).toEqual({ name: "credential", payload: { providerId: "provider-a", credentialId: "key-1", enabled: true, secret: "sk-test-changed" } });
+    state.providers[0]!.apiKeyCredentials![0]!.secret = "sk-test-changed";
+    await nextTick();
+    expect(get<HTMLButtonElement>('[data-part="save-secret"]').disabled).toBe(true);
+    await click('[data-part="back"]'); await click('[data-part="back"]');
+    await details("oauth");
+    const oauthInput = get<HTMLInputElement>('[data-part="credential-secret"] input');
+    expect(oauthInput.type).toBe("password");
+    expect(oauthInput.value).toBe('{"access":"tok"}');
+  });
+
+  it("omits the secret field unless the host supplies one", async () => {
+    const { state } = await mount();
+    await details("api-key");
+    expect(document.querySelector('[data-part="credential-secret"]')).toBeNull();
+    state.providers[0]!.apiKeyCredentials![0]!.secret = "";
+    await nextTick();
+    expect(get<HTMLInputElement>('[data-part="credential-secret"] input').value).toBe("");
   });
 
   it("renders a dynamic authentication prompt and returns the host response", async () => {

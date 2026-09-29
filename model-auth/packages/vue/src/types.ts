@@ -101,6 +101,7 @@ export interface ProviderCredential {
   models?: string[];
   cooldownUntilUtc?: string | null;
   extend?: CredentialExtend;
+  secret?: string;
   usage?: CredentialUsage | null;
 }
 
@@ -129,9 +130,8 @@ export interface ModelAuthProvider {
   apiKeyCredentials?: ApiKeyCredential[];
 }
 
-export interface ModelAuthSelection { providerId: string; model: string }
 export interface AddApiKeyPayload { providerId: string; label: string; apiKey: string; extend?: CredentialExtend }
-export interface CredentialUpdatePayload { providerId: string; credentialId: string; enabled: boolean; extend?: CredentialExtend }
+export interface CredentialUpdatePayload { providerId: string; credentialId: string; enabled: boolean; extend?: CredentialExtend; secret?: string }
 export interface CredentialReorderPayload { providerId: string; method: AuthMethod; credentialIds: string[] }
 export interface ProviderUpdatePayload { providerId: string; oauthEnabled: boolean }
 export interface StrategyUpdatePayload { providerId: string; strategy: LoadStrategy }
