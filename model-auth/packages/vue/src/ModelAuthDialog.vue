@@ -4,6 +4,7 @@ import { defaultMessages, type ModelAuthMessages } from "./messages";
 import StrategyPicker from "./StrategyPicker.vue";
 import ModelList from "./ModelList.vue";
 import { connectionModels } from "./models";
+import ModelAuthIcon from "./ModelAuthIcon.vue";
 import ProviderMark from "./ProviderMark.vue";
 import { formatPercentage } from "./percentage";
 import type {
@@ -377,9 +378,9 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
     <div class="model-auth-root">
       <section class="model-auth-dialog" role="document" tabindex="-1">
         <header class="model-auth-header" part="header" data-part="navigation">
-          <button v-if="step !== 'method' && !connectionMode" type="button" class="model-auth-back" part="back" data-part="back" :aria-label="text.back" @click="back"><svg class="model-auth-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg></button>
+          <button v-if="step !== 'method' && !connectionMode" type="button" class="model-auth-back" part="back" data-part="back" :aria-label="text.back" @click="back"><ModelAuthIcon name="back" /></button>
           <h2 :id="titleId" ref="heading" class="model-auth-title" tabindex="-1">{{ connectionMode ? text.connectionInfo : pageTitles[stepIndex] }}</h2>
-          <button type="button" class="model-auth-close" part="close" data-part="close" :aria-label="text.close" @click="close"><svg class="model-auth-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
+          <button type="button" class="model-auth-close" part="close" data-part="close" :aria-label="text.close" @click="close"><ModelAuthIcon name="close" /></button>
         </header>
         <div v-if="!connectionMode" class="model-auth-progress" part="progress" role="progressbar" :aria-label="text.progress" :aria-valuemin="0" :aria-valuemax="3" :aria-valuenow="stepIndex" :aria-valuetext="pageTitles[stepIndex]">
           <div v-for="segment in 3" :key="segment" class="model-auth-progress-segment"><div class="model-auth-progress-fill" :style="{ width: (segment <= stepIndex ? 100 : 0) + '%' }" /></div>
@@ -414,11 +415,10 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
           <button v-for="choice in (['oauth', 'api-key'] as const)" :key="choice" type="button" class="model-auth-method-card" part="method-card" :data-part="'method-' + choice" @click="chooseMethod(choice)">
             <slot name="method-card" :method="choice" :choose="() => chooseMethod(choice)">
               <span class="model-auth-method-icon" aria-hidden="true">
-                <svg v-if="choice === 'oauth'" class="model-auth-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="3" /></svg>
-                <svg v-else class="model-auth-icon" viewBox="0 0 24 24"><circle cx="8" cy="15" r="3" /><path d="m10.5 12.5 8-8 2 2-2 2 1.5 1.5-2 2-1.5-1.5-3 3" /></svg>
+                <ModelAuthIcon :name="choice === 'oauth' ? 'oauth' : 'key'" />
               </span>
               <span><strong>{{ choice === 'oauth' ? text.oauth : text.apiKey }}</strong><small>{{ choice === 'oauth' ? text.oauthDescription : text.apiKeyDescription }}</small></span>
-              <svg class="model-auth-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" /></svg>
+              <ModelAuthIcon name="next" />
             </slot>
           </button>
         </div>
@@ -437,7 +437,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                   <ProviderMark :provider="provider" />
                   <span class="model-auth-row-main"><strong>{{ provider.name }}</strong><small>{{ provider.available ? provider.id : provider.unavailableReason || text.unavailable }}</small></span>
                   <span class="model-auth-badge">{{ provider.available ? (method === 'oauth' ? (provider.oauthCredentials?.length || 0) + ' ' + text.oauthCount : (provider.apiKeyCredentials?.length || 0) + ' ' + text.apiKeyCount) : text.unavailable }}</span>
-                  <svg class="model-auth-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" /></svg>
+                  <ModelAuthIcon name="next" />
                 </slot>
               </button>
             </section>
@@ -470,7 +470,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
               <input v-model="labelInput" :disabled="busy || !canUseMethod" type="text" autocomplete="off" :placeholder="text.label" :aria-label="text.label" />
               <label class="model-auth-key-input">
                 <input v-model="apiKeyInput" :disabled="busy || !canUseMethod" :type="revealApiKey ? 'text' : 'password'" autocomplete="off" :spellcheck="false" :placeholder="text.apiKeyPlaceholder" :aria-label="text.apiKey" />
-                <button type="button" class="model-auth-subtle" :aria-pressed="revealApiKey" @click="revealApiKey = !revealApiKey">{{ revealApiKey ? text.hide : text.show }}</button>
+                <button type="button" class="model-auth-subtle model-auth-with-icon" :aria-pressed="revealApiKey" @click="revealApiKey = !revealApiKey"><ModelAuthIcon :name="revealApiKey ? 'eye-off' : 'eye'" />{{ revealApiKey ? text.hide : text.show }}</button>
               </label>
               <button type="submit" class="model-auth-primary" :disabled="busy || !canUseMethod || !apiKeyInput.trim()">{{ text.saveAndVerify }}</button>
             </form>
@@ -489,8 +489,8 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                 </div>
                 <div class="model-auth-credential-actions">
                   <span class="model-auth-position" data-part="credential-position">{{ text.position }} {{ index + 1 }}</span>
-                  <button type="button" class="model-auth-secondary" data-part="move-up" :disabled="busy || index === 0" :aria-label="text.moveUp + ' ' + credential.label" @click="moveCredential(index, -1)">{{ text.moveUp }}</button>
-                  <button type="button" class="model-auth-secondary" data-part="move-down" :disabled="busy || index === credentials.length - 1" :aria-label="text.moveDown + ' ' + credential.label" @click="moveCredential(index, 1)">{{ text.moveDown }}</button>
+                  <button type="button" class="model-auth-secondary model-auth-with-icon" data-part="move-up" :disabled="busy || index === 0" :aria-label="text.moveUp + ' ' + credential.label" @click="moveCredential(index, -1)"><ModelAuthIcon name="arrow-up" />{{ text.moveUp }}</button>
+                  <button type="button" class="model-auth-secondary model-auth-with-icon" data-part="move-down" :disabled="busy || index === credentials.length - 1" :aria-label="text.moveDown + ' ' + credential.label" @click="moveCredential(index, 1)"><ModelAuthIcon name="arrow-down" />{{ text.moveDown }}</button>
                   <button v-if="method === 'oauth'" type="button" class="model-auth-secondary" data-part="reconnect" :disabled="busy || !canUseMethod" @click="authorize(credential.id)">{{ text.reconnect }}</button>
                   <button v-if="selectedProvider.usageEnabled || credential.usage" type="button" class="model-auth-secondary" data-part="query-usage" :disabled="busy" @click="queryUsage(credential)">{{ credential.usage ? text.refreshUsage : text.queryUsage }}</button>
                   <button v-if="method === 'oauth' && selectedProvider.logoutEnabled" type="button" class="model-auth-secondary" data-part="logout" :disabled="busy" @click="emit('logout', selectedProvider!.id, credential.id)">{{ text.logout }}</button>
@@ -499,7 +499,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                 <div v-if="credential.secret !== undefined" class="model-auth-credential-secret" data-part="credential-secret">
                   <label class="model-auth-key-input">
                     <input :value="secretValue(credential)" :disabled="busy" :type="revealedSecrets[credential.id] ? 'text' : 'password'" autocomplete="off" :spellcheck="false" :aria-label="text.secret + ' ' + credential.label" @input="secretDrafts[credential.id] = ($event.target as HTMLInputElement).value" />
-                    <button type="button" class="model-auth-subtle" data-part="toggle-secret" :aria-pressed="!!revealedSecrets[credential.id]" @click="revealedSecrets[credential.id] = !revealedSecrets[credential.id]">{{ revealedSecrets[credential.id] ? text.hide : text.show }}</button>
+                    <button type="button" class="model-auth-subtle model-auth-with-icon" data-part="toggle-secret" :aria-pressed="!!revealedSecrets[credential.id]" @click="revealedSecrets[credential.id] = !revealedSecrets[credential.id]"><ModelAuthIcon :name="revealedSecrets[credential.id] ? 'eye-off' : 'eye'" />{{ revealedSecrets[credential.id] ? text.hide : text.show }}</button>
                   </label>
                   <button type="button" class="model-auth-secondary" data-part="save-secret" :disabled="busy || !secretChanged(credential)" @click="saveSecret(credential)">{{ text.saveSecret }}</button>
                 </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, useId } from "vue";
+import ModelAuthIcon from "./ModelAuthIcon.vue";
 import type { LoadStrategy } from "./types";
 const props = defineProps<{ modelValue: LoadStrategy; options: { value: LoadStrategy; label: string }[]; label: string; disabled?: boolean }>();
 const emit = defineEmits<{ "update:modelValue": [value: LoadStrategy] }>();
@@ -62,11 +63,11 @@ onBeforeUnmount(close);
 <template>
   <div class="model-auth-select" part="strategy" @keydown="keydown" @focusout="focusout">
     <button ref="trigger" type="button" class="model-auth-secondary" :disabled="disabled" :aria-label="label" aria-haspopup="listbox" :aria-expanded="expanded" :aria-controls="id" @click="expanded ? close() : open()">
-      {{ current?.label }} <svg class="model-auth-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+      {{ current?.label }} <ModelAuthIcon name="chevron-down" />
     </button>
     <div v-if="expanded" :id="id" ref="list" role="listbox" :aria-label="label" :aria-activedescendant="id + '-' + active" tabindex="-1" class="model-auth-select-menu" part="strategy-menu" :style="menuStyle">
       <button v-for="(option, index) in options" :id="id + '-' + index" :key="option.value" type="button" role="option" :aria-selected="modelValue === option.value" :class="{ focused: active === index }" tabindex="-1" @click="choose(option.value)">
-        {{ option.label }} <svg v-if="modelValue === option.value" class="model-auth-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4 10-10" /></svg>
+        {{ option.label }} <ModelAuthIcon v-if="modelValue === option.value" name="check" />
       </button>
     </div>
   </div>

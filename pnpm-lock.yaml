@@ -42,6 +42,10 @@ importers:
       vue:
         specifier: ^3.5.0
         version: 3.5.42(typescript@5.9.3)
+    devDependencies:
+      '@fluentui/svg-icons':
+        specifier: ^1.1.343
+        version: 1.1.343
 
   styles/ui-tokens: {}
 
@@ -219,6 +223,9 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@fluentui/svg-icons@1.1.343':
+    resolution: {integrity: sha512-+rlKFnM2MkAg2G0qMD3BM/K3jC+Jc+VAKgxE7x9cpCPDDNpwKaOSD0DntUkVXrZGOjBvfmID0DoRslsXbC8X5Q==}
 
   '@jridgewell/sourcemap-codec@1.6.0':
     resolution: {integrity: sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw==}
@@ -763,6 +770,8 @@ snapshots:
 
   '@esbuild/win32-x64@0.28.2':
     optional: true
+
+  '@fluentui/svg-icons@1.1.343': {}
 
   '@jridgewell/sourcemap-codec@1.6.0': {}
 

@@ -26,10 +26,13 @@
     "./style.css": "./dist/style.css"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && node build.mjs",
-    "typecheck": "tsc -p tsconfig.json"
+    "build": "node icons.mjs && tsc -p tsconfig.build.json && node build.mjs",
+    "typecheck": "node icons.mjs && tsc -p tsconfig.json"
   },
   "peerDependencies": {
     "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "@fluentui/svg-icons": "^1.1.343"
   }
 }

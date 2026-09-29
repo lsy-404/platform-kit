@@ -47,6 +47,9 @@ importers:
 
   packages/vue:
     devDependencies:
+      '@fluentui/svg-icons':
+        specifier: ^1.1.343
+        version: 1.1.343
       '@lobehub/icons-static-svg':
         specifier: ^1.95.1
         version: 1.95.1
@@ -81,6 +84,9 @@ packages:
   '@babel/types@7.29.8':
     resolution: {integrity: sha512-Vj1jF3cPfxg7OAfoI7QnVKLoILlm2JF9pnVHrX8qx7AHMiYWT+NDAA7jChlNgRS4WTLc/fD1lXLmPixluj+3Gg==}
     engines: {node: '>=6.9.0'}
+
+  '@fluentui/svg-icons@1.1.343':
+    resolution: {integrity: sha512-+rlKFnM2MkAg2G0qMD3BM/K3jC+Jc+VAKgxE7x9cpCPDDNpwKaOSD0DntUkVXrZGOjBvfmID0DoRslsXbC8X5Q==}
 
   '@jridgewell/resolve-uri@3.1.2':
     resolution: {integrity: sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw==}
@@ -619,6 +625,8 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
+
+  '@fluentui/svg-icons@1.1.343': {}
 
   '@jridgewell/resolve-uri@3.1.2': {}
 

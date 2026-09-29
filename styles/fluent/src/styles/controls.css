@@ -454,7 +454,7 @@ textarea.fluent-field__input {
 .fluent-radio__input:checked::before { transform: scale(1); }
 .fluent-checkbox__box--checked,
 .fluent-checkbox__box--indeterminate { border-color: var(--fluent-accent); background: var(--fluent-accent); }
-.fluent-checkbox__check { width: 14px; height: 14px; transform: translateY(1px); stroke-width: 2.25px; }
+.fluent-checkbox__check { width: 14px; height: 14px; transform: translateY(1px); }
 .fluent-checkbox__indeterminate { width: 9px; height: 2px; border-radius: 999px; background: currentColor; }
 .fluent-checkbox:hover .fluent-checkbox__box:not(.fluent-checkbox__box--checked, .fluent-checkbox__box--indeterminate),
 .fluent-radio:hover .fluent-radio__input:not(:disabled, :checked) {

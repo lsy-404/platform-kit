@@ -44,6 +44,9 @@ assert.ok(readFileSync(join(consumer, "node_modules/@model-auth/vue/THIRD-PARTY.
 assert.ok(readFileSync(join(consumer, "node_modules/@model-auth/vue/THIRD-PARTY.md"), "utf8").includes("LobeHub"));
 const vueBundle = readFileSync(join(consumer, "node_modules/@model-auth/vue/dist/model-auth-vue.js"), "utf8");
 assert.ok(vueBundle.includes("<svg") && !vueBundle.includes("favicon") && !/from\s+["']@lobehub/.test(vueBundle), "Provider icons must be bundled, not fetched or imported");
+assert.ok(!/from\s+["']@fluentui/.test(vueBundle) && vueBundle.includes("M3.15"), "Control icons must be bundled, not imported");
+assert.ok(readFileSync(join(consumer, "node_modules/@model-auth/vue/THIRD-PARTY.md"), "utf8").includes("Microsoft Corporation"));
+assert.ok(!Object.keys(JSON.parse(readFileSync(join(consumer, "node_modules/@model-auth/vue/package.json"), "utf8")).dependencies ?? {}).some(name => name.startsWith("@fluentui")));
 assert.ok(vueBundle.includes('import "./model-auth.css"'), "Vue entry must load the default stylesheet");
 const standalone = readFileSync(join(consumer, "node_modules/@model-auth/vue/dist/model-auth-element.js"), "utf8");
 assert.ok(!/from\s+["']vue["']/.test(standalone), "Standalone build must bundle Vue");

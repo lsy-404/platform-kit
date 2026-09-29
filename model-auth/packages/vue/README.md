@@ -17,7 +17,7 @@ The Vue entry includes styles. The standalone entry bundles Vue and Shadow DOM s
 
 `ModelAuthDialog` accepts `percentagePrecision`: `0` shows whole percentages, `-1` keeps the full meaningful decimal representation, and any other non-negative integer sets fixed decimal places. The default is `2`.
 
-Licensed under Apache-2.0. The standalone custom-element bundle includes Vue and both bundles include provider icons; see THIRD-PARTY.md.
+Licensed under Apache-2.0. The standalone custom-element bundle includes Vue and both bundles include provider icons and Microsoft Fluent UI System Icons for controls (baked in at build time, no runtime dependency); see THIRD-PARTY.md.
 
 Each connection card in the panel expands to list its models, and the connection details show the same list: the union of the provider's method models (or catalog models) and the models of its saved credentials. The list is read-only with a search field for long lists; there is no selected or current model, so hosts choose models themselves.
 
