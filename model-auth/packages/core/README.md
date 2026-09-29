@@ -12,7 +12,6 @@ const credential = createCredentialMetadata({
   providerId: "workbuddy",
   authMethod: "api-key",
   modelIds: ["glm-5.2"],
-  weight: 1,
 });
 const router = new CredentialRouter([credential], { strategy: "failover" });
 const [candidate] = router.candidates({ providerId: "workbuddy", modelId: "glm-5.2" });

@@ -4,15 +4,15 @@ import ModelConnectionPanel from "../../model-auth/packages/vue/src/ModelConnect
 import type { ModelAuthProvider } from "../../model-auth/packages/vue/src/types";
 
 const fixture = (): ModelAuthProvider[] => [
-  { id: "oauth", name: "OAuth service", description: "OAuth", iconUrl: "https://assets.example.test/oauth.svg", authMethods: ["oauth"], available: true, models: ["o-model"], loadStrategy: "weighted-round-robin", oauthCredentials: [
-    { id: "oauth-healthy", label: "Primary", account: "person@example.test", enabled: true, healthy: true, weight: 2, models: ["o-model"] },
-    { id: "oauth-disabled", label: "Paused", enabled: false, healthy: false, weight: 3, models: ["o-model"] },
+  { id: "oauth", name: "OAuth service", description: "OAuth", iconUrl: "https://assets.example.test/oauth.svg", authMethods: ["oauth"], available: true, models: ["o-model"], loadStrategy: "round-robin", oauthCredentials: [
+    { id: "oauth-healthy", label: "Primary", account: "person@example.test", enabled: true, healthy: true, models: ["o-model"] },
+    { id: "oauth-disabled", label: "Paused", enabled: false, healthy: false, models: ["o-model"] },
   ] },
   { id: "key", name: "Key service", description: "API Key", authMethods: ["api-key"], available: true, models: ["k-model"], loadStrategy: "failover", apiKeyCredentials: [
-    { id: "key-unhealthy", label: "Workspace", enabled: true, healthy: false, weight: 1, models: ["k-model"] },
+    { id: "key-unhealthy", label: "Workspace", enabled: true, healthy: false, models: ["k-model"] },
   ] },
   { id: "offline", name: "Offline service", description: "Not installed", authMethods: ["oauth"], available: false, unavailableReason: "Host integration unavailable", models: [], oauthCredentials: [
-    { id: "offline-account", label: "Unavailable account", enabled: true, healthy: false, weight: 1, models: [] },
+    { id: "offline-account", label: "Unavailable account", enabled: true, healthy: false, models: [] },
   ] },
 ];
 
@@ -68,7 +68,7 @@ describe("model connection panel", () => {
   it("reacts to host state updates without dropping existing connection cards", async () => {
     const { state } = await mount();
     state.providers[0]!.oauthCredentials![0]!.enabled = false;
-    state.providers[0]!.oauthCredentials!.push({ id: "new-account", label: "Second account", enabled: true, healthy: true, weight: 1, models: ["o-model"] });
+    state.providers[0]!.oauthCredentials!.push({ id: "new-account", label: "Second account", enabled: true, healthy: true, models: ["o-model"] });
     state.error = "Refresh failed";
     await nextTick();
     expect(get('[data-provider-id="oauth"]').textContent).toContain("Second account");

@@ -36,7 +36,7 @@ The same composable can be used in each Vue host. It never logs action payloads 
 | `auth` | idle state | Dynamic authentication notices and current prompt |
 | `messages` | Chinese defaults | Override any visible string |
 
-An available provider can support browser authentication, API keys or both. `oauthEnabled=false` disables the provider's browser authentication independently of its individual credential preferences. Set `usageEnabled` or `logoutEnabled` only when the host handles those actions. Each credential has `enabled`, `weight`, health state, optional `usage`, and optional scalar `extend` metadata. Supply discovered `models` on credentials to restrict eligibility; when eligible credentials have no model list, the provider catalog is used. Only explicitly healthy and enabled credentials can expose models for selection.
+An available provider can support browser authentication, API keys or both. `oauthEnabled=false` disables the provider's browser authentication independently of its individual credential preferences. Set `usageEnabled` or `logoutEnabled` only when the host handles those actions. Credential order is the array order supplied by the host and is the priority order; each credential has `enabled`, health state, optional `usage`, and optional scalar `extend` metadata. Supply discovered `models` on credentials to restrict eligibility; when eligible credentials have no model list, the provider catalog is used. Only explicitly healthy and enabled credentials can expose models for selection.
 
 ## Events
 
@@ -48,7 +48,8 @@ An available provider can support browser authentication, API keys or both. `oau
 | `reconnect-oauth` | providerId, credentialId |
 | `remove-oauth` / `remove-api-key` | providerId, credentialId |
 | `add-api-key` | { providerId, label, apiKey } |
-| `update-credential` | { providerId, credentialId, enabled, weight } |
+| `update-credential` | { providerId, credentialId, enabled, extend? } |
+| `reorder-credentials` | { providerId, method, credentialIds }; the full new order |
 | `query-usage` | providerId, credentialId |
 | `logout` | providerId, credentialId |
 | `respond-auth` | { loginId, promptId, value } |
@@ -105,7 +106,7 @@ Vue scoped slots:
 
 - `method-card`: method and choose; rendered inside the navigation button.
 - `provider-row`: provider and method; rendered inside the provider button.
-- `credential-row`: credential, provider, method, update(enabled, weight), remove; replaces the complete row content.
+- `credential-row`: credential, provider, method, update(enabled), remove; replaces the complete row content.
 - `model-row`: model and provider; rendered inside the model button.
 - `footer`: step and close.
 

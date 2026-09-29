@@ -1,6 +1,6 @@
 import { computed, onBeforeUnmount, ref, shallowRef } from "vue";
 import type {
-  AddApiKeyPayload, CatalogStatus, CredentialUpdatePayload, ModelAuthProvider,
+  AddApiKeyPayload, AuthMethod, CatalogStatus, CredentialReorderPayload, CredentialUpdatePayload, ModelAuthProvider,
   ModelAuthSelection, ProviderAuthEvent, ProviderAuthResponseRequest, ProviderAuthState,
   ProviderUpdatePayload, StrategyUpdatePayload,
 } from "./types";
@@ -17,6 +17,7 @@ export type ModelAuthAction =
   | { type: "add-api-key"; payload: AddApiKeyPayload }
   | { type: "remove-credential"; providerId: string; credentialId: string; authMethod: "oauth" | "api-key" }
   | { type: "update-credential"; payload: CredentialUpdatePayload }
+  | { type: "reorder-credentials"; providerId: string; method: AuthMethod; credentialIds: string[] }
   | { type: "update-provider"; payload: ProviderUpdatePayload }
   | { type: "select-model"; payload: ModelAuthSelection }
   | { type: "update-strategy"; payload: StrategyUpdatePayload }
@@ -90,6 +91,7 @@ export function useModelAuth(host: ModelAuthHost, options: { errorMessage?: stri
     "remove-oauth": (providerId: string, credentialId: string) => run({ type: "remove-credential", providerId, credentialId, authMethod: "oauth" }),
     "remove-api-key": (providerId: string, credentialId: string) => run({ type: "remove-credential", providerId, credentialId, authMethod: "api-key" }),
     "update-credential": (payload: CredentialUpdatePayload) => run({ type: "update-credential", payload }),
+    "reorder-credentials": (payload: CredentialReorderPayload) => run({ type: "reorder-credentials", ...payload }),
     "update-provider": (payload: ProviderUpdatePayload) => run({ type: "update-provider", payload }),
     "select-model": (payload: ModelAuthSelection) => run({ type: "select-model", payload }),
     "update-provider-strategy": (payload: StrategyUpdatePayload) => run({ type: "update-strategy", payload }),

@@ -45,8 +45,8 @@
 .model-auth-credential-row { display: grid; gap: 12px; }
 .model-auth-credential-summary { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 10px; align-items: center; }
 .model-auth-credential-actions { display: flex; justify-content: flex-end; gap: 8px; align-items: center; flex-wrap: wrap; }
-.model-auth-toggle, .model-auth-weight { display: inline-flex; align-items: center; gap: 8px; position: relative; }
-.model-auth-weight input { width: 66px; }
+.model-auth-toggle { display: inline-flex; align-items: center; gap: 8px; position: relative; }
+.model-auth-position { font-size: 12px; color: var(--ma-muted); }
 .model-auth-switch-track { display: none; }
 .model-auth-health { width: 7px; height: 7px; border-radius: 50%; }
 .model-auth-model-row { display: flex; justify-content: space-between; text-align: left; align-items: center; gap: 12px; overflow-wrap: anywhere; }

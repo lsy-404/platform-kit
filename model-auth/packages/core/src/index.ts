@@ -3,7 +3,7 @@ export const MODEL_AUTH_VERSION = "0.6.1";
 export type AuthMethod = "oauth" | "api-key";
 export type ProviderAuthType = "oauth" | "api_key";
 export type CredentialHealth = "healthy" | "cooling-down" | "permanently-failed";
-export type RouteStrategy = "round-robin" | "weighted-round-robin" | "failover";
+export type RouteStrategy = "round-robin" | "failover";
 
 export type ProviderAuthPrompt =
   | { readonly type: "text" | "secret" | "manual_code"; readonly message: string; readonly placeholder?: string }
@@ -392,7 +392,6 @@ export interface CredentialMetadata {
   readonly providerId: string;
   readonly authMethod: AuthMethod;
   readonly enabled: boolean;
-  readonly weight: number;
   readonly modelIds: readonly string[];
   readonly health: CredentialHealth;
   readonly cooldownUntilUtc: string | null;
@@ -407,20 +406,12 @@ export interface CredentialInput {
   readonly providerId: string;
   readonly authMethod: AuthMethod;
   readonly enabled?: boolean;
-  readonly weight?: number;
   readonly modelIds: readonly string[];
   readonly extend?: CredentialExtend;
 }
 
 function credentialId(value: unknown): string {
   if (typeof value !== "string" || !value.trim() || /[\u0000-\u001f]/.test(value)) throw new Error("credential id must be opaque and non-empty");
-  return value;
-}
-
-function credentialWeight(value: unknown): number {
-  if (typeof value !== "number" || !Number.isFinite(value) || !Number.isInteger(value) || value < 1 || value > 100) {
-    throw new Error("credential weight must be a finite integer between 1 and 100");
-  }
   return value;
 }
 
@@ -480,7 +471,6 @@ function projectCredential(input: Record<string, unknown>, defaults?: Pick<Crede
     providerId: normalizeProviderId(typeof input.providerId === "string" ? input.providerId : ""),
     authMethod,
     enabled: input.enabled,
-    weight: credentialWeight(input.weight),
     modelIds: credentialModelIds(input.modelIds),
     extend: credentialExtend(input.extend),
     health,
@@ -493,7 +483,7 @@ function cloneCredential(input: CredentialMetadata): CredentialMetadata {
 }
 
 export function createCredentialMetadata(input: CredentialInput): CredentialMetadata {
-  return projectCredential({ ...input, enabled: input.enabled ?? true, weight: input.weight ?? 1 });
+  return projectCredential({ ...input, enabled: input.enabled ?? true });
 }
 
 export function serializeCredentialMetadata(credential: CredentialMetadata): string {
@@ -502,7 +492,6 @@ export function serializeCredentialMetadata(credential: CredentialMetadata): str
     providerId: credential.providerId,
     authMethod: credential.authMethod,
     enabled: credential.enabled,
-    weight: credential.weight,
     modelIds: [...credential.modelIds],
     extend: { ...credential.extend },
     health: credential.health,
@@ -580,9 +569,15 @@ export class CredentialRouter {
     if (current) this.credentials.set(credentialId, { ...current, enabled });
   }
 
-  public setWeight(credentialId: string, weight: number): void {
-    const current = this.credentials.get(credentialId);
-    if (current) this.credentials.set(credentialId, { ...current, weight: credentialWeight(weight) });
+  public setOrder(credentialIds: readonly string[]): void {
+    if (!Array.isArray(credentialIds) || new Set(credentialIds).size !== credentialIds.length) throw new Error("credential order must be unique ids");
+    const slots = credentialIds.map((id) => {
+      const index = this.order.indexOf(id);
+      if (index < 0) throw new Error("credential order contains an unknown id");
+      return index;
+    }).sort((left, right) => left - right);
+    credentialIds.forEach((id, position) => { this.order[slots[position]!] = id; });
+    this.cursor.clear();
   }
 
   public setExtend(credentialId: string, extend: CredentialExtend): void {
@@ -607,18 +602,10 @@ export class CredentialRouter {
       && (credential.authMethod !== "oauth" || this.providerOAuthEnabled.get(providerId) !== false)
       && this.isEligible(credential);
     const eligible = this.order.map((id) => this.credentials.get(id)).filter((credential): credential is CredentialMetadata => Boolean(credential))
-      .filter(matchesRequest)
-      .sort((left, right) => left.id.localeCompare(right.id));
+      .filter(matchesRequest);
     const strategy = this.providerStrategies.get(providerId) ?? this.strategy;
-    if (strategy === "failover") {
-      return this.order.map((id) => this.credentials.get(id)).filter((credential): credential is CredentialMetadata => Boolean(credential))
-        .filter(matchesRequest)
-        .map(cloneCredential);
-    }
-    if (eligible.length < 2) return eligible.map(cloneCredential);
-    const key = `${providerId}\u0000${modelId}`;
-    const ordered = strategy === "weighted-round-robin" ? this.weightedOrder(eligible, key) : this.rotatedOrder(eligible, key);
-    return ordered.map(cloneCredential);
+    if (strategy === "failover" || eligible.length < 2) return eligible.map(cloneCredential);
+    return this.rotatedOrder(eligible, `${providerId}\u0000${modelId}`).map(cloneCredential);
   }
 
   public reportSuccess(credentialId: string): void {
@@ -684,22 +671,10 @@ export class CredentialRouter {
     this.cursor.set(key, start + 1);
     return [...eligible.slice(start), ...eligible.slice(0, start)];
   }
-
-  private weightedOrder(eligible: CredentialMetadata[], key: string): CredentialMetadata[] {
-    const slots = eligible.flatMap((credential) => Array.from({ length: credential.weight }, () => credential));
-    const start = (this.cursor.get(key) ?? 0) % slots.length;
-    this.cursor.set(key, start + 1);
-    const result: CredentialMetadata[] = [];
-    for (let offset = 0; offset < slots.length && result.length < eligible.length; offset += 1) {
-      const candidate = slots[(start + offset) % slots.length];
-      if (candidate && !result.some((item) => item.id === candidate.id)) result.push(candidate);
-    }
-    return result;
-  }
 }
 
 function validateStrategy(strategy: RouteStrategy): void {
-  if (strategy !== "round-robin" && strategy !== "weighted-round-robin" && strategy !== "failover") throw new Error("invalid route strategy");
+  if (strategy !== "round-robin" && strategy !== "failover") throw new Error("invalid route strategy");
 }
 
 export interface ProviderCapabilityDescriptor {

@@ -11,9 +11,9 @@ const fixtures = (): ModelAuthProvider[] => [
   { id: "provider-a", name: "Provider A", description: "Both methods", authMethods: ["oauth", "api-key"], available: true,
     models: ["shared", "disabled-only"], oauthModels: ["shared", "disabled-only"], apiKeyModels: ["shared"],
     oauthCredentials: [
-      { id: "oauth-1", label: "Primary", enabled: true, healthy: true, weight: 1, models: ["shared"] },
-      { id: "oauth-2", label: "Paused", enabled: false, healthy: true, weight: 2, models: ["disabled-only"] },
-    ], apiKeyCredentials: [{ id: "key-1", label: "API", enabled: true, healthy: true, weight: 2, models: ["shared"] }] },
+      { id: "oauth-1", label: "Primary", enabled: true, healthy: true, models: ["shared"] },
+      { id: "oauth-2", label: "Paused", enabled: false, healthy: true, models: ["disabled-only"] },
+    ], apiKeyCredentials: [{ id: "key-1", label: "API", enabled: true, healthy: true, models: ["shared"] }] },
   { id: "unavailable", name: "Unavailable", description: "Missing runtime", authMethods: ["oauth", "api-key"], available: false, models: [] },
   { id: "workbuddy", name: "WorkBuddy", description: "Host OAuth", authMethods: ["oauth"], available: true, models: [], oauthCredentials: [] },
 ];
@@ -27,7 +27,7 @@ async function mount(extra: Record<string, unknown> = {}, slots?: Record<string,
   const on = (name: string) => (...payload: unknown[]) => events.push({ name, payload: payload.length === 1 ? payload[0] : payload });
   const app = createApp(() => h(ModelAuthDialog, {
     ...state, onClose: () => { events.push({ name: "close", payload: null }); state.open = false; },
-    onAddApiKey: on("key"), onUpdateCredential: on("credential"), onUpdateProvider: on("provider"),
+    onAddApiKey: on("key"), onUpdateCredential: on("credential"), onReorderCredentials: on("reorder"), onUpdateProvider: on("provider"),
     onUpdateProviderStrategy: on("strategy"), onRefreshCatalog: on("refresh"),
     onRemoveApiKey: on("remove"), onSelectModel: on("model"),
     onQueryUsage: on("usage"), onRespondAuth: on("respond-auth"), onCancelAuth: on("cancel-auth"), onOpenAuthUrl: on("open-auth-url"),
@@ -71,7 +71,7 @@ describe("authentication dialog", () => {
     const { state, events } = await mount();
     await details("oauth", "workbuddy");
     await click('[data-part="oauth-config"] button');
-    state.providers[2]!.oauthCredentials = [{ id: "verified", label: "Verified", healthy: true, enabled: true, weight: 1 }];
+    state.providers[2]!.oauthCredentials = [{ id: "verified", label: "Verified", healthy: true, enabled: true }];
     await nextTick();
     expectStage("确认", "3/3", ["100%", "100%", "100%"]);
     expect(document.querySelector('[part="models"]')).toBeNull();
@@ -91,7 +91,7 @@ describe("authentication dialog", () => {
     expect(document.querySelector('[data-part="confirm"]')).toBeNull();
     await click('[data-part="oauth-config"] button');
     state.providers[2]!.models = ["test-model"];
-    state.providers[2]!.oauthCredentials = [{ id: "verified", label: "Verified", healthy: true, enabled: true, weight: 1 }];
+    state.providers[2]!.oauthCredentials = [{ id: "verified", label: "Verified", healthy: true, enabled: true }];
     await nextTick();
     expectStage("确认", "3/3", ["100%", "100%", "100%"]);
     expect(get('[data-part="confirmation-step"]')).toBeTruthy();
@@ -152,7 +152,7 @@ describe("authentication dialog", () => {
     await fill('input[type="password"]', "retry-test-value");
     get("form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     state.busy = true;
-    state.providers[0]!.apiKeyCredentials = [{ id: "verified-key", label: "Verified", healthy: true, enabled: true, weight: 1, models: ["shared"] }];
+    state.providers[0]!.apiKeyCredentials = [{ id: "verified-key", label: "Verified", healthy: true, enabled: true, models: ["shared"] }];
     await nextTick();
     expect(document.querySelector('[data-part="confirmation-step"]')).toBeNull();
     state.busy = false;
@@ -177,7 +177,7 @@ describe("authentication dialog", () => {
   it("advances after reconnect only when the host reports verified metadata", async () => {
     const { state, events } = await mount();
     await details("oauth", "provider-a");
-    await click('[data-part="oauth-credential"] .model-auth-secondary');
+    await click('[data-part="oauth-credential"] [data-part="reconnect"]');
     expect(events.at(-1)).toEqual({ name: "reconnect-oauth", payload: ["provider-a", "oauth-1"] });
     expectStage("完成授权", "2/3", ["100%", "100%", "0%"]);
     state.providers[0]!.models = ["reconnected"];
@@ -191,7 +191,7 @@ describe("authentication dialog", () => {
     await details("oauth", "workbuddy");
     await click('[data-part="oauth-config"] button');
     state.providers[2]!.models = ["test-model"];
-    state.providers[2]!.oauthCredentials = [{ id: "verified", label: "Verified", healthy: true, enabled: true, weight: 1 }];
+    state.providers[2]!.oauthCredentials = [{ id: "verified", label: "Verified", healthy: true, enabled: true }];
     await nextTick();
     expectStage("确认", "3/3", ["100%", "100%", "100%"]);
     await click('[data-part="back"]');
@@ -277,7 +277,7 @@ describe("authentication dialog", () => {
     expect(get<HTMLInputElement>('input[type="password"]').disabled).toBe(true);
   });
 
-  it("keeps credential toggles and weights without strategy UI", async () => {
+  it("keeps credential toggles and ordering without strategy UI", async () => {
     const { events, state } = await mount();
     state.providers[0]!.oauthCredentials![0]!.healthy = false;
     await details();
@@ -286,10 +286,12 @@ describe("authentication dialog", () => {
     expect(document.querySelector('[aria-haspopup="listbox"]')).toBeNull();
     const toggle = get<HTMLInputElement>('[data-part="oauth-credential"] input[role="switch"]');
     toggle.checked = false; toggle.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(events.at(-1)).toEqual({ name: "credential", payload: { providerId: "provider-a", credentialId: "oauth-1", enabled: false, weight: 1 } });
-    const weight = get<HTMLInputElement>('input[type="number"]');
-    weight.value = "0"; weight.dispatchEvent(new Event("change", { bubbles: true })); await nextTick();
-    expect(get('[role="alert"]').textContent).toContain("1–100");
+    expect(events.at(-1)).toEqual({ name: "credential", payload: { providerId: "provider-a", credentialId: "oauth-1", enabled: false } });
+    expect(document.querySelector('input[type="number"]')).toBeNull();
+    expect(get('[data-part="credential-position"]').textContent).toContain("1");
+    expect(get<HTMLButtonElement>('[data-part="move-up"]').disabled).toBe(true);
+    await click('[data-part="move-down"]');
+    expect(events.at(-1)).toEqual({ name: "reorder", payload: { providerId: "provider-a", method: "oauth", credentialIds: ["oauth-2", "oauth-1"] } });
     state.providers[0]!.oauthEnabled = false; await nextTick();
     expect(get<HTMLButtonElement>('[data-part="oauth-config"] button').disabled).toBe(true);
   });
@@ -302,7 +304,7 @@ describe("authentication dialog", () => {
     const textarea = get<HTMLTextAreaElement>('[data-part="credential-extend"] textarea');
     textarea.value = '{"region":"us","priority":2}';
     textarea.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(events.at(-1)).toEqual({ name: "credential", payload: { providerId: "provider-a", credentialId: "key-1", enabled: true, weight: 2, extend: { region: "us", priority: 2 } } });
+    expect(events.at(-1)).toEqual({ name: "credential", payload: { providerId: "provider-a", credentialId: "key-1", enabled: true, extend: { region: "us", priority: 2 } } });
     await click('[data-part="query-usage"]');
     expect(events.at(-1)).toEqual({ name: "usage", payload: ["provider-a", "key-1"] });
   });

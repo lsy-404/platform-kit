@@ -8,12 +8,11 @@ import {
   type CredentialMetadata,
 } from "../../model-auth/packages/core/src/index.js";
 
-const credential = (id: string, authMethod: "oauth" | "api-key" = "api-key", weight = 1): CredentialMetadata => createCredentialMetadata({
+const credential = (id: string, authMethod: "oauth" | "api-key" = "api-key"): CredentialMetadata => createCredentialMetadata({
   id,
   providerId: "provider-a",
   authMethod,
   modelIds: ["shared"],
-  weight,
 });
 
 const catalogPayload = (providerId = "provider") => ({ providers: {
@@ -34,7 +33,6 @@ describe("core review fixes", () => {
 
     expect(router.snapshot()[0]).toEqual(metadata);
     expect(router.snapshot()[0]).not.toHaveProperty("injectedToken");
-    expect(() => createCredentialMetadata({ id: "bad", providerId: "provider-a", authMethod: "api-key", modelIds: ["shared"], weight: 1.5 })).toThrow(/weight/);
     expect(() => router.upsert({ ...metadata, health: "cooling-down", cooldownUntilUtc: "not-a-date" } as never)).toThrow(/cooldown/);
   });
 
@@ -59,8 +57,13 @@ describe("core review fixes", () => {
     router.setProviderOAuthEnabled("provider-a", true);
     router.setStrategy("failover");
     expect(router.candidates(request).map((item) => item.id)).toEqual(["oauth", "key"]);
-    router.setStrategy("weighted-round-robin", "provider-a");
+    router.setStrategy("round-robin", "provider-a");
+    expect(router.candidates(request).map((item) => item.id)).toEqual(["oauth", "key"]);
+    router.setOrder(["key", "oauth"]);
+    router.setStrategy("failover", "provider-a");
     expect(router.candidates(request).map((item) => item.id)).toEqual(["key", "oauth"]);
+    expect(() => router.setOrder(["key", "key"])).toThrow(/unique/);
+    expect(() => router.setOrder(["missing"])).toThrow(/unknown/);
   });
 
   it("single-flights refreshes, keeps the prior catalog on invalid results, and isolates snapshots", async () => {
