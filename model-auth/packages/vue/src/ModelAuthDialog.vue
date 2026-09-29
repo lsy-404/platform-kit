@@ -229,10 +229,11 @@ function secretValue(credential: ProviderCredential): string {
   return secretDrafts[credential.id] ?? credential.secret ?? "";
 }
 function secretChanged(credential: ProviderCredential): boolean {
-  return secretValue(credential) !== (credential.secret ?? "");
+  const value = secretValue(credential).trim();
+  return Boolean(value) && value !== (credential.secret ?? "");
 }
 function saveSecret(credential: ProviderCredential) {
-  if (secretChanged(credential)) updateCredential(credential, credential.enabled, { secret: secretValue(credential) });
+  if (secretChanged(credential)) updateCredential(credential, credential.enabled, { secret: secretValue(credential).trim() });
 }
 function moveCredential(index: number, offset: -1 | 1) {
   const provider = selectedProvider.value;
@@ -360,6 +361,10 @@ watch(activePromptId, () => { promptValue.value = ""; });
 watch([authReady, () => props.busy, () => props.error], () => {
   if (!authReady.value && step.value === "confirmation") { step.value = "detail"; void focusHeading(); }
   checkVerification();
+});
+watch(() => credentials.value.map(credential => [credential.id, credential.secret] as const), (current, previous) => {
+  const before = new Map(previous);
+  for (const [id, secret] of current) if (before.get(id) !== secret) delete secretDrafts[id];
 });
 watch(selectedProvider, provider => {
   if (!provider && !connectionMode.value && (step.value === "detail" || step.value === "confirmation")) { awaitingVerification = false; step.value = "providers"; }

@@ -14,8 +14,6 @@ export const defaultMessages = {
   moveUp: "上移", moveDown: "下移", position: "顺序", modelAndStrategy: "模型与负载策略", strategy: "负载策略",
   failover: "顺序故障转移", roundRobin: "顺序轮询",
   noProviders: "没有匹配的提供商", noCredentials: "尚未添加凭据。",
-  modelsAfterOAuth: "登录并启用 OAuth 账号后显示匹配模型。",
-  modelsAfterApiKey: "添加并启用 API Key 后显示匹配模型。",
   credentialHint: "每份凭据可独立启停，并按列表顺序作为优先级。", keyHint: "密钥由宿主保存。",
   credentials: "已保存凭据", oauthEnabled: "启用此提供商的 OAuth", ready: "可用", needsReconnect: "需要重新连接",
   cooling: "冷却至", modelCount: "个模型", oauthCount: "个 OAuth 账号", apiKeyCount: "个 API Key",
