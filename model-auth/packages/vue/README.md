@@ -17,6 +17,8 @@ The Vue entry includes styles. The standalone entry bundles Vue and Shadow DOM s
 
 `ModelAuthDialog` accepts `percentagePrecision`: `0` shows whole percentages, `-1` keeps the full meaningful decimal representation, and any other non-negative integer sets fixed decimal places. The default is `2`.
 
-Licensed under Apache-2.0. The standalone custom-element bundle includes Vue; see THIRD-PARTY.md.
+Licensed under Apache-2.0. The standalone custom-element bundle includes Vue and both bundles include provider icons; see THIRD-PARTY.md.
 
 Saved connection details and the final authorization step offer models from the provider catalog and saved credentials. Selection emits `select-model`; the host owns selected model state and persistence. Disabled, unhealthy, cooling, and unavailable connections remain visible but cannot be selected. `useModelAuth` keeps the dialog open after a successful selection; Confirm and Close finish the dialog explicitly.
+
+Provider icons for known ids are bundled as inline SVG and never fetched. `ModelAuthProvider.iconUrl` overrides the built-in icon (http(s) or same-origin only); unknown providers show a letter mark.

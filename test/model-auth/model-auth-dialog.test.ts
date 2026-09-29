@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createApp, h, nextTick, reactive, type App } from "vue";
 import ModelAuthDialog from "../../model-auth/packages/vue/src/ModelAuthDialog.vue";
-import { providerIconUrls } from "../../model-auth/packages/vue/src/provider-icon";
+import { providerIconUrl } from "../../model-auth/packages/vue/src/provider-icon";
 import { registerModelAuthElement } from "../../model-auth/packages/vue/src/custom-element";
 import type { ModelAuthProvider } from "../../model-auth/packages/vue/src/types";
 
@@ -60,12 +60,11 @@ function expectStage(title: string, caption: string, widths: string[]) {
 
 describe("authentication dialog", () => {
   it("accepts bundled same-origin app icons without trusting another app host", () => {
-    const provider = { id: "openai-codex", iconUrl: "iris-ui://app/assets/codex.svg" };
-    const urls = providerIconUrls(provider, "iris-ui://app/index.html");
-    expect(urls[0]).toBe(provider.iconUrl);
-    expect(providerIconUrls({ ...provider, iconUrl: "./assets/codex.svg" }, "iris-ui://app/index.html")[0]).toBe(provider.iconUrl);
-    expect(providerIconUrls({ ...provider, iconUrl: "iris-ui://other/assets/codex.svg" }, "iris-ui://app/index.html")).not.toContain("iris-ui://other/assets/codex.svg");
-    expect(providerIconUrls({ ...provider, iconUrl: "data:image/svg+xml,<svg/>" }, "iris-ui://app/index.html")).not.toContain("data:image/svg+xml,<svg/>");
+    const provider = { iconUrl: "iris-ui://app/assets/codex.svg" };
+    expect(providerIconUrl(provider, "iris-ui://app/index.html")).toBe(provider.iconUrl);
+    expect(providerIconUrl({ iconUrl: "./assets/codex.svg" }, "iris-ui://app/index.html")).toBe(provider.iconUrl);
+    expect(providerIconUrl({ iconUrl: "iris-ui://other/assets/codex.svg" }, "iris-ui://app/index.html")).toBeNull();
+    expect(providerIconUrl({ iconUrl: "data:image/svg+xml,<svg/>" }, "iris-ui://app/index.html")).toBeNull();
   });
 
   it("confirms verified authorization without any discovered models", async () => {
@@ -104,32 +103,36 @@ describe("authentication dialog", () => {
     expect(events.some(event => event.name === "model")).toBe(false);
   });
 
-  it("uses a provider API favicon and falls back to the mark after an image failure", async () => {
+  it("renders built-in inline icons for mapped ids without any image request", async () => {
     const { state } = await mount();
-    state.providers[0]!.api = "https://api.provider.example.com/v1";
+    state.providers[2]!.id = "ollama";
     await click('[data-part="method-oauth"]');
-    const icon = get<HTMLImageElement>('[data-provider-id="provider-a"] img');
-    expect(icon.src).toBe("https://api.provider.example.com/favicon.ico");
-    icon.dispatchEvent(new Event("error"));
-    await nextTick();
-    expect(document.querySelector('[data-provider-id="provider-a"] img')).toBeNull();
-    expect(get('[data-provider-id="provider-a"] .model-auth-provider-mark').textContent).toBe("P");
+    const mark = get('[data-provider-id="ollama"] .model-auth-provider-mark');
+    expect(mark.querySelector("svg")).toBeTruthy();
+    expect(mark.querySelector("img")).toBeNull();
+    expect(mark.innerHTML).not.toMatch(/favicon|href=|src=/);
   });
 
-  it("tries each provider icon candidate before falling back to the mark", async () => {
+  it("renders the letter mark for unknown provider ids", async () => {
+    const { state } = await mount();
+    await click('[data-part="method-oauth"]');
+    const mark = get('[data-provider-id="provider-a"] .model-auth-provider-mark');
+    expect(mark.querySelector("svg")).toBeNull();
+    expect(mark.querySelector("img")).toBeNull();
+    expect(mark.textContent).toBe("P");
+    expect(state.providers[0]!.id).toBe("provider-a");
+  });
+
+  it("prefers the host icon and falls back to the built-in icon after an image failure", async () => {
     const { state } = await mount();
     state.providers[2]!.iconUrl = "https://assets.example.com/workbuddy.svg";
     await click('[data-part="method-oauth"]');
-    let icon = get<HTMLImageElement>('[data-provider-id="workbuddy"] img');
+    const icon = get<HTMLImageElement>('[data-provider-id="workbuddy"] img');
     expect(icon.src).toBe("https://assets.example.com/workbuddy.svg");
     icon.dispatchEvent(new Event("error"));
     await nextTick();
-    icon = get<HTMLImageElement>('[data-provider-id="workbuddy"] img');
-    expect(icon.src).toBe("https://copilot.tencent.com/favicon.ico");
-    icon.dispatchEvent(new Event("error"));
-    await nextTick();
     expect(document.querySelector('[data-provider-id="workbuddy"] img')).toBeNull();
-    expect(get('[data-provider-id="workbuddy"] .model-auth-provider-mark').textContent).toBe("W");
+    expect(get('[data-provider-id="workbuddy"] .model-auth-provider-mark svg')).toBeTruthy();
   });
 
   it("keeps failed authorization at detail until authReady, idle, and error-free", async () => {
