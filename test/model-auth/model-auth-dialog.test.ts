@@ -305,18 +305,18 @@ describe("authentication dialog", () => {
     expect(events.at(-1)).toEqual({ name: "usage", payload: ["provider-a", "key-1"] });
   });
 
-  it("shows the credential secret masked, reveals it on demand and saves only a changed value", async () => {
+  it("shows the credential secret by default, hides it on demand and saves only a changed value", async () => {
     const { events, state } = await mount();
     state.providers[0]!.apiKeyCredentials![0]!.secret = "sk-test-value";
     state.providers[0]!.oauthCredentials![0]!.secret = '{"access":"tok"}';
     await details("api-key");
     const input = get<HTMLInputElement>('[data-part="credential-secret"] input');
     const save = get<HTMLButtonElement>('[data-part="save-secret"]');
-    expect(input.type).toBe("password");
+    expect(input.type).toBe("text");
     expect(input.value).toBe("sk-test-value");
     expect(save.disabled).toBe(true);
     await click('[data-part="toggle-secret"]');
-    expect(input.type).toBe("text");
+    expect(input.type).toBe("password");
     expect(get('[data-part="toggle-secret"]').getAttribute("aria-pressed")).toBe("true");
     await fill('[data-part="credential-secret"] input', "sk-test-changed");
     expect(save.disabled).toBe(false);
@@ -338,7 +338,7 @@ describe("authentication dialog", () => {
     await click('[data-part="back"]'); await click('[data-part="back"]');
     await details("oauth");
     const oauthInput = get<HTMLInputElement>('[data-part="credential-secret"] input');
-    expect(oauthInput.type).toBe("password");
+    expect(oauthInput.type).toBe("text");
     expect(oauthInput.value).toBe('{"access":"tok"}');
   });
 

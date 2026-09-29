@@ -66,7 +66,7 @@ const labelInput = ref("");
 const apiKeyInput = ref("");
 const revealApiKey = ref(false);
 const secretDrafts = reactive<Record<string, string>>({});
-const revealedSecrets = reactive<Record<string, boolean>>({});
+const hiddenSecrets = reactive<Record<string, boolean>>({});
 const localError = ref("");
 const pendingRemoval = ref("");
 const connectionMode = ref(false);
@@ -123,7 +123,7 @@ function clearNewKey() { labelInput.value = ""; apiKeyInput.value = ""; revealAp
 function clearSecret() {
   clearNewKey();
   for (const id of Object.keys(secretDrafts)) delete secretDrafts[id];
-  for (const id of Object.keys(revealedSecrets)) delete revealedSecrets[id];
+  for (const id of Object.keys(hiddenSecrets)) delete hiddenSecrets[id];
 }
 function resetState() {
   awaitingVerification = false;
@@ -498,8 +498,8 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                 </div>
                 <div v-if="credential.secret !== undefined" class="model-auth-credential-secret" data-part="credential-secret">
                   <label class="model-auth-key-input">
-                    <input :value="secretValue(credential)" :disabled="busy" :type="revealedSecrets[credential.id] ? 'text' : 'password'" autocomplete="off" :spellcheck="false" :aria-label="text.secret + ' ' + credential.label" @input="secretDrafts[credential.id] = ($event.target as HTMLInputElement).value" />
-                    <button type="button" class="model-auth-subtle model-auth-with-icon" data-part="toggle-secret" :aria-pressed="!!revealedSecrets[credential.id]" @click="revealedSecrets[credential.id] = !revealedSecrets[credential.id]"><ModelAuthIcon :name="revealedSecrets[credential.id] ? 'eye-off' : 'eye'" />{{ revealedSecrets[credential.id] ? text.hide : text.show }}</button>
+                    <input :value="secretValue(credential)" :disabled="busy" :type="hiddenSecrets[credential.id] ? 'password' : 'text'" autocomplete="off" :spellcheck="false" :aria-label="text.secret + ' ' + credential.label" @input="secretDrafts[credential.id] = ($event.target as HTMLInputElement).value" />
+                    <button type="button" class="model-auth-subtle model-auth-with-icon" data-part="toggle-secret" :aria-pressed="!!hiddenSecrets[credential.id]" @click="hiddenSecrets[credential.id] = !hiddenSecrets[credential.id]"><ModelAuthIcon :name="hiddenSecrets[credential.id] ? 'eye' : 'eye-off'" />{{ hiddenSecrets[credential.id] ? text.show : text.hide }}</button>
                   </label>
                   <button type="button" class="model-auth-secondary" data-part="save-secret" :disabled="busy || !secretChanged(credential)" @click="saveSecret(credential)">{{ text.saveSecret }}</button>
                 </div>
