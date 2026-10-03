@@ -43,6 +43,8 @@ try {
   const panel = page.locator("fixture-connections");
   await panel.locator('[data-part="connection-card"]').first().waitFor();
   assert.equal(await panel.locator('[data-part="connection-card"]').count(), 3);
+  assert.equal(await panel.locator('[data-part="connection-account"]').count(), 0, "cards start collapsed");
+  for (const toggle of await panel.locator('[data-part="toggle-connection"]').all()) await toggle.click();
   assert.ok(await panel.evaluate(element => { const text = element.shadowRoot.textContent; return text.includes("已停用") && text.includes("需要重新连接") && text.includes("Host integration unavailable"); }));
   assert.equal(await panel.locator('input[type="password"], input[type="text"]').count(), 0);
   const card = panel.locator('[data-provider-id="oauth"]');
