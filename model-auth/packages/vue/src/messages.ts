@@ -23,5 +23,10 @@ export const defaultMessages = {
   modelSearch: "搜索模型", secret: "密钥", saveSecret: "保存密钥", emptyModels: "没有可用模型", enabledState: "开", disabledState: "关",
   configured: "已配置", strategyHint: "按凭据顺序生效：顺序故障转移始终从靠前的凭据开始尝试，顺序轮询按该顺序依次轮换。",
   connections: "已接入", connectionInfo: "接入信息", viewConnection: "查看接入信息", newConnection: "新增接入", noConnections: "尚未接入账号。", account: "账号", models: "可用模型", refreshConnections: "刷新接入信息",
+  connectionSummary: "{count} 个账号 · {ready} 个可用", lowestRemaining: "最低剩余 {percent}", showDetails: "展开详情", hideDetails: "收起详情",
+  credentialSettings: "账号设置", saveLabel: "保存名称", accountLogin: "账号登录",
+  accountLoginHint: "会话过期时用它自动登录并刷新剩余额度。密码由宿主加密保存，不会回传到界面。",
+  username: "邮箱或用户名", password: "密码", passwordSaved: "已保存（留空则不修改）", saveLogin: "保存账号", clearLogin: "清除账号",
+  usageRemaining: "{label} · 剩余 {percent}",
 };
 export type ModelAuthMessages = typeof defaultMessages;

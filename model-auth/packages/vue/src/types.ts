@@ -103,6 +103,7 @@ export interface ProviderCredential {
   extend?: CredentialExtend;
   secret?: string;
   usage?: CredentialUsage | null;
+  login?: { username: string; passwordSaved: boolean } | null;
 }
 
 export interface ApiKeyCredential extends ProviderCredential {
@@ -123,6 +124,7 @@ export interface ModelAuthProvider {
   authorizeLabel?: string;
   usageEnabled?: boolean;
   logoutEnabled?: boolean;
+  accountLogin?: boolean;
   models: string[];
   oauthModels?: string[];
   apiKeyModels?: string[];
@@ -131,7 +133,8 @@ export interface ModelAuthProvider {
 }
 
 export interface AddApiKeyPayload { providerId: string; label: string; apiKey: string; extend?: CredentialExtend }
-export interface CredentialUpdatePayload { providerId: string; credentialId: string; enabled: boolean; extend?: CredentialExtend; secret?: string }
+export interface CredentialLoginInput { username: string; password?: string }
+export interface CredentialUpdatePayload { providerId: string; credentialId: string; enabled: boolean; extend?: CredentialExtend; secret?: string; label?: string; login?: CredentialLoginInput | null }
 export interface CredentialReorderPayload { providerId: string; method: AuthMethod; credentialIds: string[] }
 export interface ProviderUpdatePayload { providerId: string; oauthEnabled: boolean }
 export interface StrategyUpdatePayload { providerId: string; strategy: LoadStrategy }

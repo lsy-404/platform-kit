@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, useId } from "vue";
 import { defaultMessages, type ModelAuthMessages } from "./messages";
 import ModelList from "./ModelList.vue";
+import ModelAuthIcon from "./ModelAuthIcon.vue";
 import ProviderMark from "./ProviderMark.vue";
+import { DEFAULT_PERCENTAGE_PRECISION, formatPercentage } from "./percentage";
+import { credentialReady, credentialRemaining, fill, lowestRemaining } from "./usage";
 import { connectionModels } from "./models";
 import type { AuthMethod, ModelAuthProvider, ModelConnectionTarget, ProviderCredential, Theme } from "./types";
 
@@ -13,9 +16,12 @@ const props = withDefaults(defineProps<{
   styled?: boolean;
   theme?: Theme;
   messages?: Partial<ModelAuthMessages>;
-}>(), { providers: () => [], busy: false, error: null, styled: true, theme: "system", messages: () => ({}) });
+  percentagePrecision?: number;
+}>(), { providers: () => [], busy: false, error: null, styled: true, theme: "system", messages: () => ({}), percentagePrecision: DEFAULT_PERCENTAGE_PRECISION });
 const emit = defineEmits<{ manage: [target: ModelConnectionTarget]; add: []; refresh: [] }>();
 const text = computed(() => ({ ...defaultMessages, ...props.messages }));
+const uid = useId();
+const expanded = ref(new Set<string>());
 const groups = computed(() => props.providers.flatMap(provider => (["oauth", "api-key"] as AuthMethod[]).flatMap(method => {
   const credentials = (method === "oauth" ? provider.oauthCredentials : provider.apiKeyCredentials) ?? [];
   return credentials.length ? [{ provider, method, credentials, models: connectionModels(provider, method) }] : [];
@@ -29,6 +35,24 @@ function status(credential: ProviderCredential) {
 function strategy(provider: ModelAuthProvider) {
   if (provider.loadStrategy === "failover") return text.value.failover;
   return provider.loadStrategy === "round-robin" ? text.value.roundRobin : "—";
+}
+const groupKey = (group: { provider: ModelAuthProvider; method: AuthMethod }) => `${group.provider.id}/${group.method}`;
+const regionId = (group: { provider: ModelAuthProvider; method: AuthMethod }) => `${uid}-${groupKey(group)}`;
+function toggle(group: { provider: ModelAuthProvider; method: AuthMethod }) {
+  const next = new Set(expanded.value);
+  const key = groupKey(group);
+  if (!next.delete(key)) next.add(key);
+  expanded.value = next;
+}
+const percent = (value: number) => formatPercentage(value, props.percentagePrecision) + "%";
+function summaryParts(credentials: ProviderCredential[]): { text: string; attention?: boolean }[] {
+  const parts: { text: string; attention?: boolean }[] = [{ text: fill(text.value.connectionSummary, { count: credentials.length, ready: credentials.filter(credentialReady).length }) }];
+  const plan = credentials.map(credential => credential.usage?.plan).find(Boolean);
+  if (plan) parts.push({ text: plan });
+  const lowest = lowestRemaining(credentials);
+  if (lowest !== null) parts.push({ text: fill(text.value.lowestRemaining, { percent: percent(lowest) }) });
+  if (credentials.some(credential => credential.enabled && !credential.healthy)) parts.push({ text: text.value.needsReconnect, attention: true });
+  return parts;
 }
 function modelCount(provider: ModelAuthProvider, method: AuthMethod, credential: ProviderCredential) {
   if (credential.models?.length) return credential.models.length;
@@ -55,17 +79,21 @@ function modelCount(provider: ModelAuthProvider, method: AuthMethod, credential:
         <button type="button" class="model-auth-secondary" :disabled="busy" :aria-label="text.viewConnection + ' · ' + group.provider.name + ' · ' + methodLabel(group.method)" data-part="view-connection" @click="emit('manage', { providerId: group.provider.id, method: group.method })">{{ text.viewConnection }}</button>
       </header>
       <p v-if="!group.provider.available && group.provider.unavailableReason" class="model-auth-connection-warning" role="status">{{ group.provider.unavailableReason }}</p>
-      <ul class="model-auth-connection-accounts">
-        <li v-for="(credential, index) in group.credentials" :key="credential.id" data-part="connection-account">
-          <div><strong>{{ credential.label }}</strong><small v-if="credential.account && credential.account !== credential.label">{{ text.account }}：{{ credential.account }}</small></div>
-          <span>{{ status(credential) }}</span>
-          <span class="model-auth-connection-meta">{{ text.position }} {{ index + 1 }} · {{ modelCount(group.provider, group.method, credential) }} {{ text.modelCount }}</span>
-        </li>
-      </ul>
-      <details class="model-auth-connection-models" data-part="connection-models">
-        <summary>{{ text.models }} ({{ group.models.length }})</summary>
-        <ModelList :models="group.models" :messages="text" />
-      </details>
+      <p class="model-auth-connection-summary" data-part="connection-summary"><template v-for="(part, index) in summaryParts(group.credentials)" :key="index"><template v-if="index"> · </template><span v-if="part.attention" data-part="connection-attention" class="model-auth-connection-attention">{{ part.text }}</span><template v-else>{{ part.text }}</template></template></p>
+      <button type="button" class="model-auth-subtle model-auth-connection-toggle" data-part="toggle-connection" :aria-expanded="expanded.has(groupKey(group))" :aria-controls="regionId(group)" @click="toggle(group)">{{ expanded.has(groupKey(group)) ? text.hideDetails : text.showDetails }}<ModelAuthIcon name="arrow-down" /></button>
+      <div v-if="expanded.has(groupKey(group))" :id="regionId(group)" class="model-auth-connection-details" data-part="connection-details">
+        <ul class="model-auth-connection-accounts">
+          <li v-for="(credential, index) in group.credentials" :key="credential.id" data-part="connection-account">
+            <div><strong>{{ credential.label }}</strong><small v-if="credential.account && credential.account !== credential.label">{{ text.account }}：{{ credential.account }}</small></div>
+            <span>{{ status(credential) }}</span>
+            <span class="model-auth-connection-meta">{{ text.position }} {{ index + 1 }} · {{ modelCount(group.provider, group.method, credential) }} {{ text.modelCount }}<template v-if="credentialRemaining(credential) !== null"> · {{ fill(text.lowestRemaining, { percent: percent(credentialRemaining(credential)!) }) }}</template></span>
+          </li>
+        </ul>
+        <details class="model-auth-connection-models" data-part="connection-models">
+          <summary>{{ text.models }} ({{ group.models.length }})</summary>
+          <ModelList :models="group.models" :messages="text" />
+        </details>
+      </div>
     </article>
   </section>
 </template>

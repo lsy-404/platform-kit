@@ -17,7 +17,7 @@ async function mount(initialConnection: { providerId: string; method: "oauth" | 
   const state = reactive({ open: true, providers: providers(), initialConnection, busy: false, ...extra });
   const events: { name: string; payload: unknown }[] = [];
   const on = (name: string) => (...payload: unknown[]) => events.push({ name, payload: payload.length === 1 ? payload[0] : payload });
-  const app = createApp(() => h(ModelAuthDialog, { ...state, onClose: on("close"), onReconnectOauth: on("reconnect"), onUpdateCredential: on("credential"), onRemoveOauth: on("remove-oauth"), onRemoveApiKey: on("remove-key"), onUpdateProviderStrategy: on("strategy"), onRefreshCatalog: on("refresh") }));
+  const app = createApp(() => h(ModelAuthDialog, { ...state, onClose: on("close"), onReconnectOauth: on("reconnect"), onAuthorizeOauth: on("authorize"), onAddApiKey: on("add-key"), onUpdateCredential: on("credential"), onRemoveOauth: on("remove-oauth"), onRemoveApiKey: on("remove-key"), onUpdateProviderStrategy: on("strategy"), onRefreshCatalog: on("refresh") }));
   apps.push(app); app.mount(host); await nextTick(); await nextTick();
   return { state, events };
 }
@@ -166,5 +166,91 @@ describe("connection detail dialog", () => {
     expect([...document.querySelectorAll("h2")].at(-1)?.textContent).toBe("选择方式");
     expect(document.querySelector('[part="progress"]')).toBeTruthy();
     void standard;
+  });
+
+  async function fillInput(selector: string, value: string) {
+    const input = get<HTMLInputElement>(selector);
+    input.value = value; input.dispatchEvent(new Event("input", { bubbles: true })); await nextTick();
+  }
+
+  it("renames a credential and disables saving when the name is unchanged", async () => {
+    const { events } = await mount({ providerId: "oauth", method: "oauth" });
+    const save = get<HTMLButtonElement>('[data-part="save-label"]');
+    expect(get<HTMLInputElement>('[data-part="credential-label"]').value).toBe("Primary");
+    expect(save.disabled).toBe(true);
+    await fillInput('[data-part="credential-label"]', "  Renamed  ");
+    expect(save.disabled).toBe(false);
+    await click('[data-part="save-label"]');
+    expect(events.at(-1)).toEqual({ name: "credential", payload: { providerId: "oauth", credentialId: "account", enabled: true, label: "Renamed" } });
+  });
+
+  it("adds API keys and OAuth accounts from the detail view without leaving it", async () => {
+    const { events, state } = await mount({ providerId: "key", method: "api-key" });
+    await fillInput('[data-part="api-key-form"] input[type="password"]', "sk-test-value");
+    get('[data-part="api-key-form"]').dispatchEvent(new Event("submit", { cancelable: true })); await nextTick(); await nextTick();
+    expect(events.at(-1)).toEqual({ name: "add-key", payload: { providerId: "key", label: "", apiKey: "sk-test-value" } });
+    state.providers[1]!.apiKeyCredentials![0]!.enabled = true; state.providers[1]!.apiKeyCredentials![0]!.healthy = true; await nextTick(); await nextTick();
+    expect(document.querySelector('[data-part="connection-info"]')).not.toBeNull();
+    expect(document.querySelector('[data-part="confirmation-step"]')).toBeNull();
+    const oauth = await mount({ providerId: "oauth", method: "oauth" });
+    document.querySelectorAll<HTMLElement>('[data-part="authorize"]').forEach(button => button.click()); await nextTick(); await nextTick();
+    expect(oauth.events.at(-1)).toEqual({ name: "authorize", payload: "oauth" });
+    expect(document.querySelector('[data-part="connection-info"]')).not.toBeNull();
+  });
+
+  describe("account login", () => {
+    const withLogin = (login?: { username: string; passwordSaved: boolean }) => async () => {
+      const ctx = await mount({ providerId: "oauth", method: "oauth" });
+      ctx.state.providers[0]!.accountLogin = true;
+      if (login) ctx.state.providers[0]!.oauthCredentials![0]!.login = login;
+      await nextTick();
+      return ctx;
+    };
+    const submit = async () => { get('[data-part="credential-login"]').dispatchEvent(new Event("submit", { cancelable: true })); await nextTick(); await nextTick(); };
+
+    it("is absent unless the provider declares accountLogin", async () => {
+      await mount({ providerId: "oauth", method: "oauth" });
+      expect(document.querySelector('[data-part="credential-login"]')).toBeNull();
+    });
+
+    it("submits username and password, then drops the password from the input", async () => {
+      const { events } = await withLogin()();
+      expect(get<HTMLInputElement>('[data-part="login-username"]').type).toBe("email");
+      expect(get<HTMLButtonElement>('[data-part="save-login"]').disabled).toBe(true);
+      await fillInput('[data-part="login-username"]', "person@example.test");
+      await fillInput('[data-part="login-password"]', "fixture-password");
+      await submit();
+      expect(events.at(-1)).toEqual({ name: "credential", payload: { providerId: "oauth", credentialId: "account", enabled: true, login: { username: "person@example.test", password: "fixture-password" } } });
+      expect(get<HTMLInputElement>('[data-part="login-password"]').value).toBe("");
+      expect(document.body.innerHTML).not.toContain("fixture-password");
+    });
+
+    it("emits a username-only change when a password is already saved", async () => {
+      const { events } = await withLogin({ username: "old@example.test", passwordSaved: true })();
+      expect(get<HTMLInputElement>('[data-part="login-password"]').placeholder).toBe("已保存（留空则不修改）");
+      expect(get<HTMLButtonElement>('[data-part="save-login"]').disabled).toBe(true);
+      await fillInput('[data-part="login-username"]', "new@example.test");
+      await submit();
+      const payload = (events.at(-1)!.payload as { login: object }).login;
+      expect(payload).toEqual({ username: "new@example.test" });
+      expect("password" in payload).toBe(false);
+    });
+
+    it("clears the account after a second click", async () => {
+      const { events } = await withLogin({ username: "old@example.test", passwordSaved: true })();
+      await click('[data-part="clear-login"]');
+      expect(events.some(event => event.name === "credential")).toBe(false);
+      await click('[data-part="clear-login"]');
+      expect(events.at(-1)).toEqual({ name: "credential", payload: { providerId: "oauth", credentialId: "account", enabled: true, login: null } });
+    });
+  });
+
+  it("shows remaining rather than used percentage in usage windows", async () => {
+    const { state } = await mount({ providerId: "oauth", method: "oauth" });
+    state.providers[0]!.oauthCredentials![0]!.usage = { providerId: "oauth", credentialId: "account", status: "ok", plan: null, windows: [{ id: "w", label: "Weekly", usedPercent: 60, resetAt: Date.UTC(2030, 0, 1) }, { id: "u", label: "Unknown", usedPercent: null, resetAt: null }], balance: null, fetchedAtUtc: "2000-01-01T00:00:00.000Z", error: null };
+    state.percentagePrecision = 0; await nextTick();
+    const spans = [...document.querySelectorAll<HTMLElement>('[data-part="credential-usage"] span')];
+    expect(spans.map(span => span.textContent)).toEqual(["Weekly · 剩余 40%", "Unknown · 剩余 —"]);
+    expect(spans[0]!.title).toBe("2030-01-01T00:00:00.000Z");
   });
 });

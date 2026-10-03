@@ -209,7 +209,19 @@
 .model-auth-connection-models { min-width: 0; }
 .model-auth-connection-models summary { padding: 8px 0; cursor: pointer; }
 .model-auth-models { max-height: 240px; overflow: auto; padding: 2px; margin: -2px; list-style: none; }
-.model-auth-connection-card > .model-auth-connection-models { border-top: 1px solid var(--ma-line); }
+.model-auth-connection-details { display: grid; gap: 12px; min-width: 0; }
+.model-auth-connection-details > .model-auth-connection-models { border-top: 1px solid var(--ma-line); }
+.model-auth-connection-summary { color: var(--ma-muted); font-size: 13px; overflow-wrap: anywhere; }
+.model-auth-connection-attention { color: var(--ma-danger); }
+.model-auth-connection-toggle { justify-self: start; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.model-auth-connection-toggle svg { transition: transform .15s ease; }
+.model-auth-connection-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .model-auth-connection-toggle svg { transition: none; } }
+.model-auth-credential-settings { display: grid; gap: 10px; }
+.model-auth-credential-settings > summary { cursor: pointer; color: var(--ma-muted, currentColor); font-size: 12px; }
+.model-auth-credential-rename, .model-auth-credential-login { display: grid; gap: 8px; }
+.model-auth-credential-rename { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.model-auth-credential-login small { color: var(--ma-muted, currentColor); }
 .model-auth-connection-models summary:focus-visible { outline: 2px solid var(--ma-accent); outline-offset: 2px; }
 
 .model-auth-connections.model-auth-styled { padding: 16px; border: 1px solid var(--ma-line); border-radius: 8px; background: var(--ma-surface); }
