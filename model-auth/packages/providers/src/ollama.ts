@@ -23,6 +23,9 @@ export interface OllamaWebAuthorizationOptions extends ProviderUsageRequestOptio
   readonly pollMs?: number;
 }
 
+const SESSION_MISSING = "Ollama web session is not available.";
+const SESSION_EXPIRED = "Ollama web session has expired.";
+export const OLLAMA_SIGN_IN_INEFFECTIVE = "Ollama sign-in completed but the web session is still unavailable.";
 const MAX_AUTH_TIMEOUT_MS = 600_000;
 const DEFAULT_POLL_MS = 1_500;
 
@@ -50,12 +53,49 @@ export async function authorizeOllamaWeb(options: OllamaWebAuthorizationOptions)
   }
 }
 
+export interface OllamaAccountLogin {
+  readonly username: string;
+  readonly password: string;
+}
+
+export interface OllamaAccountUsageOptions extends ProviderUsageRequestOptions {
+  readonly readCookieHeader: () => Promise<string | null>;
+  readonly login?: OllamaAccountLogin | null;
+  /** Host-driven browser sign-in; must leave a fresh session readable through readCookieHeader. */
+  readonly signIn?: (login: OllamaAccountLogin, context: { signal?: AbortSignal }) => Promise<void>;
+}
+
+/** Query usage, signing in once through the host when the stored session is missing or expired. */
+export async function queryOllamaAccountUsage(options: OllamaAccountUsageOptions): Promise<ProviderUsageSnapshot> {
+  const { signal } = options;
+  const query = async () => {
+    if (signal?.aborted) throw new Error("Ollama usage query was cancelled.");
+    const cookie = (await options.readCookieHeader())?.trim() ?? "";
+    if (signal?.aborted) throw new Error("Ollama usage query was cancelled.");
+    return queryOllamaUsage({
+      cookie, ...(signal ? { signal } : {}),
+      ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
+      ...(options.credentialId ? { credentialId: options.credentialId } : {}),
+    });
+  };
+  const first = await query();
+  const { login, signIn } = options;
+  if (first.status !== "error" || (first.error !== SESSION_MISSING && first.error !== SESSION_EXPIRED) || !login || !signIn) return first;
+  signal?.throwIfAborted();
+  await signIn(login, signal ? { signal } : {});
+  const second = await query();
+  if (second.status === "error" && (second.error === SESSION_MISSING || second.error === SESSION_EXPIRED)) {
+    return { ...second, error: OLLAMA_SIGN_IN_INEFFECTIVE };
+  }
+  return second;
+}
+
 export async function queryOllamaUsage(options: OllamaUsageRequestOptions = {}): Promise<ProviderUsageSnapshot> {
   const credentialId = options.credentialId ?? "ollama-web";
   if (!options.cookie?.trim()) {
     return usageSnapshot("ollama-cloud", credentialId, {
       status: "error", plan: null, windows: [], balance: null,
-      error: "Ollama web session is not available.",
+      error: SESSION_MISSING,
     });
   }
   try {
@@ -64,13 +104,13 @@ export async function queryOllamaUsage(options: OllamaUsageRequestOptions = {}):
       redirect: "manual",
       ...(options.signal ? { signal: options.signal } : {}),
     });
-    if (response.status >= 300 && response.status < 400 || response.redirected || !response.ok) {
-      throw new Error(response.status === 401 || response.status === 403 || response.status === 302
-        ? "Ollama web session has expired."
+    if (response.status === 0 || response.type === "opaqueredirect" || response.status >= 300 && response.status < 400 || response.redirected || !response.ok) {
+      throw new Error(response.status === 401 || response.status === 403 || response.status === 0 || response.type === "opaqueredirect" || response.status >= 300 && response.status < 400
+        ? SESSION_EXPIRED
         : `Ollama settings request failed (${response.status}).`);
     }
     const html = await response.text();
-    if (/\/signin(?:[/?#]|$)/i.test(response.url)) throw new Error("Ollama web session has expired.");
+    if (/\/signin(?:[/?#]|$)/i.test(response.url)) throw new Error(SESSION_EXPIRED);
     return usageSnapshot("ollama-cloud", credentialId, parseOllamaSettings(html));
   } catch (error) {
     return usageSnapshot("ollama-cloud", credentialId, {

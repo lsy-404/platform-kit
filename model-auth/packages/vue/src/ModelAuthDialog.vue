@@ -7,9 +7,10 @@ import { connectionModels } from "./models";
 import ModelAuthIcon from "./ModelAuthIcon.vue";
 import ProviderMark from "./ProviderMark.vue";
 import { formatPercentage } from "./percentage";
+import { fill, windowRemaining } from "./usage";
 import type {
-  AddApiKeyPayload, AuthMethod, CredentialExtend, CredentialReorderPayload, CredentialUpdatePayload, CatalogStatus, LoadStrategy,
-  ModelAuthProvider, ModelConnectionTarget, ProviderAuthResponseRequest, ProviderAuthState, ProviderCredential, ProviderAuthNotice, ProviderUpdatePayload, StrategyUpdatePayload, Theme, CredentialUsageEstimate,
+  AddApiKeyPayload, AuthMethod, CredentialExtend, CredentialLoginInput, CredentialReorderPayload, CredentialUpdatePayload, CatalogStatus, LoadStrategy,
+  ModelAuthProvider, ModelConnectionTarget, ProviderAuthResponseRequest, ProviderAuthState, ProviderCredential, ProviderAuthNotice, ProviderUpdatePayload, StrategyUpdatePayload, Theme, CredentialUsageEstimate, CredentialUsageWindow,
 } from "./types";
 
 const props = withDefaults(defineProps<{
@@ -66,6 +67,9 @@ const labelInput = ref("");
 const apiKeyInput = ref("");
 const revealApiKey = ref(false);
 const secretDrafts = reactive<Record<string, string>>({});
+const labelDrafts = reactive<Record<string, string>>({});
+const loginDrafts = reactive<Record<string, { username?: string; password?: string }>>({});
+const pendingLoginClear = ref("");
 const hiddenSecrets = reactive<Record<string, boolean>>({});
 const localError = ref("");
 const pendingRemoval = ref("");
@@ -123,6 +127,9 @@ function clearNewKey() { labelInput.value = ""; apiKeyInput.value = ""; revealAp
 function clearSecret() {
   clearNewKey();
   for (const id of Object.keys(secretDrafts)) delete secretDrafts[id];
+  for (const id of Object.keys(labelDrafts)) delete labelDrafts[id];
+  for (const id of Object.keys(loginDrafts)) delete loginDrafts[id];
+  pendingLoginClear.value = "";
   for (const id of Object.keys(hiddenSecrets)) delete hiddenSecrets[id];
 }
 function resetState() {
@@ -206,12 +213,17 @@ function handleProviderKeydown(event: KeyboardEvent) {
     if (provider) chooseProvider(provider);
   }
 }
+function closedDetailsAncestors(element: HTMLElement): HTMLElement[] {
+  const found: HTMLElement[] = [];
+  for (let node = element.closest<HTMLElement>("details:not([open])"); node; node = node.parentElement?.closest<HTMLElement>("details:not([open])") ?? null) found.push(node);
+  return found;
+}
 function handleDialogKeydown(event: KeyboardEvent) {
   if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); return; }
   if (event.key !== "Tab" || !dialog.value) return;
   const focusable = [...dialog.value.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]), [tabindex='0'], a[href], summary")]
     .filter(element => element.tabIndex >= 0 && !element.closest("[hidden]")
-      && (!element.closest("details:not([open])") || element.matches("summary")));
+      && !closedDetailsAncestors(element).some(details => !(element.matches("summary") && element.parentElement === details)));
   const first = focusable[0], last = focusable.at(-1), active = activeElement();
   if (!first || !last) { event.preventDefault(); dialog.value.focus(); return; }
   if (event.shiftKey && (active === first || !focusable.includes(active as HTMLElement))) {
@@ -220,11 +232,11 @@ function handleDialogKeydown(event: KeyboardEvent) {
     event.preventDefault(); first.focus();
   }
 }
-function updateCredential(credential: ProviderCredential, enabled: boolean, patch: { extend?: CredentialExtend; secret?: string } = {}) {
+function updateCredential(credential: ProviderCredential, enabled: boolean, patch: { extend?: CredentialExtend; secret?: string; label?: string; login?: CredentialLoginInput | null } = {}) {
   const provider = selectedProvider.value;
   if (!provider || props.busy) return;
   localError.value = "";
-  emit("update-credential", { providerId: provider.id, credentialId: credential.id, enabled, ...(patch.extend ? { extend: patch.extend } : {}), ...(patch.secret !== undefined ? { secret: patch.secret } : {}) });
+  emit("update-credential", { providerId: provider.id, credentialId: credential.id, enabled, ...(patch.extend ? { extend: patch.extend } : {}), ...(patch.secret !== undefined ? { secret: patch.secret } : {}), ...(patch.label !== undefined ? { label: patch.label } : {}), ...(patch.login !== undefined ? { login: patch.login } : {}) });
 }
 function secretValue(credential: ProviderCredential): string {
   return secretDrafts[credential.id] ?? credential.secret ?? "";
@@ -235,6 +247,55 @@ function secretChanged(credential: ProviderCredential): boolean {
 }
 function saveSecret(credential: ProviderCredential) {
   if (secretChanged(credential)) updateCredential(credential, credential.enabled, { secret: secretValue(credential).trim() });
+}
+function labelValue(credential: ProviderCredential): string {
+  return labelDrafts[credential.id] ?? credential.label;
+}
+function labelChanged(credential: ProviderCredential): boolean {
+  const value = labelValue(credential).trim();
+  return Boolean(value) && value !== credential.label;
+}
+function rename(credential: ProviderCredential, label: string) {
+  const value = label.trim();
+  if (value && value !== credential.label) updateCredential(credential, credential.enabled, { label: value });
+}
+function onLabelEnter(event: KeyboardEvent, credential: ProviderCredential) {
+  if (event.isComposing || event.keyCode === 229) return;
+  saveLabel(credential);
+}
+function saveLabel(credential: ProviderCredential) {
+  rename(credential, labelValue(credential));
+}
+function loginUsername(credential: ProviderCredential): string {
+  return loginDrafts[credential.id]?.username ?? credential.login?.username ?? "";
+}
+function loginPassword(credential: ProviderCredential): string {
+  return loginDrafts[credential.id]?.password ?? "";
+}
+function setLoginDraft(credential: ProviderCredential, field: "username" | "password", value: string) {
+  loginDrafts[credential.id] = { ...loginDrafts[credential.id], [field]: value };
+}
+function loginSavable(credential: ProviderCredential): boolean {
+  const username = loginUsername(credential).trim();
+  if (!username) return false;
+  if (loginPassword(credential)) return true;
+  return Boolean(credential.login?.passwordSaved) && username !== credential.login?.username;
+}
+function saveLogin(credential: ProviderCredential, login: CredentialLoginInput | null) {
+  if (props.busy) return;
+  updateCredential(credential, credential.enabled, { login });
+  delete loginDrafts[credential.id];
+  pendingLoginClear.value = "";
+}
+function submitLogin(credential: ProviderCredential) {
+  if (!loginSavable(credential)) return;
+  const password = loginPassword(credential);
+  saveLogin(credential, { username: loginUsername(credential).trim(), ...(password ? { password } : {}) });
+}
+function clearLogin(credential: ProviderCredential) {
+  if (props.busy) return;
+  if (pendingLoginClear.value !== credential.id) { pendingLoginClear.value = credential.id; return; }
+  saveLogin(credential, null);
 }
 function moveCredential(index: number, offset: -1 | 1) {
   const provider = selectedProvider.value;
@@ -272,6 +333,12 @@ function usageEstimateText(estimate: CredentialUsageEstimate): string {
 }
 function usagePercentText(value: number | null): string {
   return value === null ? "—" : formatPercentage(value, props.percentagePrecision) + "%";
+}
+function windowText(window: CredentialUsageWindow): string {
+  return fill(text.value.usageRemaining, { label: window.label, percent: usagePercentText(windowRemaining(window)) });
+}
+function windowTitle(window: CredentialUsageWindow): string | undefined {
+  return window.resetAt ? new Date(window.resetAt).toISOString() : undefined;
 }
 function noticeText(notice: ProviderAuthNotice): string {
   if (notice.type === "device_code") return `${text.value.authDeviceCode}: ${notice.userCode} · ${notice.verificationUri}`;
@@ -367,6 +434,10 @@ watch(() => credentials.value.map(credential => [credential.id, credential.secre
   const before = new Map(previous);
   for (const [id, secret] of current) if (before.get(id) !== secret) delete secretDrafts[id];
 });
+watch(() => credentials.value.map(credential => [credential.id, credential.label] as const), (current, previous) => {
+  const before = new Map(previous);
+  for (const [id, label] of current) if (before.get(id) !== label) delete labelDrafts[id];
+});
 watch(selectedProvider, provider => {
   if (!provider && !connectionMode.value && (step.value === "detail" || step.value === "confirmation")) { awaitingVerification = false; step.value = "providers"; }
 });
@@ -457,14 +528,14 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
           <section v-if="method === 'oauth'" class="model-auth-credential-section" data-part="oauth-config">
             <div class="model-auth-section-heading">
               <div><strong>{{ connectionMode ? text.connections : text.oauth }}</strong><small>{{ text.credentialHint }}</small></div>
-              <button v-if="!connectionMode" type="button" class="model-auth-primary" :disabled="busy || !canUseMethod" @click="authorize()">{{ selectedProvider.authorizeLabel || text.authorize }}</button>
+              <button type="button" class="model-auth-primary" data-part="authorize" :disabled="busy || !canUseMethod" @click="authorize()">{{ selectedProvider.authorizeLabel || text.authorize }}</button>
             </div>
             <label class="model-auth-toggle model-auth-provider-toggle">
               <input type="checkbox" role="switch" :checked="selectedProvider.oauthEnabled !== false" :disabled="busy" :aria-label="text.oauthEnabled" @change="emit('update-provider', { providerId: selectedProvider.id, oauthEnabled: ($event.target as HTMLInputElement).checked })" />
               <span class="model-auth-switch-track" aria-hidden="true"></span>{{ text.oauthEnabled }}
             </label>
           </section>
-          <section v-else-if="!connectionMode" class="model-auth-credential-section" data-part="api-key-config">
+          <section v-else class="model-auth-credential-section" data-part="api-key-config">
             <form class="model-auth-api-form" part="api-key-form" data-part="api-key-form" @submit.prevent="addApiKey">
               <div><strong>{{ text.addApiKey }}</strong><small>{{ text.keyHint }}</small></div>
               <input v-model="labelInput" :disabled="busy || !canUseMethod" type="text" autocomplete="off" :placeholder="text.label" :aria-label="text.label" />
@@ -478,7 +549,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
 
           <section class="model-auth-credentials" :aria-label="text.credentials">
             <article v-for="(credential, index) in credentials" :key="credential.id" class="model-auth-credential-row" part="credential-row" :data-part="method === 'oauth' ? 'oauth-credential' : 'api-key-credential'">
-              <slot name="credential-row" :credential="credential" :provider="selectedProvider" :method="method" :update="(enabled: boolean) => updateCredential(credential, enabled)" :remove="() => removeCredential(credential)">
+              <slot name="credential-row" :credential="credential" :provider="selectedProvider" :method="method" :update="(enabled: boolean) => updateCredential(credential, enabled)" :remove="() => removeCredential(credential)" :rename="(label: string) => rename(credential, label)" :save-login="(login: CredentialLoginInput | null) => saveLogin(credential, login)">
                 <div class="model-auth-credential-summary">
                   <span class="model-auth-health" :class="{ healthy: credential.enabled && credential.healthy }" aria-hidden="true"></span>
                   <span class="model-auth-row-main"><strong>{{ credential.label }}</strong><small>{{ connectionMode && credential.account ? text.account + ' · ' + credential.account + ' · ' : '' }}{{ credentialStatus(credential) }}</small></span>
@@ -496,22 +567,38 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                   <button v-if="method === 'oauth' && selectedProvider.logoutEnabled" type="button" class="model-auth-secondary" data-part="logout" :disabled="busy" @click="emit('logout', selectedProvider!.id, credential.id)">{{ text.logout }}</button>
                   <button type="button" class="model-auth-danger" :disabled="busy" :data-confirmed="pendingRemoval === credential.id" @click="removeCredential(credential)">{{ pendingRemoval === credential.id ? text.confirmRemove : text.remove }}</button>
                 </div>
-                <div v-if="credential.secret !== undefined" class="model-auth-credential-secret" data-part="credential-secret">
-                  <label class="model-auth-key-input">
-                    <input :value="secretValue(credential)" :disabled="busy" :type="hiddenSecrets[credential.id] ? 'password' : 'text'" autocomplete="off" :spellcheck="false" :aria-label="text.secret + ' ' + credential.label" @input="secretDrafts[credential.id] = ($event.target as HTMLInputElement).value" />
-                    <button type="button" class="model-auth-subtle model-auth-with-icon" data-part="toggle-secret" :aria-pressed="!!hiddenSecrets[credential.id]" @click="hiddenSecrets[credential.id] = !hiddenSecrets[credential.id]"><ModelAuthIcon :name="hiddenSecrets[credential.id] ? 'eye' : 'eye-off'" />{{ hiddenSecrets[credential.id] ? text.show : text.hide }}</button>
-                  </label>
-                  <button type="button" class="model-auth-secondary" data-part="save-secret" :disabled="busy || !secretChanged(credential)" @click="saveSecret(credential)">{{ text.saveSecret }}</button>
-                </div>
-                <details class="model-auth-credential-extend" data-part="credential-extend">
-                  <summary>{{ text.extend }}</summary>
-                  <textarea :value="extendText(credential)" :disabled="busy" :aria-label="text.extend" spellcheck="false" @change="updateExtend(credential, ($event.target as HTMLTextAreaElement).value)" />
-                  <small>{{ text.extendHint }}</small>
+                <details class="model-auth-credential-settings" data-part="credential-settings">
+                  <summary>{{ text.credentialSettings }}</summary>
+                  <div class="model-auth-credential-rename">
+                    <input :value="labelValue(credential)" :disabled="busy" maxlength="80" type="text" autocomplete="off" data-part="credential-label" :aria-label="text.label" @input="labelDrafts[credential.id] = ($event.target as HTMLInputElement).value" @keydown.enter.prevent="onLabelEnter($event, credential)" />
+                    <button type="button" class="model-auth-secondary" data-part="save-label" :disabled="busy || !labelChanged(credential)" @click="saveLabel(credential)">{{ text.saveLabel }}</button>
+                  </div>
+                  <div v-if="credential.secret !== undefined" class="model-auth-credential-secret" data-part="credential-secret">
+                    <label class="model-auth-key-input">
+                      <input :value="secretValue(credential)" :disabled="busy" :type="hiddenSecrets[credential.id] ? 'password' : 'text'" autocomplete="off" :spellcheck="false" :aria-label="text.secret + ' ' + credential.label" @input="secretDrafts[credential.id] = ($event.target as HTMLInputElement).value" />
+                      <button type="button" class="model-auth-subtle model-auth-with-icon" data-part="toggle-secret" :aria-pressed="!!hiddenSecrets[credential.id]" @click="hiddenSecrets[credential.id] = !hiddenSecrets[credential.id]"><ModelAuthIcon :name="hiddenSecrets[credential.id] ? 'eye' : 'eye-off'" />{{ hiddenSecrets[credential.id] ? text.show : text.hide }}</button>
+                    </label>
+                    <button type="button" class="model-auth-secondary" data-part="save-secret" :disabled="busy || !secretChanged(credential)" @click="saveSecret(credential)">{{ text.saveSecret }}</button>
+                  </div>
+                  <form v-if="selectedProvider.accountLogin === true" class="model-auth-credential-login" data-part="credential-login" @submit.prevent="submitLogin(credential)">
+                    <div><strong>{{ text.accountLogin }}</strong><small>{{ text.accountLoginHint }}</small></div>
+                    <input :value="loginUsername(credential)" :disabled="busy" type="text" inputmode="email" autocomplete="username" data-part="login-username" :placeholder="text.username" :aria-label="text.username" @input="setLoginDraft(credential, 'username', ($event.target as HTMLInputElement).value)" />
+                    <input :value="loginPassword(credential)" :disabled="busy" type="password" autocomplete="current-password" data-part="login-password" :placeholder="credential.login?.passwordSaved ? text.passwordSaved : text.password" :aria-label="text.password" @input="setLoginDraft(credential, 'password', ($event.target as HTMLInputElement).value)" />
+                    <div class="model-auth-credential-actions">
+                      <button type="submit" class="model-auth-secondary" data-part="save-login" :disabled="busy || !loginSavable(credential)">{{ text.saveLogin }}</button>
+                      <button v-if="credential.login" type="button" class="model-auth-danger" data-part="clear-login" :disabled="busy" :data-confirmed="pendingLoginClear === credential.id" @click="clearLogin(credential)">{{ pendingLoginClear === credential.id ? text.confirmRemove : text.clearLogin }}</button>
+                    </div>
+                  </form>
+                  <details class="model-auth-credential-extend" data-part="credential-extend">
+                    <summary>{{ text.extend }}</summary>
+                    <textarea :value="extendText(credential)" :disabled="busy" :aria-label="text.extend" spellcheck="false" @change="updateExtend(credential, ($event.target as HTMLTextAreaElement).value)" />
+                    <small>{{ text.extendHint }}</small>
+                  </details>
                 </details>
                 <div v-if="credential.usage" class="model-auth-usage" data-part="credential-usage">
                   <span v-if="credential.usage.plan">{{ credential.usage.plan }}</span>
                   <span v-if="credential.usage.balance">{{ credential.usage.balance.amount }} {{ credential.usage.balance.unit }}</span>
-                  <span v-for="window in credential.usage.windows" :key="window.id">{{ window.label }} · {{ usagePercentText(window.usedPercent) }}</span>
+                  <span v-for="window in credential.usage.windows" :key="window.id" :title="windowTitle(window)">{{ windowText(window) }}</span>
                   <span v-if="credential.usage.estimate">{{ usageEstimateText(credential.usage.estimate) }}</span>
                   <span v-if="credential.usage.error">{{ credential.usage.error }}</span>
                 </div>
