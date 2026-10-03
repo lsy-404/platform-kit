@@ -296,6 +296,7 @@ describe("authentication dialog", () => {
     const { events, state } = await mount();
     state.providers[0]!.usageEnabled = true;
     await details("api-key");
+    get<HTMLDetailsElement>('[data-part="credential-settings"]').open = true; await nextTick();
     await click('[data-part="credential-extend"] summary');
     const textarea = get<HTMLTextAreaElement>('[data-part="credential-extend"] textarea');
     textarea.value = '{"region":"us","priority":2}';
@@ -310,6 +311,7 @@ describe("authentication dialog", () => {
     state.providers[0]!.apiKeyCredentials![0]!.secret = "sk-test-value";
     state.providers[0]!.oauthCredentials![0]!.secret = '{"access":"tok"}';
     await details("api-key");
+    get<HTMLDetailsElement>('[data-part="credential-settings"]').open = true; await nextTick();
     const input = get<HTMLInputElement>('[data-part="credential-secret"] input');
     const save = get<HTMLButtonElement>('[data-part="save-secret"]');
     expect(input.type).toBe("text");
@@ -337,6 +339,7 @@ describe("authentication dialog", () => {
     expect(input.value).toBe("sk-test-rotated");
     await click('[data-part="back"]'); await click('[data-part="back"]');
     await details("oauth");
+    get<HTMLDetailsElement>('[data-part="credential-settings"]').open = true; await nextTick();
     const oauthInput = get<HTMLInputElement>('[data-part="credential-secret"] input');
     expect(oauthInput.type).toBe("text");
     expect(oauthInput.value).toBe('{"access":"tok"}');

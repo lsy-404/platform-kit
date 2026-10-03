@@ -205,6 +205,12 @@ describe("Ollama account usage", () => {
     expect(h.state.signIns).toBe(0);
   });
 
+  it.each([303, 307])("treats a %i response as an expired session", async (status) => {
+    const h = harness({ cookies: ["s=old", "s=new"], pages: [() => new Response(null, { status, headers: { location: "/signin" } }), okPage] });
+    expect(await h.run()).toMatchObject({ status: "ok" });
+    expect(h.state.signIns).toBe(1);
+  });
+
   it("signs in once after a redirect to sign-in and returns the second query", async () => {
     const h = harness({ cookies: ["s=old", "s=new"], pages: [expiredPage, okPage] });
     expect(await h.run()).toMatchObject({ status: "ok" });
@@ -226,7 +232,7 @@ describe("Ollama account usage", () => {
 
   it("does not loop when the session is still expired after signing in", async () => {
     const h = harness({ cookies: ["s=old"], pages: [expiredPage] });
-    expect(await h.run()).toMatchObject({ status: "error", error: "Ollama web session has expired." });
+    expect(await h.run()).toMatchObject({ status: "error", error: "Ollama sign-in completed but the web session is still unavailable." });
     expect(h.state.signIns).toBe(1);
     expect(h.state.fetches).toBe(2);
   });
@@ -234,6 +240,13 @@ describe("Ollama account usage", () => {
   it("propagates a sign-in rejection", async () => {
     const h = harness({ cookies: ["s=old"], pages: [expiredPage], signIn: async () => { throw new Error("sign-in failed"); } });
     await expect(h.run()).rejects.toThrow("sign-in failed");
+  });
+
+  it("does not sign in when the signal aborts after the first query", async () => {
+    const controller = new AbortController();
+    const h = harness({ cookies: ["s=old"], pages: [() => { controller.abort(); return expiredPage(); }] });
+    await expect(h.run({ signal: controller.signal })).rejects.toThrow();
+    expect(h.state.signIns).toBe(0);
   });
 
   it("rejects an aborted signal without signing in", async () => {

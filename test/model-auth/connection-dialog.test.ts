@@ -184,6 +184,30 @@ describe("connection detail dialog", () => {
     expect(events.at(-1)).toEqual({ name: "credential", payload: { providerId: "oauth", credentialId: "account", enabled: true, label: "Renamed" } });
   });
 
+  async function pressEnter(selector: string, init: KeyboardEventInit) {
+    get(selector).dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true, ...init })); await nextTick();
+  }
+
+  it("saves a rename on Enter but not while an IME composition is active", async () => {
+    const { events } = await mount({ providerId: "oauth", method: "oauth" });
+    await fillInput('[data-part="credential-label"]', "zhang");
+    await pressEnter('[data-part="credential-label"]', { isComposing: true });
+    await pressEnter('[data-part="credential-label"]', { keyCode: 229 });
+    expect(events.some(event => event.name === "credential")).toBe(false);
+    await fillInput('[data-part="credential-label"]', "张");
+    await pressEnter('[data-part="credential-label"]', {});
+    expect(events.at(-1)).toEqual({ name: "credential", payload: { providerId: "oauth", credentialId: "account", enabled: true, label: "张" } });
+  });
+
+  it("ignores rename saves while busy", async () => {
+    const { events, state } = await mount({ providerId: "oauth", method: "oauth" });
+    await fillInput('[data-part="credential-label"]', "Other");
+    state.busy = true; await nextTick();
+    expect(get<HTMLButtonElement>('[data-part="save-label"]').disabled).toBe(true);
+    await pressEnter('[data-part="credential-label"]', {});
+    expect(events.some(event => event.name === "credential")).toBe(false);
+  });
+
   it("adds API keys and OAuth accounts from the detail view without leaving it", async () => {
     const { events, state } = await mount({ providerId: "key", method: "api-key" });
     await fillInput('[data-part="api-key-form"] input[type="password"]', "sk-test-value");
@@ -215,7 +239,8 @@ describe("connection detail dialog", () => {
 
     it("submits username and password, then drops the password from the input", async () => {
       const { events } = await withLogin()();
-      expect(get<HTMLInputElement>('[data-part="login-username"]').type).toBe("email");
+      expect(get<HTMLInputElement>('[data-part="login-username"]').type).toBe("text");
+      expect(get<HTMLInputElement>('[data-part="login-username"]').inputMode).toBe("email");
       expect(get<HTMLButtonElement>('[data-part="save-login"]').disabled).toBe(true);
       await fillInput('[data-part="login-username"]', "person@example.test");
       await fillInput('[data-part="login-password"]', "fixture-password");
@@ -234,6 +259,34 @@ describe("connection detail dialog", () => {
       const payload = (events.at(-1)!.payload as { login: object }).login;
       expect(payload).toEqual({ username: "new@example.test" });
       expect("password" in payload).toBe(false);
+    });
+
+    it("keeps save disabled for a password without a username and for an unchanged username", async () => {
+      await withLogin()();
+      await fillInput('[data-part="login-password"]', "fixture-password");
+      expect(get<HTMLButtonElement>('[data-part="save-login"]').disabled).toBe(true);
+      document.body.replaceChildren();
+      await withLogin({ username: "old@example.test", passwordSaved: false })();
+      await fillInput('[data-part="login-username"]', "new@example.test");
+      expect(get<HTMLButtonElement>('[data-part="save-login"]').disabled).toBe(true);
+      await fillInput('[data-part="login-username"]', "old@example.test");
+      await fillInput('[data-part="login-password"]', "");
+      expect(get<HTMLButtonElement>('[data-part="save-login"]').disabled).toBe(true);
+    });
+
+    it("ignores login actions while busy and keeps the typed draft", async () => {
+      const { events, state } = await withLogin({ username: "old@example.test", passwordSaved: true })();
+      await fillInput('[data-part="login-password"]', "fixture-password");
+      state.busy = true; await nextTick();
+      expect(get<HTMLButtonElement>('[data-part="save-login"]').disabled).toBe(true);
+      expect(get<HTMLButtonElement>('[data-part="clear-login"]').disabled).toBe(true);
+      await submit();
+      expect(events.some(event => event.name === "credential")).toBe(false);
+      expect(get<HTMLInputElement>('[data-part="login-password"]').value).toBe("fixture-password");
+      get<HTMLButtonElement>('[data-part="clear-login"]').disabled = false;
+      await click('[data-part="clear-login"]');
+      state.busy = false; await nextTick();
+      expect(get('[data-part="clear-login"]').textContent).not.toContain("确认");
     });
 
     it("clears the account after a second click", async () => {

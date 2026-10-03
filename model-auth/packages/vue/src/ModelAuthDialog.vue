@@ -213,12 +213,17 @@ function handleProviderKeydown(event: KeyboardEvent) {
     if (provider) chooseProvider(provider);
   }
 }
+function closedDetailsAncestors(element: HTMLElement): HTMLElement[] {
+  const found: HTMLElement[] = [];
+  for (let node = element.closest<HTMLElement>("details:not([open])"); node; node = node.parentElement?.closest<HTMLElement>("details:not([open])") ?? null) found.push(node);
+  return found;
+}
 function handleDialogKeydown(event: KeyboardEvent) {
   if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); return; }
   if (event.key !== "Tab" || !dialog.value) return;
   const focusable = [...dialog.value.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]), [tabindex='0'], a[href], summary")]
     .filter(element => element.tabIndex >= 0 && !element.closest("[hidden]")
-      && (!element.closest("details:not([open])") || element.matches("summary")));
+      && !closedDetailsAncestors(element).some(details => !(element.matches("summary") && element.parentElement === details)));
   const first = focusable[0], last = focusable.at(-1), active = activeElement();
   if (!first || !last) { event.preventDefault(); dialog.value.focus(); return; }
   if (event.shiftKey && (active === first || !focusable.includes(active as HTMLElement))) {
@@ -254,6 +259,10 @@ function rename(credential: ProviderCredential, label: string) {
   const value = label.trim();
   if (value && value !== credential.label) updateCredential(credential, credential.enabled, { label: value });
 }
+function onLabelEnter(event: KeyboardEvent, credential: ProviderCredential) {
+  if (event.isComposing || event.keyCode === 229) return;
+  saveLabel(credential);
+}
 function saveLabel(credential: ProviderCredential) {
   rename(credential, labelValue(credential));
 }
@@ -273,6 +282,7 @@ function loginSavable(credential: ProviderCredential): boolean {
   return Boolean(credential.login?.passwordSaved) && username !== credential.login?.username;
 }
 function saveLogin(credential: ProviderCredential, login: CredentialLoginInput | null) {
+  if (props.busy) return;
   updateCredential(credential, credential.enabled, { login });
   delete loginDrafts[credential.id];
   pendingLoginClear.value = "";
@@ -560,7 +570,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                 <details class="model-auth-credential-settings" data-part="credential-settings">
                   <summary>{{ text.credentialSettings }}</summary>
                   <div class="model-auth-credential-rename">
-                    <input :value="labelValue(credential)" :disabled="busy" maxlength="80" type="text" autocomplete="off" data-part="credential-label" :aria-label="text.label" @input="labelDrafts[credential.id] = ($event.target as HTMLInputElement).value" @keydown.enter.prevent="saveLabel(credential)" />
+                    <input :value="labelValue(credential)" :disabled="busy" maxlength="80" type="text" autocomplete="off" data-part="credential-label" :aria-label="text.label" @input="labelDrafts[credential.id] = ($event.target as HTMLInputElement).value" @keydown.enter.prevent="onLabelEnter($event, credential)" />
                     <button type="button" class="model-auth-secondary" data-part="save-label" :disabled="busy || !labelChanged(credential)" @click="saveLabel(credential)">{{ text.saveLabel }}</button>
                   </div>
                   <div v-if="credential.secret !== undefined" class="model-auth-credential-secret" data-part="credential-secret">
@@ -572,7 +582,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                   </div>
                   <form v-if="selectedProvider.accountLogin === true" class="model-auth-credential-login" data-part="credential-login" @submit.prevent="submitLogin(credential)">
                     <div><strong>{{ text.accountLogin }}</strong><small>{{ text.accountLoginHint }}</small></div>
-                    <input :value="loginUsername(credential)" :disabled="busy" type="email" autocomplete="username" data-part="login-username" :placeholder="text.username" :aria-label="text.username" @input="setLoginDraft(credential, 'username', ($event.target as HTMLInputElement).value)" />
+                    <input :value="loginUsername(credential)" :disabled="busy" type="text" inputmode="email" autocomplete="username" data-part="login-username" :placeholder="text.username" :aria-label="text.username" @input="setLoginDraft(credential, 'username', ($event.target as HTMLInputElement).value)" />
                     <input :value="loginPassword(credential)" :disabled="busy" type="password" autocomplete="current-password" data-part="login-password" :placeholder="credential.login?.passwordSaved ? text.passwordSaved : text.password" :aria-label="text.password" @input="setLoginDraft(credential, 'password', ($event.target as HTMLInputElement).value)" />
                     <div class="model-auth-credential-actions">
                       <button type="submit" class="model-auth-secondary" data-part="save-login" :disabled="busy || !loginSavable(credential)">{{ text.saveLogin }}</button>

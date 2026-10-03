@@ -25,6 +25,7 @@ export interface OllamaWebAuthorizationOptions extends ProviderUsageRequestOptio
 
 const SESSION_MISSING = "Ollama web session is not available.";
 const SESSION_EXPIRED = "Ollama web session has expired.";
+export const OLLAMA_SIGN_IN_INEFFECTIVE = "Ollama sign-in completed but the web session is still unavailable.";
 const MAX_AUTH_TIMEOUT_MS = 600_000;
 const DEFAULT_POLL_MS = 1_500;
 
@@ -80,8 +81,13 @@ export async function queryOllamaAccountUsage(options: OllamaAccountUsageOptions
   const first = await query();
   const { login, signIn } = options;
   if (first.status !== "error" || (first.error !== SESSION_MISSING && first.error !== SESSION_EXPIRED) || !login || !signIn) return first;
+  signal?.throwIfAborted();
   await signIn(login, signal ? { signal } : {});
-  return query();
+  const second = await query();
+  if (second.status === "error" && (second.error === SESSION_MISSING || second.error === SESSION_EXPIRED)) {
+    return { ...second, error: OLLAMA_SIGN_IN_INEFFECTIVE };
+  }
+  return second;
 }
 
 export async function queryOllamaUsage(options: OllamaUsageRequestOptions = {}): Promise<ProviderUsageSnapshot> {
@@ -98,8 +104,8 @@ export async function queryOllamaUsage(options: OllamaUsageRequestOptions = {}):
       redirect: "manual",
       ...(options.signal ? { signal: options.signal } : {}),
     });
-    if (response.status >= 300 && response.status < 400 || response.redirected || !response.ok) {
-      throw new Error(response.status === 401 || response.status === 403 || response.status === 302
+    if (response.status === 0 || response.type === "opaqueredirect" || response.status >= 300 && response.status < 400 || response.redirected || !response.ok) {
+      throw new Error(response.status === 401 || response.status === 403 || response.status === 0 || response.type === "opaqueredirect" || response.status >= 300 && response.status < 400
         ? SESSION_EXPIRED
         : `Ollama settings request failed (${response.status}).`);
     }
