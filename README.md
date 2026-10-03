@@ -48,7 +48,7 @@ pnpm typecheck
 pnpm test
 cargo test --manifest-path test/rust/Cargo.toml --locked
 pnpm build
-pnpm pack:release
+pnpm run pack:release
 node test/release-consumer.mjs
 ```
 

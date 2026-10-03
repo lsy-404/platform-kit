@@ -39,7 +39,7 @@ jobs:
       - run: node test/fluent-selection.browser.mjs
       - run: node test/fluent-catalog.browser.mjs
       - run: node test/connection-panel.browser.mjs
-      - run: pnpm pack:release
+      - run: pnpm run pack:release
       - run: node test/release-consumer.mjs
       - run: docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1 git /repo --redact=100 --no-banner
       - uses: actions/upload-artifact@v4

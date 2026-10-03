@@ -35,8 +35,8 @@ for (const target of targets) {
   }
   for (const name of ["LICENSE", "README.md"]) await cp(resolve(source, name), resolve(stage, name));
   await writeFile(resolve(stage, "package.json"), JSON.stringify(manifest, null, 2) + "\n");
-  const result = JSON.parse(execFileSync("npm", ["pack", "--json", "--pack-destination", destination], { cwd: stage, encoding: "utf8" }));
-  const archive = result[0].filename;
+  const result = JSON.parse(execFileSync("corepack", ["pnpm@10.17.1", "pack", "--json", "--pack-destination", destination], { cwd: stage, encoding: "utf8" }));
+  const archive = result.filename;
   const archivePath = resolve(destination, archive);
   const listing = execFileSync("tar", ["-tzf", archivePath], { encoding: "utf8" });
   if (!listing.includes("package/LICENSE") || /(?:^|\/)(?:agents|inventory|kits|\.env|node_modules)(?:\/|$)|IRIS-LICENSE/.test(listing)) throw new Error("Package archive boundary violation");

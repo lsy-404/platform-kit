@@ -1,23 +1,21 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { createContext, runInContext } from "node:vm";
 import { createRequire } from "node:module";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../model-auth");
-const output = resolve(dirname(fileURLToPath(import.meta.url)), "../artifacts/model-auth-packages");
+const output = mkdtempSync(join(tmpdir(), "platform-kit-model-auth-packages-"));
 const require = createRequire(join(root, "package.json"));
 const { Window } = require("happy-dom");
-mkdirSync(output, { recursive: true });
 const run = mkdtempSync(join(output, "consumer-"));
 const archives = join(run, "archives");
 mkdirSync(archives);
-const pnpm = process.env.npm_execpath;
-assert.ok(pnpm, "Run through pnpm test:packages");
 for (const name of ["core", "vue", "providers"]) {
-  execFileSync(process.execPath, [pnpm, "--dir", join(root, "packages", name), "pack", "--pack-destination", archives], { stdio: "pipe" });
+  execFileSync("corepack", ["pnpm@10.17.1", "--dir", join(root, "packages", name), "pack", "--pack-destination", archives], { stdio: "pipe" });
 }
 const files = ["core", "vue", "providers"].map(name => {
   const version = JSON.parse(readFileSync(join(root, "packages", name, "package.json"), "utf8")).version;
@@ -27,7 +25,7 @@ for (const archive of files) assert.ok(existsSync(archive));
 const consumer = join(run, "app");
 mkdirSync(consumer);
 writeFileSync(join(consumer, "package.json"), JSON.stringify({ private: true, type: "module" }));
-execFileSync("npm", ["install", "--prefix", consumer, "--ignore-scripts", "--no-audit", "--no-fund", ...files, "vue@3.5.42"], { stdio: "pipe" });
+execFileSync("corepack", ["pnpm@10.17.1", "add", "--dir", consumer, "--ignore-scripts", ...files, "vue@3.5.42"], { stdio: "pipe" });
 
 for (const name of ["core", "vue", "providers"]) {
   const folder = join(consumer, "node_modules", "@model-auth", name);
@@ -101,3 +99,5 @@ const router = new CredentialRouter([createCredentialMetadata({ id: "one", provi
 if (router.candidates({ providerId: "sample", modelId: "sample" })[0]?.id !== "one") throw new Error("Installed core cannot route");
 `], { stdio: "pipe", cwd: consumer });
 console.log("Package consumer passed: installed tarballs, declarations, runtime, styles, standalone and licenses.");
+
+rmSync(output, { recursive: true, force: true });
