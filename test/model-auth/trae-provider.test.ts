@@ -1,8 +1,13 @@
 // @vitest-environment node
 import { createHash, verify } from "node:crypto";
 import { request } from "node:http";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { authorizeTrae, createTraeDevice, DEFAULT_TRAE_CLIENT_ID, refreshTrae, traeStatus, type TraeCredential } from "../../model-auth/packages/providers/src/trae.js";
+
+vi.mock("../../model-auth/packages/providers/src/client-versions.js", async importOriginal => {
+  const actual = await importOriginal<typeof import("../../model-auth/packages/providers/src/client-versions.js")>();
+  return { ...actual, latestClientVersion: async (client: keyof typeof actual.CLIENT_VERSION_FLOORS) => actual.CLIENT_VERSION_FLOORS[client] };
+});
 
 const host = "https://growsg-normal.trae.ai";
 const tokens = () => ({ Token: "access", RefreshToken: "refresh", TokenExpireAt: Date.now() + 60_000, RefreshExpireAt: Date.now() + 120_000 });

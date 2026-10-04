@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { request as httpRequest } from "node:http";
 import {
   GROK_ENDPOINTS,
@@ -12,6 +12,12 @@ import {
 import { authorizeOllamaWeb, parseOllamaSettings, queryOllamaAccountUsage, queryOllamaUsage, type OllamaAccountLogin } from "../../model-auth/packages/providers/src/ollama.js";
 import { parseAnthropicUsage, parseCodexUsage, queryAnthropicUsage, queryCodexUsage, queryProviderUsage } from "../../model-auth/packages/providers/src/usage.js";
 
+vi.mock("../../model-auth/packages/providers/src/client-versions.js", async importOriginal => {
+  const actual = await importOriginal<typeof import("../../model-auth/packages/providers/src/client-versions.js")>();
+  return { ...actual, latestClientVersion: async (client: keyof typeof actual.CLIENT_VERSION_FLOORS) => actual.CLIENT_VERSION_FLOORS[client] };
+});
+
+const daysFromNow = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString();
 const grokCredential: GrokOAuthCredential = {
   type: "oauth", access: "oauth-access", refresh: "oauth-refresh", expires: Date.now() + 60_000, accountId: "account-1",
 };
@@ -119,12 +125,12 @@ describe("provider usage adapters", () => {
     expect(weekly.windows[0]).toMatchObject({ label: "Weekly credits", usedPercent: 37.5, remainingPercent: 62.5 });
 
     const monthly = parseGrokBilling({ config: {
-      currentPeriod: { start: "2026-09-01T00:00:00Z", end: "2026-10-01T00:00:00Z" },
+      currentPeriod: { start: daysFromNow(-10), end: daysFromNow(20) },
       monthlyLimit: { val: 100 }, usage: { includedUsed: { val: 12 } },
     } });
     expect(monthly.windows[0]).toMatchObject({ id: "included", usedPercent: 12, remainingPercent: 88, remaining: 88 });
 
-    const unknown = parseGrokBilling({ config: { currentPeriod: { start: "2026-09-01T00:00:00Z", end: "2026-10-01T00:00:00Z" } } });
+    const unknown = parseGrokBilling({ config: { currentPeriod: { start: daysFromNow(-10), end: daysFromNow(20) } } });
     expect(unknown.status).toBe("unknown");
     expect(unknown.windows).toEqual([]);
   });
@@ -134,8 +140,8 @@ describe("provider usage adapters", () => {
     const usage = await queryGrokUsage(grokCredential, {
       fetchImpl: async (url, init) => {
         calls.push({ url: String(url), headers: new Headers(init?.headers) });
-        if (String(url) === GROK_ENDPOINTS.billing) return new Response(JSON.stringify({ config: { currentPeriod: { start: "2026-09-01", end: "2026-10-01" } } }));
-        return new Response(JSON.stringify({ config: { monthlyLimit: { val: 100 }, usage: { includedUsed: { val: 25 } }, currentPeriod: { start: "2026-09-01", end: "2026-10-01" } } }));
+        if (String(url) === GROK_ENDPOINTS.billing) return new Response(JSON.stringify({ config: { currentPeriod: { start: daysFromNow(-10), end: daysFromNow(20) } } }));
+        return new Response(JSON.stringify({ config: { monthlyLimit: { val: 100 }, usage: { includedUsed: { val: 25 } }, currentPeriod: { start: daysFromNow(-10), end: daysFromNow(20) } } }));
       },
     });
     expect(usage).toMatchObject({ providerId: "grok", credentialId: "account-1", status: "ok" });
@@ -143,7 +149,9 @@ describe("provider usage adapters", () => {
     expect(calls.map(call => call.url)).toEqual([GROK_ENDPOINTS.billing, GROK_ENDPOINTS.billingDefault]);
     expect(calls[0]!.headers.get("authorization")).toBe("Bearer oauth-access");
     expect(calls[0]!.headers.get("x-xai-token-auth")).toBe("xai-grok-cli");
-    expect(grokHeaders(grokCredential)).not.toHaveProperty("refresh");
+    expect(calls[0]!.headers.get("x-grok-client-version")).toBe("0.2.99");
+    expect(grokHeaders(grokCredential, "1.2.3")).toMatchObject({ "x-grok-client-version": "1.2.3" });
+    expect(grokHeaders(grokCredential, "1.2.3")).not.toHaveProperty("refresh");
     expect(GROK_OAUTH_CLIENT_ID).toMatch(/^[0-9a-f-]{36}$/);
   });
 

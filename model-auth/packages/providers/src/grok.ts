@@ -1,4 +1,5 @@
 import { authorizeBrowserOAuth, refreshBrowserOAuth, type BrowserOAuthAuthorizationOptions, type BrowserOAuthCredential, type BrowserOAuthRefreshOptions } from "./browser-oauth.js";
+import { latestClientVersion } from "./client-versions.js";
 import { usageSnapshot, type ProviderUsageData, type ProviderUsageRequestOptions, type ProviderUsageSnapshot, type ProviderUsageWindow } from "./usage.js";
 
 export const GROK_ENDPOINTS = Object.freeze({
@@ -13,7 +14,6 @@ export const GROK_ENDPOINTS = Object.freeze({
 
 export const GROK_OAUTH_CLIENT_ID = "b1a00492-073a-47ea-816f-4c329264a828";
 export const GROK_OAUTH_SCOPE = "openid profile email offline_access grok-cli:access api:access conversations:read conversations:write";
-export const GROK_DEFAULT_CLIENT_VERSION = "0.2.99";
 
 export interface GrokOAuthCredential extends BrowserOAuthCredential {
   readonly label?: string;
@@ -47,7 +47,7 @@ export async function refreshGrok(credential: GrokOAuthCredential, options: Grok
   return { ...credential, ...refreshed };
 }
 
-export function grokHeaders(credential: Pick<GrokOAuthCredential, "access">, clientVersion = GROK_DEFAULT_CLIENT_VERSION): Record<string, string> {
+export function grokHeaders(credential: Pick<GrokOAuthCredential, "access">, clientVersion: string): Record<string, string> {
   if (typeof credential.access !== "string" || !credential.access.trim()) throw new Error("Grok OAuth access token is required.");
   if (typeof clientVersion !== "string" || !clientVersion.trim() || clientVersion.length > 64) throw new Error("Grok client version is invalid.");
   return {
@@ -68,7 +68,7 @@ export async function queryGrokUsage(
 ): Promise<ProviderUsageSnapshot> {
   const credentialId = options.credentialId ?? credential.accountId ?? "grok-oauth";
   const fetchImpl = options.fetchImpl ?? fetch;
-  const headers = grokHeaders(credential, options.clientVersion);
+  const headers = grokHeaders(credential, options.clientVersion ?? await latestClientVersion("grok", { fetchImpl, ...(options.signal ? { signal: options.signal } : {}) }));
   try {
     const credits = await requestJson(GROK_ENDPOINTS.billing, headers, fetchImpl, options.signal);
     const parsed = parseGrokBilling(credits);

@@ -1,5 +1,6 @@
 import { createHash, createPublicKey, generateKeyPairSync, randomBytes, randomUUID, sign } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { latestClientVersion } from "./client-versions.js";
 
 export const TRAE_PROVIDER_ID = "traecode";
 export const DEFAULT_TRAE_SSO_HOST = "https://www.trae.ai";
@@ -30,7 +31,6 @@ export interface TraeRefreshOptions {
   readonly clientId?: string; readonly appVersion?: string; readonly fetchImpl?: typeof fetch; readonly signal?: AbortSignal;
 }
 export interface TraeStatus { readonly authenticated: boolean; readonly detail: "authenticated" | "expired" | "unauthenticated"; }
-const DEFAULT_APP_VERSION = "3.5.81", DEFAULT_BUILD_VERSION = "2.3.61406";
 const EXCHANGE_PATH = "/trae/api/v3/oauth/ExchangeToken";
 const API_HOSTS = ["https://growsg-normal.trae.ai", "https://grow-normal.traeapi.us", "https://grow-normal.trae.ai"] as const;
 
@@ -44,7 +44,11 @@ export async function authorizeTrae(options: TraeAuthorizationOptions): Promise<
   abort(options.signal);
   const host = origin(options.ssoHost ?? DEFAULT_TRAE_SSO_HOST);
   const clientId = required(options.clientId ?? DEFAULT_TRAE_CLIENT_ID, "clientId");
-  const appVersion = required(options.appVersion ?? DEFAULT_APP_VERSION, "appVersion");
+  const [appVersion, buildVersion] = await Promise.all([
+    options.appVersion === undefined ? latestVersion("trae-app", options) : required(options.appVersion, "appVersion"),
+    latestVersion("trae-build", options),
+  ]);
+  abort(options.signal);
   const binding = createTraeDevice(), trace = randomUUID(), verifier = randomBytes(48).toString("base64url");
   const server = createServer({ maxHeaderSize: 32_768 });
   const controller = new AbortController();
@@ -57,7 +61,7 @@ export async function authorizeTrae(options: TraeAuthorizationOptions): Promise<
     const port = await listen(server), callback = new URL(`http://127.0.0.1:${port}/authorize`);
     const query = new URLSearchParams({
       login_version: "1", auth_from: required(options.authFrom ?? "trae", "authFrom"), login_channel: "native_ide",
-      plugin_version: DEFAULT_BUILD_VERSION, auth_type: "local", client_id: clientId, redirect: "0", login_trace_id: trace,
+      plugin_version: buildVersion, auth_type: "local", client_id: clientId, redirect: "0", login_trace_id: trace,
       auth_callback_url: callback.href, machine_id: binding.machineId, device_id: binding.deviceId,
       x_device_id: binding.deviceId, x_machine_id: binding.machineId, x_app_version: appVersion, x_app_type: "stable",
       code_challenge: createHash("sha256").update(verifier).digest("base64url"), code_challenge_method: "S256",
@@ -94,7 +98,7 @@ export async function refreshTrae(value: TraeCredential, options: TraeRefreshOpt
   const credential = credentialOf(value);
   if (credential.refreshExpires <= Date.now()) throw new TraeProviderError("authentication", "Trae refresh credential has expired.");
   if (options.clientId && options.clientId !== credential.clientId) throw new TraeProviderError("authentication", "Trae client identifier does not match the credential binding.");
-  const appVersion = options.appVersion ?? DEFAULT_APP_VERSION, timestamp = Math.floor(Date.now() / 1000), nonce = randomBytes(16).toString("hex");
+  const appVersion = options.appVersion ?? await latestVersion("trae-app", options), timestamp = Math.floor(Date.now() / 1000), nonce = randomBytes(16).toString("hex");
   const signature = sign("sha256", Buffer.from(["POST", EXCHANGE_PATH, credential.clientId, credential.refresh, String(timestamp), nonce].join("\n")), credential.device.privateKeyPem).toString("base64");
   const result = await post(credential.host, EXCHANGE_PATH, credential.access, {
     ClientID: credential.clientId, ClientSecret: "", RefreshToken: credential.refresh,
@@ -108,7 +112,7 @@ export async function traeStatus(value: TraeCredential, options: Pick<TraeRefres
   const credential = credentialOf(value);
   if (credential.expires <= Date.now()) return { authenticated: false, detail: "expired" };
   try {
-    const result = await post(credential.host, "/cloudide/api/v3/trae/CheckLogin", credential.access, { IDEVersion: options.appVersion ?? DEFAULT_APP_VERSION, ReqSource: "IDE", GetAIPayHost: true }, options);
+    const result = await post(credential.host, "/cloudide/api/v3/trae/CheckLogin", credential.access, { IDEVersion: options.appVersion ?? await latestVersion("trae-app", options), ReqSource: "IDE", GetAIPayHost: true }, options);
     return result.IsLogin === true ? { authenticated: true, detail: "authenticated" } : { authenticated: false, detail: "unauthenticated" };
   } catch (error) {
     if (error instanceof TraeProviderError && (error.code === "authentication" || error.code === "response")) return { authenticated: false, detail: "unauthenticated" };
@@ -207,6 +211,9 @@ function origin(value: string): string {
   catch { throw new TraeProviderError("transport", "Trae service must be an HTTPS origin."); }
 }
 function apiOrigin(value: string): string { const host = origin(value); if (!(API_HOSTS as readonly string[]).includes(host)) throw new TraeProviderError("response", "Trae credential service host is not trusted."); return host; }
+function latestVersion(client: "trae-app" | "trae-build", options: Pick<TraeRefreshOptions, "fetchImpl" | "signal">): Promise<string> {
+  return latestClientVersion(client, { ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}), ...(options.signal ? { signal: options.signal } : {}) });
+}
 function timeout(value?: number): number { return Number.isFinite(value) ? Math.max(1, Math.min(value!, 600_000)) : 300_000; }
 function cancellation(signal: AbortSignal): TraeProviderError { return signal.reason instanceof TraeProviderError ? signal.reason : new TraeProviderError("aborted", "Trae operation was cancelled."); }
 function abort(signal?: AbortSignal): void { if (signal?.aborted) throw cancellation(signal); }
