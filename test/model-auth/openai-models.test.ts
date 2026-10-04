@@ -75,4 +75,18 @@ describe("OpenAI Codex account model catalog", () => {
     })).rejects.toThrow("timed out");
     expect(Date.now() - started).toBeLessThan(2_000);
   });
+
+  it("honours supports_reasoning, floors limits and keeps the server error text", async () => {
+    expect(parseOpenAICodexModels({ models: [
+      { slug: "flagged", supports_reasoning: true, max_output_tokens: 1000.9 },
+      { slug: "plain", supports_reasoning: false, supported_reasoning_levels: [{ effort: "low" }] },
+    ] })).toEqual([
+      { id: "flagged", name: "flagged", reasoning: true, limits: { output: 1000 } },
+      { id: "plain", name: "plain", reasoning: false, reasoningEfforts: ["low"] },
+    ]);
+    await expect(listOpenAICodexModels({ access: "token" }, {
+      clientVersion: "1.0.0",
+      fetchImpl: async () => new Response(JSON.stringify({ error: { message: "workspace\n deactivated" } }), { status: 403 }),
+    })).rejects.toThrow("OpenAI Codex model catalog request failed (403): workspace deactivated");
+  });
 });
