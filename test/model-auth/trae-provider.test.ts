@@ -34,13 +34,13 @@ describe("Trae browser provider", () => {
     }, openExternal: async url => { opened = url; expect(await send(callback(url))).toBe(200); } });
     const url = new URL(opened), query = url.searchParams;
     expect(url.origin + url.pathname).toBe("https://www.trae.ai/authorization");
-    expect(query.get("auth_from")).toBe("trae"); expect(query.get("plugin_version")).toBe("2.3.61406");
+    expect(query.get("auth_from")).toBe("trae"); expect(query.get("plugin_version")).toBe("2.3.88407");
     expect(query.get("code_challenge_method")).toBe("S256");
     const exchange = requests[0]!;
     expect(exchange.url).toBe(`${host}/trae/api/v3/oauth/ExchangeToken`);
     expect(exchange.init?.redirect).toBe("error");
     expect(createHash("sha256").update(exchange.body.CodeVerifier).digest("base64url")).toBe(query.get("code_challenge"));
-    expect(exchange.body).toMatchObject({ ClientID: DEFAULT_TRAE_CLIENT_ID, AuthCode: "code", IDEVersion: "3.5.81", DeviceInfo: { DeviceID: query.get("device_id"), MachineID: query.get("machine_id"), DevicePublicKey: result.device.publicKeyPem } });
+    expect(exchange.body).toMatchObject({ ClientID: DEFAULT_TRAE_CLIENT_ID, AuthCode: "code", IDEVersion: "3.5.104", DeviceInfo: { DeviceID: query.get("device_id"), MachineID: query.get("machine_id"), DevicePublicKey: result.device.publicKeyPem } });
     expect(exchange.body).not.toHaveProperty("RefreshToken");
     expect(result).toMatchObject({ access: "access", refresh: "refresh", host, accountId: "account", label: "name", region: "singapore-central", storeCountry: "CA", userTag: "row", clientId: DEFAULT_TRAE_CLIENT_ID });
     expect(requests[1]?.url).toBe(`${host}/cloudide/api/v3/trae/GetUserInfo`);
