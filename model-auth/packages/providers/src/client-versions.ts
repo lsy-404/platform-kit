@@ -12,23 +12,23 @@ const FEEDS: Readonly<Record<Feed, { urls: readonly string[]; parse: (body: stri
   trae: { urls: ["https://api.trae.ai/icube/api/v1/native/version/trae/latest"], parse: parseTrae },
 };
 const FEED_OF: Readonly<Record<ClientVersionTarget, Feed>> = { codex: "codex", grok: "grok", "trae-app": "trae", "trae-build": "trae" };
-const TTL_MS = 6 * 60 * 60 * 1000, DEFAULT_TIMEOUT_MS = 5_000, MAX_BODY_CHARS = 2_000_000;
-const cache = new Map<Feed, { at: number; versions: Versions }>();
+const TTL_MS = 6 * 60 * 60 * 1000, RETRY_MS = 5 * 60 * 1000, DEFAULT_TIMEOUT_MS = 5_000, MAX_BODY_CHARS = 2_000_000;
+const cache = new Map<Feed, { at: number; ttl: number; versions?: Versions }>();
 const inflight = new Map<Feed, Promise<Versions | undefined>>();
 
-/** Resolve the newest official client version, never lower than its floor; any lookup failure yields the floor. */
+/** Resolve the newest official client version, never lower than its floor; a failed lookup yields the last known version or the floor. */
 export async function latestClientVersion(client: ClientVersionTarget, options: ClientVersionOptions = {}): Promise<string> {
   if (!Object.hasOwn(CLIENT_VERSION_FLOORS, client)) throw new Error(`Unknown client version target: ${String(client)}.`);
   const floor = CLIENT_VERSION_FLOORS[client], feed = FEED_OF[client];
   const hit = cache.get(feed);
-  let versions = hit && Date.now() - hit.at < TTL_MS ? hit.versions : undefined;
-  if (!versions) {
+  let versions = hit?.versions;
+  if (!hit || Date.now() - hit.at >= hit.ttl) {
     let pending = inflight.get(feed);
     if (!pending) {
       pending = fetchFeed(feed, options).finally(() => inflight.delete(feed));
       inflight.set(feed, pending);
     }
-    versions = await until(pending, options.signal);
+    versions = (await until(pending, options.signal)) ?? versions;
   }
   const latest = versions?.[client];
   return latest && compareVersions(latest, floor) > 0 ? latest : floor;
@@ -45,10 +45,13 @@ async function fetchFeed(feed: Feed, options: ClientVersionOptions): Promise<Ver
       const body = await response.text();
       if (body.length > MAX_BODY_CHARS) continue;
       const versions = parse(body);
-      if (Object.keys(versions).length) { cache.set(feed, { at: Date.now(), versions }); return versions; }
+      if (Object.keys(versions).length) { cache.set(feed, { at: Date.now(), ttl: TTL_MS, versions }); return versions; }
     } catch { /* try the next mirror */ }
   }
-  return undefined;
+  // Back off after a failure so unreachable sources do not add a timeout to every request.
+  const stale = cache.get(feed)?.versions;
+  cache.set(feed, { at: Date.now(), ttl: RETRY_MS, ...(stale ? { versions: stale } : {}) });
+  return stale;
 }
 
 function single(client: ClientVersionTarget, value: string | undefined): Versions { return value ? { [client]: value } : {}; }
@@ -63,8 +66,10 @@ function parseTrae(body: string): Versions {
       const item = record(entry);
       if (item?.region !== "va" && item?.region !== "sg") continue;
       const appVersion = version(item.version), buildVersion = version(/\/stable\/(\d+\.\d+\.\d+)\//.exec(typeof item.url === "string" ? item.url : "")?.[1]);
-      if (appVersion && (!app || compareVersions(appVersion, app) > 0)) app = appVersion;
-      if (buildVersion && (!build || compareVersions(buildVersion, build) > 0)) build = buildVersion;
+      if (!appVersion || !buildVersion) continue;
+      // Keep the pair from one release entry so the app and build versions always match.
+      const order = app && build ? compareVersions(appVersion, app) || compareVersions(buildVersion, build) : 1;
+      if (order > 0) { app = appVersion; build = buildVersion; }
     }
   }
   return { ...(app ? { "trae-app": app } : {}), ...(build ? { "trae-build": build } : {}) };

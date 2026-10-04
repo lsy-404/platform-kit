@@ -34,14 +34,31 @@ describe("latest client versions", () => {
     expect(await latestClientVersion("codex", { fetchImpl: async () => npm("0.1000.0") })).toBe("0.1000.0");
   });
 
-  it("resolves the floor on lookup failure and does not cache failures", async () => {
+  it("resolves the floor on lookup failure and retries only after a short backoff", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
     const { latestClientVersion, CLIENT_VERSION_FLOORS } = await load();
     let calls = 0;
     const failing: typeof fetch = async () => { calls++; throw new Error("offline"); };
     expect(await latestClientVersion("codex", { fetchImpl: failing })).toBe(CLIENT_VERSION_FLOORS.codex);
+    expect(await latestClientVersion("codex", { fetchImpl: async () => { calls++; return npm("0.160.0"); } })).toBe(CLIENT_VERSION_FLOORS.codex);
+    expect(calls).toBe(1);
+    vi.setSystemTime(Date.now() + 5 * 60 * 1000 + 1);
     expect(await latestClientVersion("codex", { fetchImpl: async () => { calls++; return new Response("nope", { status: 503 }); } })).toBe(CLIENT_VERSION_FLOORS.codex);
+    vi.setSystemTime(Date.now() + 5 * 60 * 1000 + 1);
     expect(await latestClientVersion("codex", { fetchImpl: async () => { calls++; return npm("0.160.0"); } })).toBe("0.160.0");
     expect(calls).toBe(3);
+  });
+
+  it("keeps the last known version when a refresh after the TTL fails", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const { latestClientVersion } = await load();
+    expect(await latestClientVersion("codex", { fetchImpl: async () => npm("0.160.0") })).toBe("0.160.0");
+    vi.setSystemTime(Date.now() + 6 * 60 * 60 * 1000 + 1);
+    expect(await latestClientVersion("codex", { fetchImpl: async () => { throw new Error("offline"); } })).toBe("0.160.0");
+    const controller = new AbortController();
+    controller.abort();
+    vi.setSystemTime(Date.now() + 5 * 60 * 1000 + 1);
+    expect(await latestClientVersion("codex", { fetchImpl: async () => npm("0.170.0"), signal: controller.signal })).toBe("0.160.0");
   });
 
   it("falls back to the grok mirror when the primary source fails", async () => {
@@ -112,5 +129,15 @@ describe("latest client versions", () => {
     expect(await latestClientVersion("trae-app", { fetchImpl })).toBe("3.5.104");
     expect(await latestClientVersion("trae-build", { fetchImpl })).toBe("2.3.88407");
     expect(calls).toBe(1);
+  });
+
+  it("keeps the Trae app and build versions from the same release entry", async () => {
+    const { latestClientVersion } = await load();
+    const fetchImpl: typeof fetch = async () => traeManifest([
+      { region: "sg", version: "3.5.105", build: "2.3.88000" },
+      { region: "va", version: "3.5.104", build: "2.3.88407" },
+    ]);
+    expect(await latestClientVersion("trae-app", { fetchImpl })).toBe("3.5.105");
+    expect(await latestClientVersion("trae-build", { fetchImpl })).toBe("2.3.88000");
   });
 });
