@@ -18,8 +18,8 @@ const inflight = new Map<Feed, Promise<Versions | undefined>>();
 
 /** Resolve the newest official client version, never lower than its floor; any lookup failure yields the floor. */
 export async function latestClientVersion(client: ClientVersionTarget, options: ClientVersionOptions = {}): Promise<string> {
+  if (!Object.hasOwn(CLIENT_VERSION_FLOORS, client)) throw new Error(`Unknown client version target: ${String(client)}.`);
   const floor = CLIENT_VERSION_FLOORS[client], feed = FEED_OF[client];
-  if (!floor) throw new Error(`Unknown client version target: ${String(client)}.`);
   const hit = cache.get(feed);
   let versions = hit && Date.now() - hit.at < TTL_MS ? hit.versions : undefined;
   if (!versions) {

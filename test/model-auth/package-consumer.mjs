@@ -72,22 +72,28 @@ import { ModelAuthDialog, type ModelAuthProvider } from "@model-auth/vue";
 import { registerModelAuthElement } from "@model-auth/vue/custom-element";
 import { CredentialRouter, createCredentialMetadata } from "@model-auth/core";
 import { authorizeWorkBuddy, refreshWorkBuddy } from "@model-auth/providers/workbuddy";
-import { authorizeOpenAI, refreshOpenAI } from "@model-auth/providers/openai";
+import { authorizeOpenAI, refreshOpenAI, listOpenAICodexModels, parseOpenAICodexModels, type OpenAICodexModel } from "@model-auth/providers/openai";
+import { latestClientVersion, CLIENT_VERSION_FLOORS, type ClientVersionTarget } from "@model-auth/providers/client-versions";
 import { authorizeAnthropic, refreshAnthropic } from "@model-auth/providers/anthropic";
 import { authorizeTrae, refreshTrae, listTraeModels, streamTrae } from "@model-auth/providers/trae";
 import { authorizeGrok, queryGrokUsage } from "@model-auth/providers/grok";
 import { authorizeOllamaWeb, queryOllamaUsage } from "@model-auth/providers/ollama";
 import { queryProviderUsage } from "@model-auth/providers/usage";
 const providers: ModelAuthProvider[] = [];
+const target: ClientVersionTarget = "codex";
+const pending: Promise<string> = latestClientVersion(target);
+const models: readonly OpenAICodexModel[] = parseOpenAICodexModels({ models: [] });
 const router = new CredentialRouter([createCredentialMetadata({ id: "one", providerId: "sample", authMethod: "api-key", modelIds: ["sample"] })]);
-void [providers, router, ModelAuthDialog, registerModelAuthElement, authorizeWorkBuddy, refreshWorkBuddy, authorizeTrae, refreshTrae, listTraeModels, streamTrae, authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic, authorizeGrok, queryGrokUsage, authorizeOllamaWeb, queryOllamaUsage, queryProviderUsage];
+void [providers, router, ModelAuthDialog, registerModelAuthElement, authorizeWorkBuddy, refreshWorkBuddy, authorizeTrae, refreshTrae, listTraeModels, streamTrae, authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic, authorizeGrok, queryGrokUsage, authorizeOllamaWeb, queryOllamaUsage, queryProviderUsage, listOpenAICodexModels, CLIENT_VERSION_FLOORS, pending, models];
 `);
 execFileSync(process.execPath, [join(root, "node_modules/typescript/bin/tsc"), "--noEmit", "--strict", "--skipLibCheck", "--moduleResolution", "bundler", "--module", "esnext", "--target", "es2023", join(consumer, "entry.ts")], { stdio: "pipe", cwd: consumer });
 execFileSync(process.execPath, [join(root, "node_modules/typescript/bin/tsc"), "--noEmit", "--strict", "--skipLibCheck", "--moduleResolution", "node", "--module", "commonjs", "--target", "es2023", join(consumer, "entry.ts")], { stdio: "pipe", cwd: consumer });
 execFileSync(process.execPath, ["--input-type=module", "-e", `
 import { CredentialRouter, createCredentialMetadata } from "@model-auth/core";
 import { authorizeWorkBuddy, refreshWorkBuddy } from "@model-auth/providers/workbuddy";
-import { authorizeOpenAI, refreshOpenAI } from "@model-auth/providers/openai";
+import { authorizeOpenAI, refreshOpenAI, listOpenAICodexModels, parseOpenAICodexModels } from "@model-auth/providers/openai";
+import { latestClientVersion, CLIENT_VERSION_FLOORS } from "@model-auth/providers/client-versions";
+import { latestClientVersion as rootLatestClientVersion } from "@model-auth/providers";
 import { authorizeAnthropic, refreshAnthropic } from "@model-auth/providers/anthropic";
 import { authorizeGrok, queryGrokUsage } from "@model-auth/providers/grok";
 import { authorizeOllamaWeb, queryOllamaUsage } from "@model-auth/providers/ollama";
@@ -95,6 +101,9 @@ if (typeof authorizeWorkBuddy !== "function" || typeof refreshWorkBuddy !== "fun
 for (const provider of [authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic, authorizeGrok, queryGrokUsage, authorizeOllamaWeb, queryOllamaUsage]) {
   if (typeof provider !== "function") throw new Error("Installed browser OAuth unavailable");
 }
+if (latestClientVersion !== rootLatestClientVersion || typeof listOpenAICodexModels !== "function") throw new Error("Installed client version lookup unavailable");
+if (parseOpenAICodexModels({ models: [{ slug: "sample" }] })[0]?.id !== "sample") throw new Error("Installed Codex catalog parser unavailable");
+if (await latestClientVersion("grok", { fetchImpl: async () => { throw new Error("offline"); } }) !== CLIENT_VERSION_FLOORS.grok) throw new Error("Installed client version floor unavailable");
 const router = new CredentialRouter([createCredentialMetadata({ id: "one", providerId: "sample", authMethod: "api-key", modelIds: ["sample"] })]);
 if (router.candidates({ providerId: "sample", modelId: "sample" })[0]?.id !== "one") throw new Error("Installed core cannot route");
 `], { stdio: "pipe", cwd: consumer });
