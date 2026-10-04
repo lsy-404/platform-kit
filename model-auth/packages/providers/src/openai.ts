@@ -101,12 +101,15 @@ export function parseOpenAICodexModels(payload: unknown): readonly OpenAICodexMo
     const defaultReasoningEffort = stringValue(model.default_reasoning_level) ?? stringValue(model.default_reasoning_effort);
     const reasoningEfforts = listReasoningEfforts(model.supported_reasoning_levels ?? model.supported_reasoning_efforts);
     const context = numberValue(model.context_window) ?? numberValue(model.max_context_window);
+    const output = numberValue(model.max_output_tokens) ?? numberValue(model.max_completion_tokens);
+    const input = Array.isArray(model.input_modalities) ? [...new Set(model.input_modalities.flatMap(entry => stringValue(entry) ?? []))] : [];
     return [{
       id,
       name,
       ...(description ? { description } : {}),
       ...(reasoningEfforts ? { reasoning: true, reasoningEfforts } : {}),
-      ...(context !== undefined ? { limits: { context } } : {}),
+      ...(input.length ? { modalities: { input } } : {}),
+      ...(context !== undefined || output !== undefined ? { limits: { ...(context !== undefined ? { context } : {}), ...(output !== undefined ? { output } : {}) } } : {}),
       ...(defaultReasoningEffort ? { defaultReasoningEffort } : {}),
     }];
   });
