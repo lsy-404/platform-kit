@@ -1,8 +1,19 @@
 export type ProviderUsageStatus = "ok" | "unknown" | "error";
 
+export type ProviderUsageWindowScope = "account" | "model-family" | "model";
+export type ProviderUsageWindowStatus = "known" | "unknown" | "exhausted";
+export type ProviderUsageWindowReliability = "high" | "low";
+
 export interface ProviderUsageWindow {
   readonly id: string;
   readonly label: string;
+  readonly scope: ProviderUsageWindowScope;
+  /** Normalized lower-case ids the window applies to; empty for account scope. */
+  readonly modelFamilies: readonly string[];
+  readonly status: ProviderUsageWindowStatus;
+  /** Used share in the 0..1 range; null when the status is unknown. */
+  readonly usedRatio: number | null;
+  readonly reliability: ProviderUsageWindowReliability;
   readonly usedPercent: number | null;
   readonly remainingPercent?: number | null;
   readonly resetAt: number | null;
@@ -11,6 +22,29 @@ export interface ProviderUsageWindow {
   readonly limit?: number | null;
   readonly remaining?: number | null;
   readonly unit?: string | null;
+}
+
+export type ProviderUsageWindowInput =
+  Omit<ProviderUsageWindow, "scope" | "modelFamilies" | "status" | "usedRatio" | "reliability">
+  & Partial<Pick<ProviderUsageWindow, "scope" | "modelFamilies" | "reliability">>;
+
+/** Build a window whose status and ratio are derived from the used percentage. */
+export function usageWindow(input: ProviderUsageWindowInput): ProviderUsageWindow {
+  const { scope, modelFamilies, reliability, ...rest } = input;
+  const known = rest.usedPercent !== null;
+  return {
+    ...rest,
+    scope: scope ?? "account",
+    modelFamilies: modelFamilies ?? [],
+    status: !known ? "unknown" : (rest.usedPercent as number) >= 100 ? "exhausted" : "known",
+    usedRatio: known ? (rest.usedPercent as number) / 100 : null,
+    reliability: reliability ?? "high",
+  };
+}
+
+/** Lower-case model id with separators collapsed, e.g. "Alpha-5.3 Fast" becomes "alpha-5.3-fast". */
+export function normalizeModelFamilyId(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9.]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
 export interface ProviderUsageBalance {
@@ -140,14 +174,17 @@ function percent(value: unknown): number | null {
   return parsed === null ? null : Math.max(0, Math.min(100, parsed));
 }
 
-function windowFrom(id: string, label: string, value: unknown): ProviderUsageWindow | null {
+type WindowTarget = Pick<ProviderUsageWindowInput, "scope" | "modelFamilies" | "reliability">;
+
+function windowFrom(id: string, label: string, value: unknown, target: WindowTarget = {}): ProviderUsageWindow | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const row = record(value);
   const usedPercent = percent(row.used_percent ?? row.usedPercent ?? row.utilization ?? row.used_percentage ?? row.usedPercentage);
-  if (usedPercent === null) return null;
   const used = numberValue(row.used, row.consumed);
   const limit = numberValue(row.limit, row.max);
   const remaining = numberValue(row.remaining, row.remain);
-  return {
+  return usageWindow({
+    ...target,
     id,
     label,
     usedPercent,
@@ -158,7 +195,7 @@ function windowFrom(id: string, label: string, value: unknown): ProviderUsageWin
     ...(limit !== null ? { limit } : {}),
     ...(remaining !== null ? { remaining } : {}),
     ...(stringValue(row.unit) ? { unit: stringValue(row.unit) } : {}),
-  };
+  });
 }
 
 function planMultiplier(payload: Json): number | null {
@@ -187,9 +224,10 @@ export function parseCodexUsage(payload: unknown, metadata: { plan?: unknown; su
       const id = stringValue(entry.metered_feature, entry.meteredFeature, entry.limit_name, entry.limitName);
       if (!label || !id) continue;
       const additionalRate = record(entry.rate_limit ?? entry.rateLimit ?? entry.limit);
+      const target: WindowTarget = { scope: "model", modelFamilies: [normalizeModelFamilyId(stringValue(entry.limit_name, entry.limitName) ?? id)] };
       for (const window of [
-        windowFrom(`${id}:primary`, `${label} · Primary window`, additionalRate.primary_window ?? additionalRate.primary),
-        windowFrom(`${id}:secondary`, `${label} · Secondary window`, additionalRate.secondary_window ?? additionalRate.secondary),
+        windowFrom(`${id}:primary`, `${label} · Primary window`, additionalRate.primary_window ?? additionalRate.primary, target),
+        windowFrom(`${id}:secondary`, `${label} · Secondary window`, additionalRate.secondary_window ?? additionalRate.secondary, target),
       ]) if (window) windows.push(window);
     }
   }
@@ -203,12 +241,12 @@ export function parseCodexUsage(payload: unknown, metadata: { plan?: unknown; su
   };
 }
 
-const ANTHROPIC_WINDOWS: Array<[string, string]> = [
-  ["five_hour", "5 hours"],
-  ["seven_day", "7 days"],
-  ["seven_day_oauth_apps", "7 days · OAuth apps"],
-  ["seven_day_opus", "7 days · Opus"],
-  ["seven_day_sonnet", "7 days · Sonnet"],
+const ANTHROPIC_WINDOWS: Array<[string, string, WindowTarget]> = [
+  ["five_hour", "5 hours", { scope: "account" }],
+  ["seven_day", "7 days", { scope: "account" }],
+  ["seven_day_oauth_apps", "7 days · OAuth apps", { scope: "account" }],
+  ["seven_day_opus", "7 days · Opus", { scope: "model-family", modelFamilies: ["opus"] }],
+  ["seven_day_sonnet", "7 days · Sonnet", { scope: "model-family", modelFamilies: ["sonnet"] }],
 ];
 
 /** Parser for the Anthropic provider usage response used by the IRIS provider-usage view. */
@@ -216,8 +254,8 @@ export function parseAnthropicUsage(payload: unknown): ProviderUsageData {
   const root = record(payload);
   const limits = record(root.rate_limits ?? root.rateLimits ?? root.limits);
   const windows: ProviderUsageWindow[] = [];
-  for (const [id, label] of ANTHROPIC_WINDOWS) {
-    const window = windowFrom(id, label, limits[id] ?? root[id]);
+  for (const [id, label, target] of ANTHROPIC_WINDOWS) {
+    const window = windowFrom(id, label, limits[id] ?? root[id], target);
     if (window) windows.push(window);
   }
   const credits = numberValue(record(root.credits).balance, root.credit_balance);

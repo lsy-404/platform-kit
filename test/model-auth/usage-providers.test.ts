@@ -10,7 +10,7 @@ import {
   type GrokOAuthCredential,
 } from "../../model-auth/packages/providers/src/grok.js";
 import { authorizeOllamaWeb, parseOllamaSettings, queryOllamaAccountUsage, queryOllamaUsage, type OllamaAccountLogin } from "../../model-auth/packages/providers/src/ollama.js";
-import { parseAnthropicUsage, parseCodexUsage, queryAnthropicUsage, queryCodexUsage, queryProviderUsage } from "../../model-auth/packages/providers/src/usage.js";
+import { parseAnthropicUsage, parseCodexUsage, queryAnthropicUsage, queryCodexUsage, queryProviderUsage, usageWindow } from "../../model-auth/packages/providers/src/usage.js";
 
 vi.mock("../../model-auth/packages/providers/src/client-versions.js", async importOriginal => {
   const actual = await importOriginal<typeof import("../../model-auth/packages/providers/src/client-versions.js")>();
@@ -104,7 +104,7 @@ describe("provider usage adapters", () => {
     };
     const snapshot = (await import("../../model-auth/packages/providers/src/usage.js")).usageSnapshot("grok", "credential", {
       plan: null,
-      windows: [{ id: "window", label: "Window", usedPercent: 12.3456789012345, resetAt: null }],
+      windows: [usageWindow({ id: "window", label: "Window", usedPercent: 12.3456789012345, resetAt: null })],
       balance: null,
       estimate,
     });

@@ -65,6 +65,10 @@ Model discovery returns the account's actual service metadata. `streamTrae` and 
 
 `authorizeGrok` and `refreshGrok` provide the browser authentication lifecycle. `grokHeaders` binds a trusted-host request to the returned access token, and `queryGrokUsage` reads non-secret credit windows and balances from the provider billing surface. All usage snapshots preserve source precision and may carry a host-owned token/request estimate.
 
+## Structured usage windows
+
+Every `ProviderUsageWindow` carries `scope` (`account`, `model-family` or `model`), normalized `modelFamilies`, `status` (`known`, `unknown` or `exhausted`), `usedRatio` (0..1, null when unknown), `reliability` (`high`, or `low` for scraped sources such as Ollama) and `resetAt`. Providers fill these fields themselves, so consumers never infer scope from labels. A window the provider lists without usage data is reported with status `unknown` rather than omitted. Use `usageWindow` to build windows and `normalizeModelFamilyId` to normalize ids.
+
 ## Ollama web session and usage
 
 `authorizeOllamaWeb` opens `ollama.com/signin`, waits for the host to observe the authenticated browser cookie, and verifies the session by reading the first-party settings page. `queryOllamaUsage` and `parseOllamaSettings` expose plan and usage information without returning the cookie. The cookie callback and persistence remain host-owned.

@@ -710,9 +710,18 @@ export type ProviderStreamEvent =
 
 export type ProviderUsageStatus = "ok" | "unknown" | "error";
 
+export type ProviderUsageWindowScope = "account" | "model-family" | "model";
+export type ProviderUsageWindowStatus = "known" | "unknown" | "exhausted";
+export type ProviderUsageWindowReliability = "high" | "low";
+
 export interface ProviderUsageWindow {
   readonly id: string;
   readonly label: string;
+  readonly scope: ProviderUsageWindowScope;
+  readonly modelFamilies: readonly string[];
+  readonly status: ProviderUsageWindowStatus;
+  readonly usedRatio: number | null;
+  readonly reliability: ProviderUsageWindowReliability;
   readonly usedPercent: number | null;
   readonly remainingPercent?: number | null;
   readonly resetAt: number | null;
@@ -907,6 +916,13 @@ function validateUsageSnapshot(capability: ProviderCapabilityDescriptor, credent
   const windows = snapshot.windows.map((window) => {
     if (!window || typeof window !== "object" || typeof window.id !== "string" || !window.id.trim()
       || typeof window.label !== "string" || !window.label.trim()
+      || !["account", "model-family", "model"].includes(window.scope)
+      || !Array.isArray(window.modelFamilies) || window.modelFamilies.some((family: unknown) => typeof family !== "string" || !family.trim())
+      || (window.scope === "account" && window.modelFamilies.length > 0)
+      || !["known", "unknown", "exhausted"].includes(window.status)
+      || !["high", "low"].includes(window.reliability)
+      || (window.usedRatio !== null && (typeof window.usedRatio !== "number" || !Number.isFinite(window.usedRatio) || window.usedRatio < 0 || window.usedRatio > 1))
+      || (window.status === "unknown") !== (window.usedRatio === null)
       || (window.usedPercent !== null && (typeof window.usedPercent !== "number" || !Number.isFinite(window.usedPercent) || window.usedPercent < 0 || window.usedPercent > 100))
       || (window.remainingPercent !== undefined && window.remainingPercent !== null && (typeof window.remainingPercent !== "number" || !Number.isFinite(window.remainingPercent) || window.remainingPercent < 0 || window.remainingPercent > 100))
       || (window.usedPercent !== null && window.remainingPercent !== undefined && window.remainingPercent !== null
@@ -922,6 +938,11 @@ function validateUsageSnapshot(capability: ProviderCapabilityDescriptor, credent
     return {
       id: window.id.trim(),
       label: window.label.trim(),
+      scope: window.scope,
+      modelFamilies: window.modelFamilies.map((family: string) => family.trim()),
+      status: window.status,
+      usedRatio: window.usedRatio,
+      reliability: window.reliability,
       usedPercent: window.usedPercent,
       ...(window.remainingPercent !== undefined ? { remainingPercent: window.remainingPercent } : {}),
       resetAt: window.resetAt,
