@@ -61,4 +61,15 @@ describe("OpenAI Codex account model catalog", () => {
       fetchImpl: async () => new Response("secret response content", { status: 403 }),
     })).rejects.not.toThrow("secret response content");
   });
+
+  it("bounds the default client version lookup by the request timeout", async () => {
+    const started = Date.now();
+    await expect(listOpenAICodexModels({ access: "access-token" }, {
+      timeoutMs: 50,
+      fetchImpl: (url, init) => String(url).startsWith("https://registry.npmjs.org/")
+        ? new Promise<Response>((_, reject) => init?.signal?.addEventListener("abort", () => reject(init.signal!.reason), { once: true }))
+        : init?.signal?.aborted ? Promise.reject(init.signal.reason) : Promise.resolve(new Response(JSON.stringify({ models: [] }))),
+    })).rejects.toThrow("timed out");
+    expect(Date.now() - started).toBeLessThan(2_000);
+  });
 });

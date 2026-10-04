@@ -51,7 +51,9 @@ export async function listOpenAICodexModels(
   options: OpenAICodexModelsOptions = {},
 ): Promise<readonly OpenAICodexModel[]> {
   if (typeof credential?.access !== "string" || !credential.access.trim()) throw new Error("OpenAI OAuth access token is required.");
-  const clientVersion = requiredHeader(options.clientVersion ?? await latestClientVersion("codex", { ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}), ...(options.signal ? { signal: options.signal } : {}) }), "clientVersion");
+  const timeout = AbortSignal.timeout(options.timeoutMs && options.timeoutMs > 0 ? options.timeoutMs : CODEX_MODELS_TIMEOUT_MS);
+  const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
+  const clientVersion = requiredHeader(options.clientVersion ?? await latestClientVersion("codex", { ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}), signal }), "clientVersion");
   const originator = requiredHeader(options.originator ?? CODEX_ORIGINATOR, "originator");
   const url = new URL(CODEX_MODELS_URL);
   url.searchParams.set("client_version", clientVersion);
@@ -63,8 +65,6 @@ export async function listOpenAICodexModels(
   if (typeof credential.accountId === "string" && credential.accountId.trim()) {
     headers["ChatGPT-Account-ID"] = credential.accountId.trim();
   }
-  const timeout = AbortSignal.timeout(options.timeoutMs && options.timeoutMs > 0 ? options.timeoutMs : CODEX_MODELS_TIMEOUT_MS);
-  const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
   let response: Response;
   try {
     response = await (options.fetchImpl ?? fetch)(url, { headers, redirect: "error", signal });
