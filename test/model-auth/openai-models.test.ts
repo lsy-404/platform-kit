@@ -18,6 +18,8 @@ describe("OpenAI Codex account model catalog", () => {
           default_reasoning_level: "high",
           supported_reasoning_levels: [{ effort: "low" }, { effort: "high" }],
           context_window: 272_000,
+          max_output_tokens: 128_000,
+          input_modalities: ["text", "image", "text"],
         }] }));
       },
     });
@@ -33,7 +35,8 @@ describe("OpenAI Codex account model catalog", () => {
       description: "Current account catalog entry",
       reasoning: true,
       reasoningEfforts: ["low", "high"],
-      limits: { context: 272_000 },
+      modalities: { input: ["text", "image"] },
+      limits: { context: 272_000, output: 128_000 },
       defaultReasoningEffort: "high",
     }]);
   });
