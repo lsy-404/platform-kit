@@ -22,6 +22,13 @@ describe("latest client versions", () => {
     expect(CLIENT_VERSION_FLOORS.codex).toBe("0.158.0");
   });
 
+  it("rejects targets that are not own keys of the floor table", async () => {
+    const { latestClientVersion } = await load();
+    for (const target of ["nope", "constructor", "toString", "__proto__"]) {
+      await expect(latestClientVersion(target as never, { fetchImpl: async () => new Response("1.0.0") })).rejects.toThrow(`Unknown client version target: ${target}.`);
+    }
+  });
+
   it("compares numerically per segment", async () => {
     const { latestClientVersion } = await load();
     expect(await latestClientVersion("codex", { fetchImpl: async () => npm("0.1000.0") })).toBe("0.1000.0");
