@@ -2,7 +2,7 @@ export type ClientVersionTarget = "codex" | "grok" | "trae-app" | "trae-build";
 export interface ClientVersionOptions { readonly fetchImpl?: typeof fetch; readonly signal?: AbortSignal; readonly timeoutMs?: number; }
 
 /** Oldest versions known to be accepted; lookups never resolve below these. */
-export const CLIENT_VERSION_FLOORS: Readonly<Record<ClientVersionTarget, string>> = Object.freeze({ codex: "0.158.0", grok: "0.2.99", "trae-app": "3.5.81", "trae-build": "2.3.61406" });
+export const CLIENT_VERSION_FLOORS: Readonly<Record<ClientVersionTarget, string>> = Object.freeze({ codex: "0.160.0", grok: "1.0.46", "trae-app": "3.5.104", "trae-build": "2.3.88407" });
 
 type Feed = "codex" | "grok" | "trae";
 type Versions = Partial<Record<ClientVersionTarget, string>>;
@@ -12,6 +12,7 @@ const FEEDS: Readonly<Record<Feed, { urls: readonly string[]; parse: (body: stri
   trae: { urls: ["https://api.trae.ai/icube/api/v1/native/version/trae/latest"], parse: parseTrae },
 };
 const FEED_OF: Readonly<Record<ClientVersionTarget, Feed>> = { codex: "codex", grok: "grok", "trae-app": "trae", "trae-build": "trae" };
+const LEAD_OF: Readonly<Record<Feed, ClientVersionTarget>> = { codex: "codex", grok: "grok", trae: "trae-app" };
 const TTL_MS = 6 * 60 * 60 * 1000, RETRY_MS = 5 * 60 * 1000, DEFAULT_TIMEOUT_MS = 5_000, MAX_BODY_CHARS = 2_000_000;
 const cache = new Map<Feed, { at: number; ttl: number; versions?: Versions }>();
 const inflight = new Map<Feed, Promise<Versions | undefined>>();
@@ -30,8 +31,9 @@ export async function latestClientVersion(client: ClientVersionTarget, options: 
     }
     versions = (await until(pending, options.signal)) ?? versions;
   }
-  const latest = versions?.[client];
-  return latest && compareVersions(latest, floor) > 0 ? latest : floor;
+  // Versions from one feed are taken or rejected together so paired values (Trae app and build) never mix with floors.
+  const lead = LEAD_OF[feed], latest = versions?.[client], leading = versions?.[lead];
+  return latest && leading && compareVersions(leading, CLIENT_VERSION_FLOORS[lead]) > 0 ? latest : floor;
 }
 
 async function fetchFeed(feed: Feed, options: ClientVersionOptions): Promise<Versions | undefined> {

@@ -19,7 +19,7 @@ describe("latest client versions", () => {
     vi.resetModules();
     const fresh = await load();
     expect(await fresh.latestClientVersion("codex", { fetchImpl: async () => npm("0.100.0") })).toBe(CLIENT_VERSION_FLOORS.codex);
-    expect(CLIENT_VERSION_FLOORS.codex).toBe("0.158.0");
+    expect(CLIENT_VERSION_FLOORS.codex).toBe("0.160.0");
   });
 
   it("rejects targets that are not own keys of the floor table", async () => {
@@ -134,10 +134,17 @@ describe("latest client versions", () => {
   it("keeps the Trae app and build versions from the same release entry", async () => {
     const { latestClientVersion } = await load();
     const fetchImpl: typeof fetch = async () => traeManifest([
-      { region: "sg", version: "3.5.105", build: "2.3.88000" },
-      { region: "va", version: "3.5.104", build: "2.3.88407" },
+      { region: "sg", version: "3.5.106", build: "2.3.89000" },
+      { region: "va", version: "3.5.105", build: "2.3.90000" },
     ]);
-    expect(await latestClientVersion("trae-app", { fetchImpl })).toBe("3.5.105");
-    expect(await latestClientVersion("trae-build", { fetchImpl })).toBe("2.3.88000");
+    expect(await latestClientVersion("trae-app", { fetchImpl })).toBe("3.5.106");
+    expect(await latestClientVersion("trae-build", { fetchImpl })).toBe("2.3.89000");
+  });
+
+  it("falls back to the Trae floor pair when the released app is not newer than its floor", async () => {
+    const { latestClientVersion, CLIENT_VERSION_FLOORS } = await load();
+    const fetchImpl: typeof fetch = async () => traeManifest([{ region: "va", version: "3.5.90", build: "2.3.99999" }]);
+    expect(await latestClientVersion("trae-app", { fetchImpl })).toBe(CLIENT_VERSION_FLOORS["trae-app"]);
+    expect(await latestClientVersion("trae-build", { fetchImpl })).toBe(CLIENT_VERSION_FLOORS["trae-build"]);
   });
 });

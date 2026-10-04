@@ -149,7 +149,7 @@ describe("provider usage adapters", () => {
     expect(calls.map(call => call.url)).toEqual([GROK_ENDPOINTS.billing, GROK_ENDPOINTS.billingDefault]);
     expect(calls[0]!.headers.get("authorization")).toBe("Bearer oauth-access");
     expect(calls[0]!.headers.get("x-xai-token-auth")).toBe("xai-grok-cli");
-    expect(calls[0]!.headers.get("x-grok-client-version")).toBe("0.2.99");
+    expect(calls[0]!.headers.get("x-grok-client-version")).toBe("1.0.46");
     expect(grokHeaders(grokCredential, "1.2.3")).toMatchObject({ "x-grok-client-version": "1.2.3" });
     expect(grokHeaders(grokCredential, "1.2.3")).not.toHaveProperty("refresh");
     expect(GROK_OAUTH_CLIENT_ID).toMatch(/^[0-9a-f-]{36}$/);
