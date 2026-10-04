@@ -74,7 +74,10 @@ export async function listOpenAICodexModels(
       ? "OpenAI Codex model catalog request timed out."
       : "OpenAI Codex model catalog request failed.");
   }
-  if (!response.ok || response.redirected) throw new Error(`OpenAI Codex model catalog request failed (${response.status}).`);
+  if (!response.ok || response.redirected) {
+    const detail = response.redirected ? undefined : await errorDetail(response);
+    throw new Error(`OpenAI Codex model catalog request failed (${response.status})${detail ? `: ${detail}` : "."}`);
+  }
   let payload: unknown;
   try { payload = await response.json(); } catch { throw new Error("OpenAI Codex model catalog response is invalid."); }
   return parseOpenAICodexModels(payload);
@@ -100,6 +103,7 @@ export function parseOpenAICodexModels(payload: unknown): readonly OpenAICodexMo
     const description = stringValue(model.description);
     const defaultReasoningEffort = stringValue(model.default_reasoning_level) ?? stringValue(model.default_reasoning_effort);
     const reasoningEfforts = listReasoningEfforts(model.supported_reasoning_levels ?? model.supported_reasoning_efforts);
+    const reasoning = typeof model.supports_reasoning === "boolean" ? model.supports_reasoning : reasoningEfforts ? true : undefined;
     const context = numberValue(model.context_window) ?? numberValue(model.max_context_window);
     const output = numberValue(model.max_output_tokens) ?? numberValue(model.max_completion_tokens);
     const input = Array.isArray(model.input_modalities) ? [...new Set(model.input_modalities.flatMap(entry => stringValue(entry) ?? []))] : [];
@@ -107,12 +111,22 @@ export function parseOpenAICodexModels(payload: unknown): readonly OpenAICodexMo
       id,
       name,
       ...(description ? { description } : {}),
-      ...(reasoningEfforts ? { reasoning: true, reasoningEfforts } : {}),
+      ...(reasoning !== undefined ? { reasoning } : {}),
+      ...(reasoningEfforts ? { reasoningEfforts } : {}),
       ...(input.length ? { modalities: { input } } : {}),
       ...(context !== undefined || output !== undefined ? { limits: { ...(context !== undefined ? { context } : {}), ...(output !== undefined ? { output } : {}) } } : {}),
       ...(defaultReasoningEffort ? { defaultReasoningEffort } : {}),
     }];
   });
+}
+
+async function errorDetail(response: Response): Promise<string | undefined> {
+  try {
+    const payload = record(await response.json());
+    const text = stringValue(record(payload?.error)?.message) ?? stringValue(payload?.message) ?? stringValue(payload?.detail);
+    // Server text is shown to users, so keep it short and on one line.
+    return text?.replace(/\s+/g, " ").slice(0, 200);
+  } catch { return undefined; }
 }
 
 function requiredHeader(value: unknown, field: string): string {
@@ -130,7 +144,7 @@ function stringValue(value: unknown): string | undefined {
 }
 
 function numberValue(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;
+  return typeof value === "number" && Number.isFinite(value) && value >= 1 ? Math.floor(value) : undefined;
 }
 
 function listReasoningEfforts(value: unknown): readonly string[] | undefined {
