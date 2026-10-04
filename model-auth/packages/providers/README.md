@@ -35,6 +35,14 @@ Credentials contain `access`, `refresh`, `expires` (Unix milliseconds), and opti
 
 The host owns model availability, secret persistence, account removal and routing policy. OAuth switches, credential ordering, and cooldowns are handled by `@model-auth/core`. Removing a local credential is not a claim of vendor-side revocation.
 
+## ChatGPT Codex model catalog
+
+`listOpenAICodexModels(credential, options?)` reads the account's visible Codex models; `parseOpenAICodexModels` parses a raw catalog response. The catalog is filtered by the `client_version` query value, so it defaults to the latest official Codex CLI version. Pass `clientVersion` to override it.
+
+## Latest client versions
+
+Provider requests that identify an official client resolve its newest published version automatically: Codex (npm registry), Grok CLI (`x.ai/cli/stable`) and the Trae IDE application and build (the Trae release manifest). `latestClientVersion(client, options?)` from `@model-auth/providers/client-versions` exposes the lookup for `"codex"`, `"grok"`, `"trae-app"` and `"trae-build"`. Each target has a built-in minimum, so a lookup that fails or returns an older value resolves to the minimum instead of throwing. Successful lookups are cached for six hours and concurrent callers share one request. Lookups use the request's `fetchImpl` when one is supplied. Explicit `clientVersion` and `appVersion` options always win. `grokHeaders` takes the client version as an argument.
+
 ## Trae browser authorization
 
 ```ts
