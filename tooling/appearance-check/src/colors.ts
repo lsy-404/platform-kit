@@ -34,6 +34,7 @@ export async function inspectColors(page: Page, state: State, target?: string): 
   const findings: RawFinding[] = [];
   const seen = new Set<string>();
   const skipped: BrowserResult["skipped"] = [];
+  const uncertainTargets = new Set<string>();
   const checkId = state === "default" ? "AP001" as const : "AP002" as const;
 
   for (const violation of results.violations.filter(item => item.id === "color-contrast")) {
@@ -60,26 +61,37 @@ export async function inspectColors(page: Page, state: State, target?: string): 
     .filter(item => item.id === "color-contrast")
     .flatMap(item => (item.nodes as unknown as AxeNode[]).flatMap(node => {
       const selector = selectorFor(node);
+      if (selector) uncertainTargets.add(selector);
       return [{ checkId, target: selector ?? target ?? "document", reason: selector ? "Axe could not determine the rendered text or background colors reliably." : "Axe returned a multi-part target that cannot be represented as one unique CSS selector." }];
     })));
 
-  if (target && !seen.has(target)) {
-    const equality = await page.locator(target).evaluate(element => {
-      if (!element.isConnected || element.matches(":disabled") || element.getClientRects().length === 0) return null;
+  if (target && !seen.has(target)) uncertainTargets.add(target);
+  for (const candidate of uncertainTargets) {
+    if (seen.has(candidate)) continue;
+    const equality = await page.locator(candidate).evaluate(element => {
+      if (!element.isConnected || element.closest(":disabled,[aria-disabled=true]") || !element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) || element.getClientRects().length === 0) return null;
       const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
       let textNode: Node | null;
       while ((textNode = walker.nextNode())) {
         if (!textNode.textContent?.trim()) continue;
         const range = document.createRange();
         range.selectNodeContents(textNode);
-        if (![...range.getClientRects()].some(rect => rect.width > 0 && rect.height > 0)) continue;
+        if (![...range.getClientRects()].some(rect => {
+          let left = Math.max(0, rect.left), right = Math.min(innerWidth, rect.right), top = Math.max(0, rect.top), bottom = Math.min(innerHeight, rect.bottom);
+          for (let ancestor = textNode!.parentElement; ancestor; ancestor = ancestor.parentElement) {
+            const style = getComputedStyle(ancestor), box = ancestor.getBoundingClientRect();
+            if (style.overflowX !== "visible") { left = Math.max(left, box.left); right = Math.min(right, box.right); }
+            if (style.overflowY !== "visible") { top = Math.max(top, box.top); bottom = Math.min(bottom, box.bottom); }
+          }
+          return right > left && bottom > top;
+        })) continue;
         let current = textNode.parentElement;
         let foreground: string | undefined;
         while (current) {
           const style = getComputedStyle(current);
           foreground ??= style.color;
           if (style.visibility === "hidden" || style.display === "none" || Number(style.opacity) < 1) break;
-          if (style.backgroundImage !== "none") break;
+          if (style.backgroundImage !== "none" || style.textShadow !== "none" || parseFloat(style.webkitTextStrokeWidth) > 0) break;
           const background = style.backgroundColor.match(/^rgba?\(([^)]+)\)$/)?.[1];
           if (background) {
             const channels = background.split(/[\s,\/]+/).map(part => Number.parseFloat(part));
@@ -97,11 +109,11 @@ export async function inspectColors(page: Page, state: State, target?: string): 
     });
     if (equality) {
       for (let index = skipped.length - 1; index >= 0; index--) {
-        if (skipped[index]?.target === target) skipped.splice(index, 1);
+        if (skipped[index]?.target === candidate) skipped.splice(index, 1);
       }
       findings.push({
         checkId,
-        target,
+        target: candidate,
         message: state === "default" ? "Visible text has the same foreground and background color." : `Visible text has the same foreground and background color in ${state} state.`,
         confidence: "measured",
         evidence: { state, ...equality, contrastRatio: 1 },

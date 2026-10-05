@@ -8,6 +8,7 @@ await mkdir(output, { recursive: true });
 const targets = [
   "styles/fluent",
   "styles/ui-tokens",
+  "tooling/appearance-check",
   "model-auth/packages/core",
   "model-auth/packages/providers",
   "model-auth/packages/vue",

@@ -49,6 +49,27 @@ try {
   assert.ok(!has("AP007", "centered-icon"), "centered painted icon bounds are allowed");
   assert.ok(has("AP008", "nested-target"), "three nested repeated surfaces are reported");
   assert.ok(!has("AP008", ".two-surfaces"), "two surface layers are allowed");
+  await page.setContent(`<!doctype html><style>body{margin:20px;font:16px Arial}
+   .row{display:flex;gap:10px}.ellipsis{display:block;width:90px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+   .scroll{height:20px;width:90px;overflow:auto}.hidden{opacity:0}.below{position:absolute;top:1000px}
+   .icon{display:flex;align-items:center;justify-content:center;width:48px;height:48px}svg{width:24px;height:24px}
+   </style><div class="row"><span id="ellipsis" class="ellipsis">Intentionally long ellipsis content</span><span>Neighbor</span></div>
+   <div class="scroll"><p>Scrollable multi-line content beyond the first line</p></div>
+   <div class="hidden"><span>Hidden</span><span style="position:absolute;left:20px">Hidden</span></div>
+   <div class="below"><span>Below</span><span style="position:absolute;left:0">Below</span></div>
+   <details><summary>Closed</summary><span>Unrendered</span><span style="position:absolute;left:20px">Unrendered</span></details>
+   <button id="unlabeled-icon" class="icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 2h8v8h-8z"/></svg></button>`);
+  const conservative = await page.evaluate(inspectLayout, ["AP004", "AP005", "AP007"]);
+  assert(!conservative.findings.some(f => f.checkId === "AP004"), "clipped, hidden and off-screen text cannot create overlap findings");
+  assert(!conservative.findings.some(f => f.checkId === "AP005"), "nested ellipsis and scroll regions are intentional containment");
+  assert(conservative.findings.some(f => f.checkId === "AP007" && f.target.includes("unlabeled-icon")), "icon discovery must not require annotations or accessible labels");
+  await page.setContent(`<h1 style="font:64px/0.9 Arial">Tight heading line height</h1>`);
+  const tightHeading = await page.evaluate(inspectLayout, ["AP005"]);
+  assert.equal(tightHeading.findings.length, 0, "visible glyph overflow from tight leading is not clipping");
+  await page.setContent(`<div style="transform:rotate(10deg);width:80px;margin:100px"><button style="width:20px;height:20px;overflow:hidden">Long text</button></div>`);
+  const rotated = await page.evaluate(inspectLayout, ["AP005"]);
+  assert.equal(rotated.findings.length, 0);
+  assert(rotated.skipped.some(s => s.checkId === "AP005"));
   console.log(`Appearance layout browser checks passed: ${result.findings.length} findings, ${result.skipped.length} skipped`);
 } finally {
   await browser.close();

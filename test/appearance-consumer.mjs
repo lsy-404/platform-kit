@@ -1,0 +1,43 @@
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, readdir, readFile, writeFile, rm, realpath } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { resolve, join } from "node:path";
+
+const source = resolve("release/platform-kit-appearance-check");
+const archive = (await readdir(source)).find(name => name.endsWith(".tgz"));
+assert(archive, "The appearance package must be packed first");
+const archivePath = join(source, archive);
+const listing = execFileSync("tar", ["-tzf", archivePath], { encoding: "utf8" });
+assert(listing.includes("package/LICENSE"));
+assert(!listing.includes("package/src/") && !listing.includes("node_modules/"));
+const root = await realpath(await mkdtemp(join(tmpdir(), "appearance-consumer-")));
+try {
+  await writeFile(join(root, "package.json"), JSON.stringify({ private: true, type: "module", dependencies: { "@platform-kit/appearance-check": "file:" + archivePath, vite: "^8.0.0" }, devDependencies: { typescript: "^5.9.2", "@types/node": "^24.0.0" } }));
+  execFileSync("corepack", ["pnpm@10.17.1", "install", "--ignore-scripts"], { cwd: root, stdio: "pipe" });
+  const manifest = JSON.parse(await readFile(join(root, "node_modules/@platform-kit/appearance-check/package.json"), "utf8"));
+  assert.equal(manifest.private, undefined);
+  assert.equal(manifest.scripts, undefined);
+  assert(manifest.dependencies.playwright && manifest.dependencies["@axe-core/playwright"]);
+  const list = execFileSync("corepack", ["pnpm@10.17.1", "exec", "appearance-check", "--list"], { cwd: root, encoding: "utf8" });
+  assert.match(list, /AP001 text-contrast/);
+  assert.match(list, /AP008 surface-layering/);
+  await writeFile(join(root, "consumer.ts"), `import {defineConfig} from 'vite';
+    import {appearanceCheck} from '@platform-kit/appearance-check/vite';
+    import type {AuditOptions,CheckId} from '@platform-kit/appearance-check';
+    const checkId: CheckId = 'AP003';
+    const options: AuditOptions = {urls:['http://localhost:5173'],checks:[checkId]};
+    export default defineConfig({plugins:[appearanceCheck({checks:options.checks})]});`);
+  execFileSync("corepack", ["pnpm@10.17.1", "exec", "tsc", "--noEmit", "--moduleResolution", "bundler", "--module", "esnext", "--target", "es2024", "--strict", "--skipLibCheck", "consumer.ts"], { cwd: root, stdio: "pipe" });
+  await writeFile(join(root, "index.html"), `<!doctype html><div style="background:#123;border-radius:24px;padding:4px;width:240px;height:150px"><div id="inner" style="background:#fff;border-radius:24px;height:100%">Surface</div></div>`);
+  const script = `import assert from 'node:assert/strict';
+    import {checks} from '@platform-kit/appearance-check';
+    import {appearanceCheck} from '@platform-kit/appearance-check/vite';
+    import {build,createLogger} from 'vite';
+    assert.equal(checks.length,8);
+    const messages=[]; const logger=createLogger('silent'); logger.warn=m=>messages.push(m);
+    await build({root:process.cwd(),configFile:false,customLogger:logger,plugins:[appearanceCheck({checks:['AP003'],viewports:[{width:800,height:600}],executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE})]});
+    assert(messages.some(m=>m.includes('[AP003]')));
+    console.log('Packed appearance package CLI, exports and consumer build passed.');`;
+  console.log(execFileSync(process.execPath, ["--input-type=module", "-e", script], { cwd: root, encoding: "utf8", env: process.env }));
+} finally { await rm(root, { recursive: true, force: true }); }

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Automatic surface recognition</title>
+  <style>
+    body { margin:24px; background:#fff; color:#111; font:16px/1.5 system-ui; }
+    h1 { font-size:24px; }
+    .frame { box-sizing:border-box; width:280px; height:180px; padding:4px; border-radius:24px; background:#1a4d8f; margin-bottom:24px; }
+    .wrapper { width:100%; height:100%; }
+    .surface { box-sizing:border-box; width:100%; height:100%; padding:24px; border-radius:20px; background:#f0f4fa; }
+    .wrong { border-radius:24px; }
+    .teleport-frame { position:absolute; left:360px; top:98px; }
+  </style>
+  <script src="/vue.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const { createApp, h, Fragment, Teleport } = Vue;
+    const Frame = { setup(_, {slots,attrs}) { return () => h('section', {class:'frame',...attrs},slots.default()); } };
+    const Wrapper = { setup(_, {slots}) { return () => h('div', {class:'wrapper'},slots.default()); } };
+    const Surface = { props:['wrong','label'], setup(props) { return () => h('article',{class:['surface',props.wrong?'wrong':'']},props.label); } };
+    createApp({setup() { return () => h(Fragment, [
+      h('h1','Zero-annotation Vue scan'),
+      h(Frame,{id:'slot-good'},{default:()=>h(Wrapper,null,{default:()=>h(Surface,{label:'Correct: outer 24, inset 4, inner 20'})})}),
+      h(Frame,{id:'slot-bad'},{default:()=>h(Wrapper,null,{default:()=>h(Surface,{wrong:true,label:'Wrong: outer 24, inset 4, inner 24'})})}),
+      h(Teleport,{to:'body'},h(Frame,{id:'teleported',class:'frame teleport-frame'},{default:()=>h(Surface,{wrong:true,label:'Teleported surface: same error'})}))
+    ]); }}).mount('#app');
+  </script>
+</body>
+</html>

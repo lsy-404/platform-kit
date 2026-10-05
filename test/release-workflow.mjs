@@ -10,4 +10,6 @@ assert.match(workflow, /find release -type f -name SHA256SUMS/);
 assert.match(workflow, /awk -v package_dir="\$PACKAGE_DIR"/);
 assert.match(workflow, /sha256sum "\$archive"/);
 
+assert.match(workflow, /appearance-check-v\*\) PACKAGE_DIR="platform-kit-appearance-check"/);
+
 console.log('Package release workflow locates and validates artifacts independent of download layout.');

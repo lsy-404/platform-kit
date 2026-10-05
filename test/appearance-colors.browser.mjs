@@ -61,6 +61,12 @@ try {
 
   await assert.rejects(() => inspectColors(page, "hover"), /target is required/);
 
+  await page.setContent(`<style>body{background:#fff;color:#111} #invisible{color:#fff;background:#fff}</style><span id="invisible">Same default colors</span>`);
+  const equalDefault = await inspectColors(page, "default");
+  assert(equalDefault.findings.some(f => f.checkId === "AP001" && f.target === "#invisible" && f.evidence.contrastRatio === 1));
+  await page.setContent(`<style>body{background:#fff} #outlined{color:#fff;background:#fff;text-shadow:1px 0 #000,-1px 0 #000}</style><span id="outlined">Outlined text</span>`);
+  const outlined = await inspectColors(page, "default");
+  assert(!outlined.findings.some(f => f.evidence.foreground === f.evidence.background && f.evidence.contrastRatio === 1), "text shadows need separate paint analysis");
   await page.setContent(`<style>#uncertain { color:#fff; background-image:url('missing-image.png'); background-color:#fff }</style><span id="uncertain">Uncertain</span>`);
   const incomplete = await inspectColors(page, "default");
   assert(incomplete.skipped.some(f => f.checkId === "AP001" && f.target === "#uncertain"), "axe incomplete contrast should be reported as skipped");
