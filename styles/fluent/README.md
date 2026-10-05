@@ -15,4 +15,15 @@ Controls include buttons, fields, switches, sliders, selects, file pickers, chec
 
 Switches and sliders can omit a visible `label` when an `aria-label` is supplied. `FluentScrollViewer` scrolls vertically by default, enables horizontal scrolling with `horizontal`, and exposes `element()` and `scrollTo(options)` through `FluentScrollViewerHandle`. Set `focusable` to false for a non-tab-stop container.
 
+`FluentSlider` accepts continuous values by default. Set `snap="integer"` for whole numbers or `snap="available"` with `availableValues` for the nearest listed value. The existing `step` prop remains available for a numeric range interval when `snap` is omitted; `snap="none"` explicitly allows any value. `availableValues` also draws marks at those values; `tickFrequency` sets the small-mark interval and `majorTickFrequency` sets a larger-mark interval, independently of snapping. Set `tickPlacement` to `start`, `end`, or `outside` (both sides), and `orientation` to `horizontal` or `vertical`. Values outside the range and non-finite values are ignored in the available list. `formatValue` controls the visible value text; by default the actual number is shown.
+
+```vue
+<FluentSlider v-model="value" :min="0" :max="100"
+  :tick-frequency="5" :major-tick-frequency="20"
+  :available-values="[0, 25, 60, 100]" snap="available"
+  label="Level" />
+```
+
+`stops` is an array of `{ value, label?, disabled? }` that supplies the marks, labels under each mark and snap targets for any count of stops (snap defaults to `available`). Disabled stops stay visible but are skipped by dragging and the keyboard. `tone="neutral"` renders the fill and thumb in the text color instead of the accent. When `modelValue` changes outside a drag, the thumb animates to the new value unless reduced motion is requested.
+
 Selection controls use inline SVG affordances for their open, closed, and selected states; they do not use font glyphs for icons. Icon paths come from Microsoft Fluent UI System Icons (16px regular) and are baked in by `icons.mjs` at build time; `@fluentui/svg-icons` is a dev dependency only.

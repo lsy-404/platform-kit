@@ -112,9 +112,9 @@ describe("Fluent feedback controls", () => {
     const controls = await import("../styles/fluent/src/vue/controls.js");
     const slider = render(
       controls.FluentSlider,
-      { modelValue: 10, min: 0, max: 20, step: 1, label: undefined, disabled: false },
+      { modelValue: 10, min: 0, max: 20, snap: "none", label: undefined, disabled: false },
       { "aria-label": "Playback position" },
-    ).node.children[1];
+    ).node.children[1].children[0];
     expect(slider.props["aria-label"]).toBe("Playback position");
 
     const toggle = render(

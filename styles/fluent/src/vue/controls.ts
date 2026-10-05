@@ -1,8 +1,18 @@
-import { defineComponent, h, mergeProps, ref, type PropType } from "vue";
+import { computed, defineComponent, h, mergeProps, onBeforeUnmount, ref, watch, type PropType } from "vue";
 import { fluentIcon } from "./icon.js";
 
 export type FluentButtonTone = "primary" | "secondary" | "danger" | "subtle";
 export type FluentNoticeTone = "info" | "success" | "warning" | "danger";
+export type FluentSliderSnap = "none" | "integer" | "available";
+export type FluentSliderOrientation = "horizontal" | "vertical";
+export type FluentSliderTickPlacement = "start" | "end" | "outside";
+export type FluentSliderTone = "accent" | "neutral";
+
+export interface FluentSliderStop {
+  readonly value: number;
+  readonly label?: string;
+  readonly disabled?: boolean;
+}
 
 export interface FluentSelectOption {
   readonly value: string;
@@ -37,8 +47,38 @@ function inputValue(event: Event): string {
   return (event.target as HTMLInputElement).value;
 }
 
-function numericInputValue(event: Event): number {
-  return Number((event.target as HTMLInputElement).value);
+function sliderAvailableValues(values: readonly number[] | undefined, min: number, max: number): number[] {
+  return [...new Set((values ?? []).filter((value) => Number.isFinite(value) && value >= min && value <= max))]
+    .sort((a, b) => a - b);
+}
+
+function sliderValue(value: number, min: number, max: number, snap: FluentSliderSnap | undefined, available: readonly number[]): number {
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return 0;
+  const bounded = Math.min(max, Math.max(min, Number.isFinite(value) ? value : min));
+  if (snap === "available" && available.length) {
+    return available.reduce((closest, candidate) =>
+      Math.abs(candidate - bounded) < Math.abs(closest - bounded) ? candidate : closest,
+    );
+  }
+  if (snap === "integer" && Math.ceil(min) <= Math.floor(max)) {
+    return Math.min(Math.floor(max), Math.max(Math.ceil(min), Math.round(bounded)));
+  }
+  return bounded;
+}
+
+function sliderTicks(min: number, max: number, frequency: number | undefined, available: readonly number[]): number[] {
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return [];
+  const ticks = [...available];
+  if (typeof frequency === "number" && Number.isFinite(frequency) && frequency > 0) {
+    const count = Math.floor((max - min) / frequency);
+    if (!Number.isFinite(count)) return [...new Set(ticks)];
+    const stride = Math.max(1, Math.ceil(count / 100));
+    for (let index = 0; index <= count; index += stride) {
+      ticks.push(Number((min + index * frequency).toPrecision(12)));
+    }
+    ticks.push(max);
+  }
+  return [...new Set(ticks)].sort((a, b) => a - b);
 }
 
 export const FluentButton = defineComponent({
@@ -328,43 +368,165 @@ export const FluentSlider = defineComponent({
     modelValue: { type: Number, default: 0 },
     min: { type: Number, default: 0 },
     max: { type: Number, default: 100 },
-    step: { type: Number, default: 1 },
+    step: Number,
+    tickFrequency: Number,
+    majorTickFrequency: Number,
+    availableValues: { type: Array as PropType<readonly number[]>, default: () => [] },
+    stops: Array as PropType<readonly FluentSliderStop[]>,
+    tone: { type: String as PropType<FluentSliderTone>, default: "accent" },
+    snap: String as PropType<FluentSliderSnap>,
+    orientation: { type: String as PropType<FluentSliderOrientation>, default: "horizontal" },
+    tickPlacement: { type: String as PropType<FluentSliderTickPlacement>, default: "outside" },
+    formatValue: Function as PropType<(value: number) => string>,
     label: String,
     disabled: Boolean,
   },
   emits: ["update:modelValue", "change"],
   setup(props, { attrs, emit }) {
-    return () =>
-      h("label", { class: "fluent-slider" }, [
+    const snapMode = (): FluentSliderSnap | undefined => props.snap ?? (props.stops?.length ? "available" : undefined);
+    const enabledValues = () => sliderAvailableValues(
+      props.stops ? props.stops.filter((stop) => !stop.disabled).map((stop) => stop.value) : props.availableValues,
+      props.min, props.max,
+    );
+    const stopValues = () => sliderAvailableValues(props.stops?.map((stop) => stop.value) ?? props.availableValues, props.min, props.max);
+    const targetValue = computed(() => sliderValue(props.modelValue, props.min, props.max, snapMode(), enabledValues()));
+    const shown = ref(targetValue.value);
+    const dragging = ref(false);
+    let frame = 0;
+    const stopAnimation = () => {
+      if (frame) cancelAnimationFrame(frame);
+      frame = 0;
+    };
+    watch(targetValue, (to, from) => {
+      stopAnimation();
+      const animate = !dragging.value && typeof requestAnimationFrame === "function"
+        && !(typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches);
+      if (!animate) { shown.value = to; return; }
+      const start = performance.now();
+      const duration = 180;
+      const step = (now: number) => {
+        const t = Math.min(1, (now - start) / duration);
+        shown.value = from + (to - from) * (1 - (1 - t) ** 3);
+        frame = t < 1 ? requestAnimationFrame(step) : 0;
+      };
+      frame = requestAnimationFrame(step);
+    });
+    onBeforeUnmount(stopAnimation);
+    const updateFromInput = (event: Event, final = false) => {
+      const input = event.target as HTMLInputElement;
+      const available = enabledValues();
+      const next = sliderValue(Number(input.value), props.min, props.max, snapMode(), available);
+      input.value = String(next);
+      emit(final ? "change" : "update:modelValue", next);
+    };
+    const onKeydown = (event: KeyboardEvent) => {
+      const available = enabledValues();
+      const snap = snapMode();
+      if (props.disabled || !snap || snap === "none" || (snap === "available" && !available.length)) return;
+      const values = snap === "available" ? available : [];
+      const first = snap === "available" ? values[0] : Math.ceil(props.min);
+      const last = snap === "available" ? values.at(-1) : Math.floor(props.max);
+      if (first === undefined || last === undefined || !Number.isFinite(first) || !Number.isFinite(last) || first > last) return;
+      const input = event.target as HTMLInputElement;
+      const current = sliderValue(Number(input.value), props.min, props.max, snap, available);
+      const rtl = getComputedStyle(input).direction === "rtl";
+      const direction = event.key === "ArrowUp" || event.key === "PageUp" || event.key === (rtl ? "ArrowLeft" : "ArrowRight") ? 1
+        : event.key === "ArrowDown" || event.key === "PageDown" || event.key === (rtl ? "ArrowRight" : "ArrowLeft") ? -1 : 0;
+      let next: number | undefined;
+      if (event.key === "Home") next = first;
+      else if (event.key === "End") next = last;
+      else if (direction) {
+        const distance = event.key === "PageUp" || event.key === "PageDown" ? 10 : 1;
+        if (snap === "available") {
+          const index = values.indexOf(current);
+          next = values[Math.min(values.length - 1, Math.max(0, index + direction * distance))];
+        } else next = Math.min(last, Math.max(first, current + direction * distance));
+      }
+      if (next === undefined) return;
+      event.preventDefault();
+      if (next === current) return;
+      input.value = String(next);
+      emit("update:modelValue", next);
+      emit("change", next);
+    };
+    return () => {
+      const available = stopValues();
+      const value = shown.value;
+      const disabledStops = new Set(props.stops?.filter((stop) => stop.disabled).map((stop) => stop.value));
+      const labelled = (props.stops ?? []).filter((stop) => stop.label !== undefined && stop.value >= props.min && stop.value <= props.max);
+      const majorTicks = sliderTicks(props.min, props.max, props.majorTickFrequency, []);
+      const ticks = sliderTicks(props.min, props.max, props.tickFrequency, [...available, ...majorTicks]);
+      const majorValues = new Set(majorTicks);
+      const hasStartTicks = ticks.length > 0 && props.tickPlacement !== "end";
+      const hasEndTicks = ticks.length > 0 && props.tickPlacement !== "start";
+      const markPosition = (mark: number) => props.orientation === "vertical"
+        ? { bottom: `${sliderPercentage(mark, props.min, props.max)}%` }
+        : { insetInlineStart: `${sliderPercentage(mark, props.min, props.max)}%` };
+      const renderTicks = (side: "start" | "end") => h("span", {
+        class: ["fluent-slider__ticks", `fluent-slider__ticks--${side}`], "aria-hidden": "true",
+      }, ticks.map((tick) => h("span", {
+        key: tick,
+        class: ["fluent-slider__tick", {
+          "fluent-slider__tick--major": majorValues.has(tick),
+          "fluent-slider__tick--disabled": disabledStops.has(tick),
+        }],
+        "data-value": tick,
+        style: markPosition(tick),
+      })));
+      return h("label", { class: ["fluent-slider", {
+        "fluent-slider--disabled": props.disabled,
+        "fluent-slider--vertical": props.orientation === "vertical",
+        "fluent-slider--neutral": props.tone === "neutral",
+        "fluent-slider--labelled": labelled.length > 0,
+      }] }, [
         props.label ? h("span", { class: "fluent-slider__header" }, [
           h("span", { class: "fluent-slider__label" }, props.label),
           h(
             "output",
             { class: "fluent-slider__value" },
-            `${sliderPercentage(props.modelValue, props.min, props.max).toFixed(0)}%`,
+            props.formatValue?.(targetValue.value) ?? String(targetValue.value),
           ),
         ]) : null,
-        h(
-          "input",
-          mergeProps(attrs, {
+        h("span", { class: ["fluent-slider__rail", {
+          "fluent-slider__rail--marked": ticks.length > 0,
+          "fluent-slider__rail--start": hasStartTicks,
+          "fluent-slider__rail--end": hasEndTicks,
+        }] }, [
+          h("input", mergeProps(attrs, {
             class: ["fluent-slider__input", attrs.class],
             type: "range",
-            value: props.modelValue,
+            value,
             min: props.min,
             max: props.max,
-            step: props.step,
+            step: snapMode() === undefined && typeof props.step === "number" && Number.isFinite(props.step) && props.step > 0
+              ? props.step : "any",
             disabled: props.disabled,
             "aria-label": attrs["aria-label"] ?? props.label,
+            "aria-orientation": props.orientation === "vertical" ? "vertical" : undefined,
             style: {
-              "--fluent-slider-position": `${sliderPercentage(props.modelValue, props.min, props.max)}%`,
+              "--fluent-slider-position": `${sliderPercentage(value, props.min, props.max)}%`,
             },
-            onInput: (event: Event) =>
-              emit("update:modelValue", numericInputValue(event)),
-            onChange: (event: Event) =>
-              emit("change", numericInputValue(event)),
-          }),
-        ),
+            onPointerdown: () => { dragging.value = true; },
+            onPointerup: () => { dragging.value = false; },
+            onPointercancel: () => { dragging.value = false; },
+            onBlur: () => { dragging.value = false; },
+            onInput: (event: Event) => updateFromInput(event),
+            onChange: (event: Event) => updateFromInput(event, true),
+            onKeydown,
+          })),
+          hasStartTicks ? renderTicks("start") : null,
+          hasEndTicks ? renderTicks("end") : null,
+        ]),
+        labelled.length ? h("span", { class: "fluent-slider__labels", "aria-hidden": "true" }, labelled.map((stop) => h("span", {
+          key: stop.value,
+          class: ["fluent-slider__stop-label", {
+            "fluent-slider__stop-label--active": stop.value === targetValue.value,
+            "fluent-slider__stop-label--disabled": stop.disabled,
+          }],
+          style: markPosition(stop.value),
+        }, stop.label))) : null,
       ]);
+    };
   },
 });
 
