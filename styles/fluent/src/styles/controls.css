@@ -190,6 +190,7 @@
   padding: 0;
   border: 0;
   appearance: none;
+  background: transparent;
   accent-color: var(--fluent-accent);
   background: transparent;
   cursor: pointer;
