@@ -6,6 +6,7 @@ import { chromium } from "@playwright/test";
 
 const root = process.cwd();
 const dist = join(root, "apps/fluent-preview/dist");
+const fluentCss = await readFile(join(root, "styles/fluent/dist/style.css"), "utf8");
 const mime = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml" };
 const server = createServer(async (request, response) => {
   const pathname = request.url === "/" ? "/index.html" : new URL(request.url, "http://test").pathname;
@@ -104,6 +105,20 @@ try {
   assert.equal(await background(switchControl.locator(".fluent-switch__track")), accentHover, "checked switch hover lost its checked accent");
   assert.equal(await transform(switchThumb), switchThumbRest, "switch hover changed the thumb geometry");
   const sliderInput = page.getByTestId("fluent-slider");
+  for (const theme of ["light", "dark"]) {
+    await page.locator(".catalog-theme").evaluate((node, value) => node.setAttribute("data-fluent-theme", value), theme);
+    const sliderStyles = await sliderInput.evaluate(node => ({
+      backgroundColor: getComputedStyle(node).backgroundColor,
+      backgroundImage: getComputedStyle(node).backgroundImage,
+      boxShadow: getComputedStyle(node).boxShadow,
+    }));
+    assert.equal(sliderStyles.backgroundColor, "rgba(0, 0, 0, 0)", `${theme} Fluent slider input has a backdrop`);
+    assert.equal(sliderStyles.backgroundImage, "none");
+    assert.equal(sliderStyles.boxShadow, "none");
+    assert.match(fluentCss, /\.fluent-slider__input::-webkit-slider-runnable-track\s*\{[^}]*height:\s*4px[^}]*background:\s*linear-gradient/s, "Fluent slider progress track changed");
+    assert.match(fluentCss, /\.fluent-slider__input::-webkit-slider-thumb\s*\{[^}]*background:\s*var\(--fluent-accent\)/s, "Fluent slider thumb changed");
+  }
+  await page.locator(".catalog-theme").evaluate(node => node.setAttribute("data-fluent-theme", "light"));
   await sliderInput.hover(); await waitForHover();
   assert.equal(await sliderInput.evaluate(node => getComputedStyle(node, "::-webkit-slider-thumb").transform), "none", "slider hover changed the thumb geometry");
   const fieldInput = page.locator(".fluent-field__input:not(:disabled):not([readonly]):not([data-invalid])").first();

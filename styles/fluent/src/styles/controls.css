@@ -176,6 +176,7 @@
   height: 20px;
   margin: 0;
   appearance: none;
+  background: transparent;
   accent-color: var(--fluent-accent);
   cursor: pointer;
 }
