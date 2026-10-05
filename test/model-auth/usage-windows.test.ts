@@ -9,7 +9,8 @@ const daysFromNow = (days: number) => new Date(Date.now() + days * 86_400_000).t
 describe("structured usage windows", () => {
   it("derives status and ratio from the used percentage", () => {
     expect(usageWindow({ id: "a", label: "A", usedPercent: 25, resetAt: null })).toMatchObject({ scope: "account", modelFamilies: [], status: "known", usedRatio: 0.25, reliability: "high" });
-    expect(usageWindow({ id: "a", label: "A", usedPercent: 100, resetAt: 1 })).toMatchObject({ status: "exhausted", usedRatio: 1 });
+    expect(usageWindow({ id: "a", label: "A", usedPercent: 100, resetAt: 1 })).toMatchObject({ status: "known", usedRatio: 1 });
+    expect(usageWindow({ id: "a", label: "A", usedPercent: 100, resetAt: 1, exhausted: true })).toMatchObject({ status: "exhausted" });
     expect(usageWindow({ id: "a", label: "A", usedPercent: null, resetAt: null })).toMatchObject({ status: "unknown", usedRatio: null });
   });
 
@@ -20,7 +21,7 @@ describe("structured usage windows", () => {
   it("marks Anthropic windows by scope and family and keeps absent usage explicit", () => {
     const parsed = parseAnthropicUsage({
       five_hour: { utilization: 30, resets_at: "2030-02-03T04:05:06Z" },
-      seven_day: { utilization: 100 },
+      seven_day: { utilization: 100, locked_reason: "limit" },
       seven_day_opus: { utilization: 55 },
       seven_day_sonnet: {},
       seven_day_oauth_apps: null,
@@ -35,7 +36,7 @@ describe("structured usage windows", () => {
 
   it("marks Codex account windows and per-model additional limits", () => {
     const parsed = parseCodexUsage({
-      rate_limit: { primary_window: { used_percent: 10, reset_at: 2_000_000_000 }, secondary_window: { used_percent: 100 } },
+      rate_limit: { limit_reached: true, primary_window: { used_percent: 10, reset_at: 2_000_000_000, limit_window_seconds: 18000 }, secondary_window: { used_percent: 100, limit_window_seconds: 604800 } },
       additional_rate_limits: [{ limit_name: "Alpha-5.3-Fast-Spark", metered_feature: "codex_bengalfish", rate_limit: { primary_window: { used_percent: 40 }, secondary_window: {} } }],
     });
     const byId = Object.fromEntries(parsed.windows.map(window => [window.id, window]));

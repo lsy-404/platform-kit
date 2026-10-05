@@ -110,7 +110,7 @@ describe("official browser OAuth providers", () => {
     const blocker = createServer();
     await new Promise<void>((resolve, reject) => { blocker.once("error", reject); blocker.listen(1455, "127.0.0.1", resolve); });
     try {
-      await expect(authorizeOpenAI({ openExternal: () => undefined })).rejects.toMatchObject({ code: "transport", message: "OAuth callback listener could not bind." });
+      await expect(authorizeOpenAI({ openExternal: () => undefined })).rejects.toMatchObject({ code: "address-in-use", message: "OAuth callback port is already in use." });
     } finally { await new Promise<void>(resolve => blocker.close(() => resolve())); }
     let opened: URL | undefined; const abort = new AbortController();
     const authorization = authorizeOpenAI({ signal: abort.signal, openExternal: url => { opened = callback(url); } });
@@ -118,5 +118,37 @@ describe("official browser OAuth providers", () => {
     abort.abort();
     await expect(authorization).rejects.toMatchObject({ code: "aborted" });
     await expect(requestCallback(opened!)).rejects.toMatchObject({ code: expect.stringMatching(/^ECONN(?:REFUSED|RESET)$/) });
+  });
+
+  it("falls back to the device code flow when the callback port is taken", async () => {
+    const blocker = createServer();
+    await new Promise<void>((resolve, reject) => { blocker.once("error", reject); blocker.listen(1455, "127.0.0.1", resolve); });
+    const notices: unknown[] = []; const calls: Array<{ url: string; body: Record<string, string> }> = [];
+    let polls = 0;
+    const fetchImpl = (async (url: string, init: RequestInit) => {
+      const body = typeof init.body === "string" && init.body.startsWith("{") ? JSON.parse(init.body) : Object.fromEntries(new URLSearchParams(String(init.body)));
+      calls.push({ url, body });
+      if (url.endsWith("/usercode")) return new Response(JSON.stringify({ device_auth_id: "device-1", user_code: "ABCD-1234", interval: "1" }));
+      if (url.endsWith("/token") && !body.grant_type) return ++polls < 3 ? new Response("{}", { status: polls === 1 ? 403 : 404 }) : new Response(JSON.stringify({ authorization_code: "granted", code_verifier: "server-verifier" }));
+      return token(jwt("device-account"));
+    }) as unknown as typeof fetch;
+    try {
+      const opened: string[] = [];
+      const credential = await authorizeOpenAI({ fetchImpl, pollIntervalMs: 1, openExternal: url => { opened.push(url); }, notify: notice => notices.push(notice) });
+      expect(opened).toEqual([]);
+      expect(notices).toEqual([expect.objectContaining({ type: "device_code", userCode: "ABCD-1234" })]);
+      expect(polls).toBe(3);
+      expect(calls.at(-1)?.body).toMatchObject({ grant_type: "authorization_code", code: "granted", code_verifier: "server-verifier" });
+      expect(credential.accountId).toBe("device-account");
+      await expect(authorizeOpenAI({ fetchImpl, openExternal: () => undefined })).rejects.toMatchObject({ code: "address-in-use" });
+    } finally { await new Promise<void>(resolve => blocker.close(() => resolve())); }
+  });
+
+  it("keeps the previous refresh token when a refresh response omits or nulls it", async () => {
+    const initial = { type: "oauth" as const, access: "a", refresh: "old-refresh", expires: 1 };
+    for (const refresh_token of [undefined, null]) {
+      const renewed = await refreshOpenAI(initial, { fetchImpl: async () => new Response(JSON.stringify({ access_token: "n", expires_in: 3600, refresh_token })) });
+      expect(renewed.refresh).toBe("old-refresh");
+    }
   });
 });

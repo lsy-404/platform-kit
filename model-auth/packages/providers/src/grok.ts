@@ -1,6 +1,6 @@
 import { authorizeBrowserOAuth, refreshBrowserOAuth, type BrowserOAuthAuthorizationOptions, type BrowserOAuthCredential, type BrowserOAuthRefreshOptions } from "./browser-oauth.js";
 import { latestClientVersion } from "./client-versions.js";
-import { usageSnapshot, usageWindow, type ProviderUsageData, type ProviderUsageRequestOptions, type ProviderUsageSnapshot, type ProviderUsageWindow } from "./usage.js";
+import { quotaWindow, usageSnapshot, type ProviderUsageData, type ProviderUsageRequestOptions, type ProviderUsageSnapshot, type ProviderUsageWindow } from "./usage.js";
 
 export const GROK_ENDPOINTS = Object.freeze({
   issuer: "https://auth.x.ai",
@@ -108,12 +108,12 @@ export function parseGrokBilling(payload: unknown): ProviderUsageData {
   const prepaid = amount(config.prepaidBalance ?? config.prepaid_balance);
   const windows: ProviderUsageWindow[] = [];
   if (periodIsCurrent && explicitPercent !== null) {
-    windows.push(usageWindow({ id: "credits", label: periodLabel(periodStart, resetAt), usedPercent: explicitPercent, remainingPercent: 100 - explicitPercent, resetAt }));
+    windows.push(quotaWindow({ id: "credits", label: periodLabel(periodStart, resetAt), usedPercent: explicitPercent, remainingPercent: 100 - explicitPercent, resetAt }));
   } else if (periodIsCurrent && monthlyLimit !== null && monthlyLimit > 0 && includedUsed !== null) {
-    windows.push(usageWindow({ id: "included", label: "Monthly included", usedPercent: ratioPercent(includedUsed, monthlyLimit), remainingPercent: 100 - ratioPercent(includedUsed, monthlyLimit), resetAt,
+    windows.push(quotaWindow({ id: "included", label: "Monthly included", usedPercent: ratioPercent(includedUsed, monthlyLimit), remainingPercent: 100 - ratioPercent(includedUsed, monthlyLimit), resetAt,
       used: includedUsed, limit: monthlyLimit, remaining: Math.max(0, monthlyLimit - includedUsed), unit: "credits" }));
   } else if (periodIsCurrent && onDemandCap !== null && onDemandCap > 0 && onDemandUsed !== null) {
-    windows.push(usageWindow({ id: "on-demand", label: "On-demand", usedPercent: ratioPercent(onDemandUsed, onDemandCap), remainingPercent: 100 - ratioPercent(onDemandUsed, onDemandCap), resetAt,
+    windows.push(quotaWindow({ id: "on-demand", label: "On-demand", usedPercent: ratioPercent(onDemandUsed, onDemandCap), remainingPercent: 100 - ratioPercent(onDemandUsed, onDemandCap), resetAt,
       used: onDemandUsed, limit: onDemandCap, remaining: Math.max(0, onDemandCap - onDemandUsed), unit: "credits" }));
   }
   const plan = firstText(config.subscriptionTierDisplay, config.subscription_tier_display, config.subscriptionTier, config.subscription_tier, config.plan, root.plan);

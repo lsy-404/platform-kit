@@ -67,7 +67,13 @@ Model discovery returns the account's actual service metadata. `streamTrae` and 
 
 ## Structured usage windows
 
-Every `ProviderUsageWindow` carries `scope` (`account`, `model-family` or `model`), normalized `modelFamilies`, `status` (`known`, `unknown` or `exhausted`), `usedRatio` (0..1, null when unknown), `reliability` (`high`, or `low` for scraped sources such as Ollama) and `resetAt`. Providers fill these fields themselves, so consumers never infer scope from labels. A window the provider lists without usage data is reported with status `unknown` rather than omitted. Use `usageWindow` to build windows and `normalizeModelFamilyId` to normalize ids.
+Every `ProviderUsageWindow` carries `scope` (`account`, `model-family` or `model`), normalized `modelFamilies`, `status` (`known`, `unknown` or `exhausted`), `usedRatio` (0..1, null when unknown), `reliability` (`high`, or `low` for scraped sources such as Ollama) and `resetAt`. Providers fill these fields themselves, so consumers never infer scope from labels. `kind` (`session`, `daily`, `weekly`, `monthly` or null) is derived from the window duration. A window is `exhausted` only when the service reports it (limit flags, lock reasons or severity), never from a percentage alone. A window the provider lists without usage data is reported with status `unknown` rather than omitted. Use `usageWindow` to build windows and `normalizeModelFamilyId` to normalize ids.
+
+## Usage requests and errors
+
+Usage queries retry transient network failures twice, never retry 429, call the host-supplied `refresh` once after a 401 or 403, honor `signal`, and never follow redirects. Failures carry `errorCode` (`signed-out`, `rate-limited`, `server-error`, `unreadable`, `unreachable`, `no-limits`); `usageErrorSnapshot` builds an error snapshot that hosts can merge with `mergeUsageReading` from core. Anthropic profile metadata is cached for six hours per credential, failures included.
+
+`authorizeOpenAI` switches to the device code flow when the loopback port is taken and `notify` is supplied, reporting the code through a `device_code` notice.
 
 ## Ollama web session and usage
 

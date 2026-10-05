@@ -1,4 +1,4 @@
-import { usageSnapshot, usageWindow, type ProviderUsageData, type ProviderUsageRequestOptions, type ProviderUsageSnapshot, type ProviderUsageWindow } from "./usage.js";
+import { quotaWindow, usageSnapshot, type ProviderUsageData, type ProviderUsageRequestOptions, type ProviderUsageSnapshot, type ProviderUsageWindow } from "./usage.js";
 
 export const OLLAMA_WEB_ENDPOINTS = Object.freeze({
   signIn: "https://ollama.com/signin",
@@ -136,7 +136,7 @@ export function parseOllamaSettings(html: string): ProviderUsageData {
     const limit = parseMoney(money[2]);
     if (used !== null && limit !== null && limit > 0) {
       const usedPercent = ratioPercent(used, limit);
-      windows.push(usageWindow({ reliability: "low", id: "included", label: "Monthly included", usedPercent, remainingPercent: 100 - usedPercent, resetAt: resetAtNear(source, source.search(/included usage|monthly included|included credits/i)), used, limit, remaining: Math.max(0, limit - used), unit: "USD" }));
+      windows.push(quotaWindow({ reliability: "low", id: "included", label: "Monthly included", usedPercent, remainingPercent: 100 - usedPercent, resetAt: resetAtNear(source, source.search(/included usage|monthly included|included credits/i)), used, limit, remaining: Math.max(0, limit - used), unit: "USD" }));
     }
   }
   for (const [id, label, pattern] of [
@@ -150,7 +150,7 @@ export function parseOllamaSettings(html: string): ProviderUsageData {
     const match = segment.match(/(\d+(?:\.\d+)?)\s*%/);
     const usedPercent = match ? Math.max(0, Math.min(100, Number(match[1]))) : null;
     if (usedPercent === null) continue;
-    windows.push(usageWindow({ reliability: "low", id, label, usedPercent, resetAt: resetAtNear(source, source.toLowerCase().indexOf(label.toLowerCase())) }));
+    windows.push(quotaWindow({ reliability: "low", id, label, usedPercent, resetAt: resetAtNear(source, source.toLowerCase().indexOf(label.toLowerCase())) }));
   }
   return {
     plan: plan ? plan.toLowerCase().replace(/^./, (value) => value.toUpperCase()) : null,

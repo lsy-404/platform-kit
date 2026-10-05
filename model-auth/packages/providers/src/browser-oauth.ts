@@ -23,7 +23,7 @@ export interface BrowserOAuthRefreshOptions {
   readonly signal?: AbortSignal;
 }
 
-export type BrowserOAuthErrorCode = "aborted" | "browser" | "callback" | "response" | "timeout" | "transport";
+export type BrowserOAuthErrorCode = "aborted" | "address-in-use" | "browser" | "callback" | "response" | "timeout" | "transport";
 
 export class BrowserOAuthError extends Error {
   constructor(public readonly code: BrowserOAuthErrorCode, message: string) {
@@ -104,6 +104,15 @@ export async function refreshBrowserOAuth(
   return requestToken(config, { grant_type: "refresh_token", client_id: config.clientId, refresh_token: refresh }, options.fetchImpl ?? fetch, options.signal, undefined, refresh, credential.accountId);
 }
 
+/** Exchange an authorization code obtained outside the loopback listener. */
+export function exchangeBrowserOAuthCode(
+  config: BrowserOAuthConfiguration,
+  form: Record<string, string>,
+  options: { readonly fetchImpl?: typeof fetch; readonly signal?: AbortSignal } = {},
+): Promise<BrowserOAuthCredential> {
+  return requestToken(config, { grant_type: "authorization_code", client_id: config.clientId, ...form }, options.fetchImpl ?? fetch, options.signal);
+}
+
 async function requestToken(
   config: BrowserOAuthConfiguration, form: Record<string, string>, fetchImpl: typeof fetch, signal?: AbortSignal, timeoutSignal?: AbortSignal, previousRefresh?: string, previousAccountId?: string,
 ): Promise<BrowserOAuthCredential> {
@@ -140,7 +149,7 @@ async function requestToken(
 function credentialFrom(payload: unknown, accountIdFromAccess?: (access: string) => string | undefined, previousRefresh?: string, previousAccountId?: string): BrowserOAuthCredential {
   const value = record(payload);
   const access = requiredText(value?.access_token);
-  const refresh = value && Object.prototype.hasOwnProperty.call(value, "refresh_token") ? requiredText(value.refresh_token) : previousRefresh;
+  const refresh = value && value.refresh_token !== undefined && value.refresh_token !== null ? requiredText(value.refresh_token) : previousRefresh;
   const expiresIn = Number(value?.expires_in);
   if (!access || !refresh || !Number.isFinite(expiresIn) || expiresIn <= 0 || expiresIn > 365 * 86400) {
     throw new BrowserOAuthError("response", "OAuth token response is incomplete.");
@@ -197,7 +206,9 @@ async function startCallbackListener(config: BrowserOAuthConfiguration, state: s
   removeAbort = () => signal.removeEventListener("abort", abort);
   try {
     await new Promise<void>((resolve, reject) => {
-      const onError = () => reject(new BrowserOAuthError("transport", "OAuth callback listener could not bind."));
+      const onError = (error: NodeJS.ErrnoException) => reject(error.code === "EADDRINUSE"
+        ? new BrowserOAuthError("address-in-use", "OAuth callback port is already in use.")
+        : new BrowserOAuthError("transport", "OAuth callback listener could not bind."));
       server.once("error", onError);
       server.listen(Number(redirect.port), "127.0.0.1", () => { server.removeListener("error", onError); resolve(); });
     });

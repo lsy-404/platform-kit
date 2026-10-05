@@ -3,6 +3,8 @@ export { default as ModelAuthDialog } from "./ModelAuthDialog.vue";
 export type * from "./types";
 export { defaultMessages } from "./messages";
 export type { ModelAuthMessages } from "./messages";
+export { windowShortLabel, resetCountdown, usageTint, tightestWindows } from "./usage";
+export type { UsageTint } from "./usage";
 export { useModelAuth } from "./useModelAuth";
 export type { ModelAuthHost, ModelAuthState, ModelAuthAction } from "./useModelAuth";
 import "./style.css";

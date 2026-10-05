@@ -713,6 +713,8 @@ export type ProviderUsageStatus = "ok" | "unknown" | "error";
 export type ProviderUsageWindowScope = "account" | "model-family" | "model";
 export type ProviderUsageWindowStatus = "known" | "unknown" | "exhausted";
 export type ProviderUsageWindowReliability = "high" | "low";
+export type ProviderUsageWindowKind = "session" | "daily" | "weekly" | "monthly";
+export type ProviderUsageErrorCode = "signed-out" | "rate-limited" | "server-error" | "unreadable" | "unreachable" | "no-limits";
 
 export interface ProviderUsageWindow {
   readonly id: string;
@@ -722,6 +724,8 @@ export interface ProviderUsageWindow {
   readonly status: ProviderUsageWindowStatus;
   readonly usedRatio: number | null;
   readonly reliability: ProviderUsageWindowReliability;
+  /** Derived from the window duration; null when the duration is unknown. */
+  readonly kind: ProviderUsageWindowKind | null;
   readonly usedPercent: number | null;
   readonly remainingPercent?: number | null;
   readonly resetAt: number | null;
@@ -763,6 +767,8 @@ export interface ProviderUsageSnapshot {
   readonly status: ProviderUsageStatus;
   readonly plan: string | null;
   readonly planMultiplier?: number | null;
+  /** Provider tier value as reported, kept when it has no numeric multiplier. */
+  readonly planTier?: string | null;
   readonly billingInterval?: string | null;
   readonly subscriptionRenewsAt?: number | null;
   readonly subscriptionExpiresAt?: number | null;
@@ -770,8 +776,223 @@ export interface ProviderUsageSnapshot {
   readonly windows: readonly ProviderUsageWindow[];
   readonly balance: ProviderUsageBalance | null;
   readonly estimate?: ProviderUsageEstimate | null;
+  /** Organization or account id used to keep cached readings from crossing accounts. */
+  readonly identity?: string | null;
   readonly fetchedAtUtc: string;
   readonly error: string | null;
+  readonly errorCode?: ProviderUsageErrorCode | null;
+  /** True when the windows come from an earlier successful reading. */
+  readonly stale?: boolean;
+}
+
+export type UsageHttpClass = "ok" | "signed-out" | "rate-limited" | "server-error";
+
+/** Redirects and 401/403 mean the credential was rejected; 5xx never does. */
+export function classifyUsageHttp(status: number): UsageHttpClass {
+  if (status >= 200 && status < 300) return "ok";
+  if ((status >= 300 && status < 400) || status === 401 || status === 403) return "signed-out";
+  if (status === 429) return "rate-limited";
+  return "server-error";
+}
+
+export type UsageRemedy = "reauth" | "retry" | null;
+
+export function usageRemedy(code: ProviderUsageErrorCode | null | undefined): UsageRemedy {
+  if (code === "signed-out") return "reauth";
+  if (code === "rate-limited" || code === "server-error" || code === "unreadable" || code === "unreachable") return "retry";
+  return null;
+}
+
+const NO_RESET_WINDOW_TTL_MS = 24 * 3600 * 1000;
+
+/** Keep the last good reading, marked stale, when the new reading failed. */
+export function mergeUsageReading(
+  previous: ProviderUsageSnapshot | null | undefined,
+  next: ProviderUsageSnapshot,
+  now: number,
+): ProviderUsageSnapshot {
+  if (next.status !== "error") return next;
+  if (!previous || previous.status === "error" || previous.providerId !== next.providerId || previous.credentialId !== next.credentialId) return next;
+  if (previous.identity && next.identity && previous.identity !== next.identity) return next;
+  const fetchedAt = Date.parse(previous.fetchedAtUtc);
+  const windows = previous.windows.filter((window) => window.resetAt !== null
+    ? window.resetAt > now
+    : Number.isFinite(fetchedAt) && now - fetchedAt <= NO_RESET_WINDOW_TTL_MS);
+  return { ...previous, windows, stale: true, error: next.error, errorCode: next.errorCode ?? null };
+}
+
+export interface OAuthRenewalSlot {
+  readonly expires: number;
+  readonly accountId?: string;
+}
+
+export interface OAuthTombstone {
+  readonly tombstone: true;
+}
+
+export const OAUTH_TOMBSTONE: OAuthTombstone = Object.freeze({ tombstone: true });
+
+export function isOAuthTombstone(value: unknown): value is OAuthTombstone {
+  return typeof value === "object" && value !== null && (value as { tombstone?: unknown }).tombstone === true;
+}
+
+/** Compare-and-set rule for storing a refreshed credential; logout deletes without it. */
+export function acceptsRenewal(existing: OAuthRenewalSlot | OAuthTombstone | null | undefined, next: OAuthRenewalSlot): boolean {
+  if (!existing || isOAuthTombstone(existing)) return false;
+  return next.expires > existing.expires && next.accountId === existing.accountId;
+}
+
+export interface RefreshGate {
+  run<T>(credentialId: string, task: () => Promise<T>): Promise<T>;
+}
+
+/** Runs one refresh per credential id at a time; concurrent callers share its result. */
+export function createRefreshGate(): RefreshGate {
+  const running = new Map<string, Promise<unknown>>();
+  return {
+    run<T>(credentialId: string, task: () => Promise<T>): Promise<T> {
+      const current = running.get(credentialId);
+      if (current) return current as Promise<T>;
+      const promise = (async () => task())().finally(() => { if (running.get(credentialId) === promise) running.delete(credentialId); });
+      running.set(credentialId, promise);
+      return promise;
+    },
+  };
+}
+
+/** Numeric multiplier encoded in a tier name such as "default_claude_max_5x". */
+export function planMultiplierFromTier(tier: unknown): number | null {
+  if (typeof tier !== "string") return null;
+  const match = /(?:^|[^a-z0-9])(\d{1,3})x(?:$|[^a-z0-9])/i.exec(tier);
+  return match ? Number(match[1]) : null;
+}
+
+/** Codex plan names; "prolite" is the 5x Pro tier and other values pass through. */
+export function normalizeCodexPlan(value: unknown): { plan: string | null; multiplier: number | null } {
+  if (typeof value !== "string" || !value.trim()) return { plan: null, multiplier: null };
+  const plan = value.trim();
+  return plan.toLowerCase() === "prolite" ? { plan: "pro", multiplier: 5 } : { plan, multiplier: null };
+}
+
+export type OAuthCredentialStatus = "active" | "refresh-needed" | "reauth" | "unknown";
+
+/** Read-only view of an OAuth credential; never contains token values. */
+export interface OAuthCredentialView {
+  readonly account?: string;
+  readonly organization?: string;
+  readonly plan?: string;
+  readonly planMultiplier?: number;
+  readonly tokenExpiresAt?: number;
+  readonly refreshExpiresAt?: number;
+  readonly scopes?: readonly string[];
+  readonly lastRefreshAt?: number;
+  readonly status: OAuthCredentialStatus;
+}
+
+interface OAuthFieldMap {
+  readonly account: readonly string[];
+  readonly organization: readonly string[];
+  readonly plan: readonly string[];
+  readonly tier: readonly string[];
+  readonly expires: readonly string[];
+  readonly refreshExpires: readonly string[];
+  readonly scopes: readonly string[];
+  readonly lastRefresh: readonly string[];
+}
+
+const BASE_OAUTH_FIELDS: OAuthFieldMap = {
+  account: ["email", "accountEmail", "username", "login", "accountId", "account_id"],
+  organization: ["organizationName", "organization", "orgName", "organizationId", "organization_id", "orgId"],
+  plan: ["subscriptionType", "plan", "planType", "plan_type"],
+  tier: ["rateLimitTier", "rate_limit_tier", "tier"],
+  expires: ["expires", "expiresAt", "expires_at", "accessExpires"],
+  refreshExpires: ["refreshExpires", "refreshExpiresAt", "refresh_expires_at", "refreshTokenExpiresAt"],
+  scopes: ["scopes", "scope"],
+  lastRefresh: ["lastRefresh", "lastRefreshAt", "last_refresh", "refreshedAt"],
+};
+
+const OAUTH_FIELD_OVERRIDES: Readonly<Record<string, Partial<OAuthFieldMap>>> = {
+  anthropic: { organization: ["organizationName", "organizationId", "organization_id"], plan: ["subscriptionType"] },
+  "openai-codex": { account: ["email", "accountEmail"], plan: ["planType", "plan_type", "plan"] },
+  "github-copilot": { account: ["login", "username", "email"], organization: ["enterpriseUrl", "organization"] },
+};
+
+function oauthTimestamp(value: unknown): number | undefined {
+  const numeric = typeof value === "number" ? value : typeof value === "string" && /^\d+(\.\d+)?$/.test(value.trim()) ? Number(value) : NaN;
+  if (Number.isFinite(numeric) && numeric > 0) return numeric < 10_000_000_000 ? numeric * 1000 : numeric;
+  const parsed = typeof value === "string" ? Date.parse(value) : NaN;
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function jwtClaims(token: unknown): Record<string, unknown> {
+  if (typeof token !== "string") return {};
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return {};
+    const parsed: unknown = JSON.parse(globalThis.atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+  } catch { return {}; }
+}
+
+/** Parse a stored OAuth credential into a safe display view; unmapped fields are dropped. */
+export function describeOAuthCredential(provider: string, credential: unknown, now: number = Date.now()): OAuthCredentialView {
+  const source = credential && typeof credential === "object" && !Array.isArray(credential) ? credential as Record<string, unknown> : {};
+  const fields: OAuthFieldMap = { ...BASE_OAUTH_FIELDS, ...(OAUTH_FIELD_OVERRIDES[provider] ?? {}) };
+  const secrets = new Set(["access", "refresh", "id_token", "idToken", "access_token", "refresh_token"].flatMap((key) => {
+    const value = source[key];
+    return typeof value === "string" && value ? [value] : [];
+  }));
+  const text = (value: unknown): string | undefined => {
+    if (typeof value !== "string") return undefined;
+    const trimmed = value.trim();
+    return trimmed && trimmed.length <= 200 && !/\s{2,}|[\u0000-\u001f]/.test(trimmed) && !secrets.has(trimmed) && !/^eyJ[\w-]+\.[\w-]+\./.test(trimmed) ? trimmed : undefined;
+  };
+  const pick = (names: readonly string[], read: (value: unknown) => unknown = text): unknown => {
+    for (const name of names) {
+      const value = read(source[name]);
+      if (value !== undefined) return value;
+    }
+    return undefined;
+  };
+  const claims = provider === "openai-codex" ? jwtClaims(source.access) : {};
+  const profileClaims = (claims["https://api.openai.com/profile"] ?? {}) as Record<string, unknown>;
+  const authClaims = (claims["https://api.openai.com/auth"] ?? {}) as Record<string, unknown>;
+  const account = (pick(fields.account) ?? text(profileClaims.email) ?? text(source.accountId) ?? text(authClaims.chatgpt_account_id)) as string | undefined;
+  const organization = pick(fields.organization) as string | undefined;
+  let plan = (pick(fields.plan) ?? text(authClaims.chatgpt_plan_type)) as string | undefined;
+  let planMultiplier: number | undefined;
+  if (provider === "openai-codex" && plan) {
+    const normalized = normalizeCodexPlan(plan);
+    plan = normalized.plan ?? plan;
+    if (normalized.multiplier !== null) planMultiplier = normalized.multiplier;
+  }
+  const tier = pick(fields.tier) as string | undefined;
+  if (planMultiplier === undefined && tier) {
+    const fromTier = planMultiplierFromTier(tier);
+    if (fromTier !== null) planMultiplier = fromTier;
+  }
+  const scopes = pick(fields.scopes, (value) => {
+    const items = Array.isArray(value) ? value : typeof value === "string" ? value.split(/[\s,]+/) : [];
+    const safe = [...new Set(items.flatMap((item) => typeof item === "string" && /^[\w:./-]{1,100}$/.test(item) && !secrets.has(item) ? [item] : []))];
+    return safe.length ? safe : undefined;
+  }) as string[] | undefined;
+  const tokenExpiresAt = pick(fields.expires, oauthTimestamp) as number | undefined;
+  const refreshExpiresAt = pick(fields.refreshExpires, oauthTimestamp) as number | undefined;
+  const lastRefreshAt = pick(fields.lastRefresh, oauthTimestamp) as number | undefined;
+  const status: OAuthCredentialStatus = refreshExpiresAt !== undefined && refreshExpiresAt <= now ? "reauth"
+    : tokenExpiresAt === undefined ? "unknown"
+      : tokenExpiresAt <= now ? "refresh-needed" : "active";
+  return {
+    ...(account ? { account } : {}),
+    ...(organization ? { organization } : {}),
+    ...(plan ? { plan } : {}),
+    ...(planMultiplier !== undefined ? { planMultiplier } : {}),
+    ...(tokenExpiresAt !== undefined ? { tokenExpiresAt } : {}),
+    ...(refreshExpiresAt !== undefined ? { refreshExpiresAt } : {}),
+    ...(scopes ? { scopes } : {}),
+    ...(lastRefreshAt !== undefined ? { lastRefreshAt } : {}),
+    status,
+  };
 }
 
 export interface ProviderAdapterHost {
@@ -898,6 +1119,9 @@ function validateUsageEstimate(estimate: ProviderUsageEstimate): ProviderUsageEs
   };
 }
 
+const USAGE_WINDOW_KINDS: readonly string[] = ["session", "daily", "weekly", "monthly"];
+const USAGE_ERROR_CODES: readonly string[] = ["signed-out", "rate-limited", "server-error", "unreadable", "unreachable", "no-limits"];
+
 function validateUsageSnapshot(capability: ProviderCapabilityDescriptor, credentialId: string, snapshot: ProviderUsageSnapshot): ProviderUsageSnapshot {
   if (!snapshot || typeof snapshot !== "object" || snapshot.providerId !== capability.providerId
     || snapshot.credentialId !== credentialId || typeof snapshot.credentialId !== "string" || !snapshot.credentialId.trim()
@@ -910,7 +1134,11 @@ function validateUsageSnapshot(capability: ProviderCapabilityDescriptor, credent
     || (snapshot.metadataError !== undefined && snapshot.metadataError !== null && typeof snapshot.metadataError !== "string")
     || !Array.isArray(snapshot.windows)
     || typeof snapshot.fetchedAtUtc !== "string" || Number.isNaN(Date.parse(snapshot.fetchedAtUtc))
-    || (snapshot.error !== null && typeof snapshot.error !== "string")) {
+    || (snapshot.error !== null && typeof snapshot.error !== "string")
+    || (snapshot.planTier !== undefined && snapshot.planTier !== null && typeof snapshot.planTier !== "string")
+    || (snapshot.identity !== undefined && snapshot.identity !== null && typeof snapshot.identity !== "string")
+    || (snapshot.stale !== undefined && typeof snapshot.stale !== "boolean")
+    || (snapshot.errorCode !== undefined && snapshot.errorCode !== null && !USAGE_ERROR_CODES.includes(snapshot.errorCode))) {
     throw new Error("adapter returned an invalid usage snapshot");
   }
   const windows = snapshot.windows.map((window) => {
@@ -921,6 +1149,7 @@ function validateUsageSnapshot(capability: ProviderCapabilityDescriptor, credent
       || (window.scope === "account" && window.modelFamilies.length > 0)
       || !["known", "unknown", "exhausted"].includes(window.status)
       || !["high", "low"].includes(window.reliability)
+      || (window.kind !== undefined && window.kind !== null && !USAGE_WINDOW_KINDS.includes(window.kind))
       || (window.usedRatio !== null && (typeof window.usedRatio !== "number" || !Number.isFinite(window.usedRatio) || window.usedRatio < 0 || window.usedRatio > 1))
       || (window.status === "unknown") !== (window.usedRatio === null)
       || (window.usedPercent !== null && (typeof window.usedPercent !== "number" || !Number.isFinite(window.usedPercent) || window.usedPercent < 0 || window.usedPercent > 100))
@@ -943,6 +1172,7 @@ function validateUsageSnapshot(capability: ProviderCapabilityDescriptor, credent
       status: window.status,
       usedRatio: window.usedRatio,
       reliability: window.reliability,
+      kind: window.kind ?? null,
       usedPercent: window.usedPercent,
       ...(window.remainingPercent !== undefined ? { remainingPercent: window.remainingPercent } : {}),
       resetAt: window.resetAt,
@@ -966,6 +1196,7 @@ function validateUsageSnapshot(capability: ProviderCapabilityDescriptor, credent
     status: snapshot.status,
     plan: snapshot.plan,
     ...(snapshot.planMultiplier !== undefined ? { planMultiplier: snapshot.planMultiplier } : {}),
+    ...(snapshot.planTier !== undefined ? { planTier: snapshot.planTier } : {}),
     ...(snapshot.billingInterval !== undefined ? { billingInterval: snapshot.billingInterval } : {}),
     ...(snapshot.subscriptionRenewsAt !== undefined ? { subscriptionRenewsAt: snapshot.subscriptionRenewsAt } : {}),
     ...(snapshot.subscriptionExpiresAt !== undefined ? { subscriptionExpiresAt: snapshot.subscriptionExpiresAt } : {}),
@@ -973,8 +1204,11 @@ function validateUsageSnapshot(capability: ProviderCapabilityDescriptor, credent
     windows,
     balance: balance ?? null,
     ...(estimate !== undefined ? { estimate } : {}),
+    ...(snapshot.identity !== undefined ? { identity: snapshot.identity } : {}),
     fetchedAtUtc: snapshot.fetchedAtUtc,
     error: safeUsageText(snapshot.error),
+    ...(snapshot.errorCode !== undefined ? { errorCode: snapshot.errorCode } : {}),
+    ...(snapshot.stale !== undefined ? { stale: snapshot.stale } : {}),
   };
 }
 

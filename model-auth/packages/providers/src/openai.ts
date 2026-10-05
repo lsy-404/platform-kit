@@ -1,6 +1,6 @@
-import { normalizeModelId, type ModelDescriptor } from "@model-auth/core";
+import { normalizeModelId, type ModelDescriptor, type ProviderAuthNotice } from "@model-auth/core";
 import { latestClientVersion } from "./client-versions.js";
-import { authorizeBrowserOAuth, refreshBrowserOAuth, type BrowserOAuthAuthorizationOptions, type BrowserOAuthCredential, type BrowserOAuthRefreshOptions } from "./browser-oauth.js";
+import { authorizeBrowserOAuth, BrowserOAuthError, exchangeBrowserOAuthCode, refreshBrowserOAuth, type BrowserOAuthAuthorizationOptions, type BrowserOAuthCredential, type BrowserOAuthRefreshOptions } from "./browser-oauth.js";
 
 const CODEX_ORIGINATOR = "pi";
 const OPENAI_CONFIG = {
@@ -23,9 +23,74 @@ const OPENAI_CONFIG = {
 };
 
 export type OpenAIOAuthCredential = BrowserOAuthCredential;
-export type OpenAIAuthorizationOptions = BrowserOAuthAuthorizationOptions;
+export interface OpenAIAuthorizationOptions extends BrowserOAuthAuthorizationOptions {
+  /** Receives the device code when the loopback port is taken; without it that failure is thrown. */
+  readonly notify?: (notice: ProviderAuthNotice) => void;
+  /** Overrides the server-provided polling interval. */
+  readonly pollIntervalMs?: number;
+}
 export type OpenAIRefreshOptions = BrowserOAuthRefreshOptions;
-export const authorizeOpenAI = (options: OpenAIAuthorizationOptions): Promise<OpenAIOAuthCredential> => authorizeBrowserOAuth(OPENAI_CONFIG, options);
+export async function authorizeOpenAI(options: OpenAIAuthorizationOptions): Promise<OpenAIOAuthCredential> {
+  try {
+    return await authorizeBrowserOAuth(OPENAI_CONFIG, options);
+  } catch (error) {
+    if (!(error instanceof BrowserOAuthError) || error.code !== "address-in-use" || !options.notify) throw error;
+    return authorizeDeviceCode(options, options.notify);
+  }
+}
+
+const DEVICE_AUTH_BASE = "https://auth.openai.com/api/accounts/deviceauth";
+const DEVICE_VERIFICATION_URI = "https://auth.openai.com/codex/device";
+const DEVICE_REDIRECT_URI = "https://auth.openai.com/deviceauth/callback";
+const DEVICE_BUDGET_MS = 900_000;
+const DEVICE_DEFAULT_INTERVAL_S = 5;
+
+async function authorizeDeviceCode(options: OpenAIAuthorizationOptions, notify: (notice: ProviderAuthNotice) => void): Promise<OpenAIOAuthCredential> {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const budget = Math.min(options.timeoutMs && options.timeoutMs > 0 ? options.timeoutMs : DEVICE_BUDGET_MS, DEVICE_BUDGET_MS);
+  const timeout = AbortSignal.timeout(budget);
+  const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
+  const stop = (): BrowserOAuthError => timeout.aborted
+    ? new BrowserOAuthError("timeout", "OAuth authorization timed out.")
+    : new BrowserOAuthError("aborted", "Browser authorization was cancelled.");
+  const post = async (path: string, body: Record<string, string>): Promise<Response> => {
+    try {
+      return await fetchImpl(`${DEVICE_AUTH_BASE}/${path}`, {
+        method: "POST", redirect: "error", signal,
+        headers: { accept: "application/json", "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      if (signal.aborted) throw stop();
+      throw new BrowserOAuthError("transport", "OAuth device code request could not be completed.");
+    }
+  };
+  const started = await post("usercode", { client_id: OPENAI_CONFIG.clientId });
+  if (!started.ok) throw new BrowserOAuthError("transport", "OAuth device code request was rejected.");
+  const start = record(await started.json().catch(() => null));
+  const deviceAuthId = stringValue(start?.device_auth_id);
+  const userCode = stringValue(start?.user_code) ?? stringValue(start?.usercode);
+  if (!deviceAuthId || !userCode) throw new BrowserOAuthError("response", "OAuth device code response is invalid.");
+  const serverInterval = Number(start?.interval);
+  const intervalMs = options.pollIntervalMs ?? (Number.isFinite(serverInterval) && serverInterval > 0 ? serverInterval : DEVICE_DEFAULT_INTERVAL_S) * 1000;
+  notify({ type: "device_code", userCode, verificationUri: DEVICE_VERIFICATION_URI, intervalSeconds: Math.ceil(intervalMs / 1000), expiresInSeconds: Math.floor(budget / 1000) });
+  for (;;) {
+    await new Promise<void>((resolve, reject) => {
+      if (signal.aborted) { reject(stop()); return; }
+      const timer = setTimeout(() => { signal.removeEventListener("abort", onAbort); resolve(); }, intervalMs);
+      const onAbort = () => { clearTimeout(timer); reject(stop()); };
+      signal.addEventListener("abort", onAbort, { once: true });
+    });
+    const polled = await post("token", { device_auth_id: deviceAuthId, user_code: userCode });
+    if (polled.status === 403 || polled.status === 404) continue;
+    if (!polled.ok) throw new BrowserOAuthError("transport", "OAuth device code was rejected.");
+    const grant = record(await polled.json().catch(() => null));
+    const code = stringValue(grant?.authorization_code);
+    const verifier = stringValue(grant?.code_verifier);
+    if (!code || !verifier) throw new BrowserOAuthError("response", "OAuth device code response is invalid.");
+    return exchangeBrowserOAuthCode(OPENAI_CONFIG, { code, code_verifier: verifier, redirect_uri: DEVICE_REDIRECT_URI }, { fetchImpl, signal });
+  }
+}
 export const refreshOpenAI = (credential: OpenAIOAuthCredential, options?: OpenAIRefreshOptions): Promise<OpenAIOAuthCredential> => refreshBrowserOAuth(OPENAI_CONFIG, credential, options);
 
 export interface OpenAICodexModel extends ModelDescriptor {

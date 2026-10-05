@@ -36,9 +36,16 @@ export interface ProviderAuthState {
   error: string | null;
 }
 
+export type CredentialUsageWindowKind = "session" | "daily" | "weekly" | "monthly";
+export type CredentialUsageWindowStatus = "known" | "unknown" | "exhausted";
+export type CredentialUsageErrorCode = "signed-out" | "rate-limited" | "server-error" | "unreadable" | "unreachable" | "no-limits";
+
 export interface CredentialUsageWindow {
   id: string;
   label: string;
+  kind?: CredentialUsageWindowKind | null;
+  status?: CredentialUsageWindowStatus;
+  windowSeconds?: number;
   usedPercent: number | null;
   remainingPercent?: number | null;
   resetAt: number | null;
@@ -74,6 +81,7 @@ export interface CredentialUsage {
   status: "ok" | "unknown" | "error";
   plan: string | null;
   planMultiplier?: number | null;
+  planTier?: string | null;
   billingInterval?: string | null;
   subscriptionRenewsAt?: number | null;
   subscriptionExpiresAt?: number | null;
@@ -83,6 +91,8 @@ export interface CredentialUsage {
   estimate?: CredentialUsageEstimate | null;
   fetchedAtUtc: string;
   error: string | null;
+  errorCode?: CredentialUsageErrorCode | null;
+  stale?: boolean;
 }
 
 export interface CatalogStatus {
