@@ -147,12 +147,20 @@ try {
   assert.equal(await page.getByTestId("slider-available").locator("xpath=../..").locator(".fluent-slider__tick").count(), 10);
   const availableSlider = page.getByTestId("slider-available");
   await availableSlider.focus();
+  const settled = async (locator, expected, message) => {
+    await locator.evaluate((node, value) => new Promise(resolve => {
+      const started = performance.now();
+      const poll = () => node.value === value || performance.now() - started > 1000 ? resolve() : requestAnimationFrame(poll);
+      poll();
+    }), expected);
+    assert.equal(await locator.inputValue(), expected, message);
+  };
   await page.keyboard.press("ArrowRight");
-  assert.equal(await availableSlider.inputValue(), "60", "available-value keyboard step did not reach the next value");
+  await settled(availableSlider, "60", "available-value keyboard step did not reach the next value");
   await page.keyboard.press("Home");
-  assert.equal(await availableSlider.inputValue(), "0");
+  await settled(availableSlider, "0", "Home did not reach the first value");
   await page.keyboard.press("End");
-  assert.equal(await availableSlider.inputValue(), "100");
+  await settled(availableSlider, "100", "End did not reach the last value");
   const integerSlider = page.getByTestId("slider-integer");
   await integerSlider.evaluate(node => { node.value = "4.7"; node.dispatchEvent(new Event("input", { bubbles: true })); });
   assert.equal(await integerSlider.inputValue(), "5", "integer pointer input was not snapped");

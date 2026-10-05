@@ -399,6 +399,7 @@ export const FluentSlider = defineComponent({
     };
     watch(targetValue, (to, from) => {
       stopAnimation();
+      if (to === shown.value) return;
       const animate = !dragging.value && typeof requestAnimationFrame === "function"
         && !(typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches);
       if (!animate) { shown.value = to; return; }
@@ -417,6 +418,8 @@ export const FluentSlider = defineComponent({
       const available = enabledValues();
       const next = sliderValue(Number(input.value), props.min, props.max, snapMode(), available);
       input.value = String(next);
+      stopAnimation();
+      shown.value = next;
       emit(final ? "change" : "update:modelValue", next);
     };
     const onKeydown = (event: KeyboardEvent) => {
