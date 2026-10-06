@@ -75,6 +75,10 @@ Usage queries retry transient network failures twice, never retry 429, call the 
 
 `authorizeOpenAI` switches to the device code flow when the loopback port is taken and `notify` is supplied, reporting the code through a `device_code` notice.
 
+## Ollama API key usage
+
+`queryOllamaKeyUsage(apiKey, options)` reads account quota from `https://ollama.com/api/usage` with a Bearer API key. `parseOllamaKeyUsage` reads the reported session, weekly or monthly ratios. Missing plan, balance, reset date and duration stay unknown. This endpoint is not documented by Ollama.
+
 ## Ollama web session and usage
 
 `authorizeOllamaWeb` opens `ollama.com/signin`, waits for the host to observe the authenticated browser cookie, and verifies the session by reading the first-party settings page. `queryOllamaUsage` and `parseOllamaSettings` expose plan and usage information without returning the cookie. The cookie callback and persistence remain host-owned.

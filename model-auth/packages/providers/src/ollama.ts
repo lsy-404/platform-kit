@@ -1,3 +1,4 @@
+import { classifyUsageHttp } from "@model-auth/core";
 import { quotaWindow, usageSnapshot, type ProviderUsageData, type ProviderUsageRequestOptions, type ProviderUsageSnapshot, type ProviderUsageWindow } from "./usage.js";
 
 export const OLLAMA_WEB_ENDPOINTS = Object.freeze({
@@ -50,6 +51,50 @@ export async function authorizeOllamaWeb(options: OllamaWebAuthorizationOptions)
     }
   } finally {
     clearTimeout(timer);
+  }
+}
+
+export const OLLAMA_USAGE_URL = "https://ollama.com/api/usage";
+
+export function parseOllamaKeyUsage(payload: unknown): ProviderUsageData {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("Ollama usage response is unreadable.");
+  const limits = (payload as Record<string, unknown>).limits;
+  if (!limits || typeof limits !== "object" || Array.isArray(limits)) throw new Error("Ollama usage response has no limits object.");
+  const windows: ProviderUsageWindow[] = [];
+  for (const [id, label, kind] of [["session", "Session", "session"], ["weekly", "Weekly", "weekly"], ["monthly", "Monthly", "monthly"]] as const) {
+    const row = (limits as Record<string, unknown>)[id];
+    if (!row || typeof row !== "object" || Array.isArray(row)) continue;
+    const ratio = (row as Record<string, unknown>).usage;
+    if (typeof ratio !== "number" || !Number.isFinite(ratio) || ratio < 0) continue;
+    const usedPercent = Math.min(100, ratio * 100);
+    windows.push({ ...quotaWindow({ id, label, usedPercent, remainingPercent: 100 - usedPercent, resetAt: null }), kind });
+  }
+  return { plan: null, windows, balance: null };
+}
+
+export async function queryOllamaKeyUsage(apiKey: string, options: ProviderUsageRequestOptions = {}): Promise<ProviderUsageSnapshot> {
+  options.signal?.throwIfAborted();
+  const credentialId = options.credentialId ?? "ollama-key";
+  const failure = (error: string, errorCode: NonNullable<ProviderUsageSnapshot["errorCode"]>) => usageSnapshot("ollama-cloud", credentialId, {
+    status: "error", plan: null, windows: [], balance: null, error, errorCode,
+  });
+  if (typeof apiKey !== "string" || !apiKey.trim()) return failure("An Ollama API key is required.", "signed-out");
+  const signal = options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000);
+  try {
+    const response = await (options.fetchImpl ?? fetch)(OLLAMA_USAGE_URL, {
+      headers: { accept: "application/json", authorization: `Bearer ${apiKey.trim()}` }, redirect: "manual", signal,
+    });
+    signal.throwIfAborted();
+    const code = classifyUsageHttp(response.status);
+    if (code !== "ok" || response.redirected || response.type === "opaqueredirect") return failure(`Ollama usage request failed (${response.status}).`, code === "ok" ? "unreadable" : code);
+    let data: ProviderUsageData;
+    try { data = parseOllamaKeyUsage(await response.json()); }
+    catch { signal.throwIfAborted(); return failure("Ollama usage response is unreadable.", "unreadable"); }
+    signal.throwIfAborted();
+    return usageSnapshot("ollama-cloud", credentialId, data);
+  } catch {
+    options.signal?.throwIfAborted();
+    return failure("Ollama usage request failed.", "unreachable");
   }
 }
 
