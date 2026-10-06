@@ -240,7 +240,7 @@ describe("authentication dialog", () => {
   const stylesheet = readFileSync(resolve(import.meta.dirname, "../../model-auth/packages/vue/src/style.css"), "utf8");
     expect(stylesheet).toContain(".model-auth-provider-step { grid-template-rows: auto auto minmax(0, 1fr); overflow: hidden; padding-top: 4px; }");
     expect(stylesheet).toContain(".model-auth-provider-list { min-height: 0; overflow: auto; padding: 2px; margin: -2px; }");
-    expect(stylesheet).toContain(".model-auth-select-menu { position: fixed;");
+    expect(stylesheet).not.toContain(".model-auth-select-menu { position: fixed;");
     expect(step.contains(search)).toBe(true);
     expect(list).toBeTruthy();
     search.focus();

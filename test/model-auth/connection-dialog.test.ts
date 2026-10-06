@@ -77,13 +77,15 @@ describe("connection detail dialog", () => {
     expect(document.querySelectorAll('[data-part="model-row"]')).toHaveLength(3);
   });
 
-  it("closes the strategy overlay from its trigger and keeps it out of layout flow", async () => {
+  it("starts with models and load strategy collapsed and keeps the strategy menu in layout flow", async () => {
     await mount({ providerId: "oauth", method: "oauth" });
+    expect(get<HTMLDetailsElement>('[data-part="connection-models"]').open).toBe(false);
+    expect(get<HTMLDetailsElement>('[data-part="connection-strategy"]').open).toBe(false);
     const trigger = get<HTMLButtonElement>('[part="strategy"] > button');
     await click('[part="strategy"] > button');
     const menu = get<HTMLElement>('[part="strategy-menu"]');
-    expect(menu.style.top).toBeTruthy();
-    expect(menu.style.left).toBeTruthy();
+    expect(menu.style.top).toBe("");
+    expect(menu.style.position).toBe("");
     await click('[part="strategy"] > button');
     expect(document.querySelector('[part="strategy-menu"]')).toBeNull();
     expect(trigger.getAttribute("aria-expanded")).toBe("false");

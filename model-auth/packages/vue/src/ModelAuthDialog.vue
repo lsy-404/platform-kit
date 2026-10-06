@@ -622,8 +622,8 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
             <p v-if="!credentials.length" class="model-auth-empty">{{ connectionMode ? text.noConnections : text.noCredentials }}</p>
           </section>
           <section v-if="connectionMode" class="model-auth-credential-section" data-part="connection-policy">
-            <details class="model-auth-connection-models" open><summary>{{ text.models }} ({{ models.length }})</summary><ModelList :models="models" :messages="text" /></details>
-            <div class="model-auth-section-heading"><strong>{{ text.strategy }}</strong><small>{{ text.strategyHint }}</small><StrategyPicker :model-value="currentStrategy" :options="strategyOptions" :label="text.strategy" :disabled="busy" @update:model-value="updateStrategy" /></div>
+            <details class="model-auth-connection-models" data-part="connection-models"><summary>{{ text.models }} ({{ models.length }})</summary><ModelList :models="models" :messages="text" /></details>
+            <details class="model-auth-connection-strategy" data-part="connection-strategy"><summary>{{ text.strategy }} · {{ strategyOptions.find(option => option.value === currentStrategy)?.label }}</summary><small>{{ text.strategyHint }}</small><StrategyPicker :model-value="currentStrategy" :options="strategyOptions" :label="text.strategy" :disabled="busy" @update:model-value="updateStrategy" /></details>
           </section>
 
         </div>
