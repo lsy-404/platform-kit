@@ -2,7 +2,7 @@ import { computed, onBeforeUnmount, ref, shallowRef } from "vue";
 import type {
   AddApiKeyPayload, AuthMethod, CatalogStatus, CredentialReorderPayload, CredentialUpdatePayload, ModelAuthProvider,
   ProviderAuthEvent, ProviderAuthResponseRequest, ProviderAuthState,
-  ProviderUpdatePayload, StrategyUpdatePayload,
+  ProviderUpdatePayload,
 } from "./types";
 
 export interface ModelAuthState {
@@ -19,7 +19,6 @@ export type ModelAuthAction =
   | { type: "update-credential"; payload: CredentialUpdatePayload }
   | { type: "reorder-credentials"; providerId: string; method: AuthMethod; credentialIds: string[] }
   | { type: "update-provider"; payload: ProviderUpdatePayload }
-  | { type: "update-strategy"; payload: StrategyUpdatePayload }
   | { type: "refresh-catalog" };
 
 export interface ModelAuthHost {
@@ -98,7 +97,6 @@ export function useModelAuth(host: ModelAuthHost, options: { errorMessage?: stri
     "update-credential": (payload: CredentialUpdatePayload) => run({ type: "update-credential", payload }),
     "reorder-credentials": (payload: CredentialReorderPayload) => run({ type: "reorder-credentials", ...payload }),
     "update-provider": (payload: ProviderUpdatePayload) => run({ type: "update-provider", payload }),
-    "update-provider-strategy": (payload: StrategyUpdatePayload) => run({ type: "update-strategy", payload }),
     "refresh-catalog": () => run({ type: "refresh-catalog" }),
     "respond-auth": (response: ProviderAuthResponseRequest) => host.respondAuth ? host.respondAuth(response).then(() => true, () => false) : Promise.resolve(false),
     "cancel-auth": (loginId: string) => { void host.cancelAuth?.(loginId); authorization?.abort(); },

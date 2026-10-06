@@ -28,7 +28,7 @@ async function mount(extra: Record<string, unknown> = {}, slots?: Record<string,
   const app = createApp(() => h(ModelAuthDialog, {
     ...state, onClose: () => { events.push({ name: "close", payload: null }); state.open = false; },
     onAddApiKey: on("key"), onUpdateCredential: on("credential"), onReorderCredentials: on("reorder"), onUpdateProvider: on("provider"),
-    onUpdateProviderStrategy: on("strategy"), onRefreshCatalog: on("refresh"),
+    onRefreshCatalog: on("refresh"),
     onRemoveApiKey: on("remove"),
     onQueryUsage: on("usage"), onRespondAuth: on("respond-auth"), onCancelAuth: on("cancel-auth"), onOpenAuthUrl: on("open-auth-url"),
     onReconnectOauth: (...payload: unknown[]) => { state.busy = true; on("reconnect-oauth")(...payload); },

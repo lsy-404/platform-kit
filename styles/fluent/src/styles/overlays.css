@@ -46,7 +46,6 @@
   width: 360px;
   overflow-wrap: anywhere;
   padding: 6px;
-  overflow: auto;
   color: var(--fluent-text);
   background: var(--fluent-surface);
   border: 1px solid var(--fluent-border);

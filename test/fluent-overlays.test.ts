@@ -27,6 +27,17 @@ describe("Fluent overlay behavior", () => {
     expect(position.side).toBe("bottom");
   });
 
+  it("keeps the natural panel height and lets it extend past the viewport", () => {
+    const position = placeAnchored(
+      { top: 40, left: 20, width: 40, height: 32 },
+      { width: 200, height: 900 },
+      { width: 800, height: 600 },
+    );
+    expect(position).not.toHaveProperty("maxHeight");
+    expect(position.side).toBe("bottom");
+    expect(position.top).toBe(78);
+  });
+
   it("asks only the latest surface to close for Escape", () => {
     const calls: string[] = [];
     const releaseDialog = registerOverlay({

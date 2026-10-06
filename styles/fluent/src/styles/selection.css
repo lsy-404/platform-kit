@@ -28,7 +28,7 @@
 .fluent-select__value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fluent-icon { display: block; flex: none; width: 16px; height: 16px; }
 .fluent-select__chevron { width: 16px; height: 16px; }
-.fluent-popover:has(.fluent-select__listbox), .fluent-popover:has(.fluent-menu) { width: max-content; min-width: min(220px, calc(100vw - 16px)); max-width: min(420px, calc(100vw - 16px)); padding: 4px; overflow: auto; }
+.fluent-popover:has(.fluent-select__listbox), .fluent-popover:has(.fluent-menu) { width: max-content; min-width: min(220px, calc(100vw - 16px)); max-width: min(420px, calc(100vw - 16px)); padding: 4px; }
 .fluent-select__listbox, .fluent-menu { display: grid; gap: 2px; min-width: 100%; }
 .fluent-select__option, .fluent-menu__item {
   display: flex;

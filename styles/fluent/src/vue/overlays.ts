@@ -136,10 +136,10 @@ export const FluentPopover = defineComponent({
     const position = ref<{
       left: number;
       top: number;
-      maxHeight: number | null;
       maxWidth: number | null;
+      placed: boolean;
       side: "top" | "bottom";
-    }>({ left: 0, top: 0, maxHeight: null, maxWidth: null, side: "bottom" });
+    }>({ left: 0, top: 0, maxWidth: null, placed: false, side: "bottom" });
     let release: ((restoreFocus?: boolean) => void) | null = null;
     let restoreFocus = true;
     let observer: ResizeObserver | null = null;
@@ -147,15 +147,11 @@ export const FluentPopover = defineComponent({
     const style = computed(() => ({
       left: `${position.value.left}px`,
       top: `${position.value.top}px`,
-      maxHeight:
-        position.value.maxHeight === null
-          ? undefined
-          : `${position.value.maxHeight}px`,
       maxWidth:
         position.value.maxWidth === null
           ? undefined
           : `${position.value.maxWidth}px`,
-      visibility: position.value.maxHeight === null ? "hidden" : "visible",
+      visibility: position.value.placed ? "visible" : "hidden",
     }));
     const close = () => {
       if (props.open) {
@@ -165,11 +161,14 @@ export const FluentPopover = defineComponent({
     };
     const reposition = () => {
       if (!props.anchor || !panel.value) return;
-      position.value = placeAnchored(
-        props.anchor.getBoundingClientRect(),
-        { width: panel.value.offsetWidth, height: Math.max(panel.value.offsetHeight, panel.value.scrollHeight) },
-        { width: window.innerWidth, height: window.innerHeight },
-      );
+      position.value = {
+        ...placeAnchored(
+          props.anchor.getBoundingClientRect(),
+          { width: panel.value.offsetWidth, height: panel.value.offsetHeight },
+          { width: window.innerWidth, height: window.innerHeight },
+        ),
+        placed: true,
+      };
     };
     const outside = (event: PointerEvent) => {
       const target = event.target as Node | null;
@@ -217,8 +216,8 @@ export const FluentPopover = defineComponent({
       position.value = {
         left: 0,
         top: 0,
-        maxHeight: null,
         maxWidth: null,
+        placed: false,
         side: "bottom",
       };
     };

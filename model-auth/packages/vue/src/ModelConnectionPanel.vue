@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, useId } from "vue";
 import { defaultMessages, type ModelAuthMessages } from "./messages";
-import ModelList from "./ModelList.vue";
 import ModelAuthIcon from "./ModelAuthIcon.vue";
 import ProviderMark from "./ProviderMark.vue";
 import { DEFAULT_PERCENTAGE_PRECISION, formatPercentage } from "./percentage";
 import { credentialReady, credentialRemaining, fill, lowestRemaining } from "./usage";
-import { connectionModels } from "./models";
 import type { AuthMethod, ModelAuthProvider, ModelConnectionTarget, ProviderCredential, Theme } from "./types";
 
 const props = withDefaults(defineProps<{
@@ -24,17 +22,13 @@ const uid = useId();
 const expanded = ref(new Set<string>());
 const groups = computed(() => props.providers.flatMap(provider => (["oauth", "api-key"] as AuthMethod[]).flatMap(method => {
   const credentials = (method === "oauth" ? provider.oauthCredentials : provider.apiKeyCredentials) ?? [];
-  return credentials.length ? [{ provider, method, credentials, models: connectionModels(provider, method) }] : [];
+  return credentials.length ? [{ provider, method, credentials }] : [];
 })));
 const methodLabel = (method: AuthMethod) => method === "oauth" ? text.value.oauth : text.value.apiKey;
 function status(credential: ProviderCredential) {
   if (!credential.enabled) return text.value.disabled;
   if (credential.cooldownUntilUtc) return `${text.value.cooling} ${credential.cooldownUntilUtc}`;
   return credential.healthy ? text.value.ready : text.value.needsReconnect;
-}
-function strategy(provider: ModelAuthProvider) {
-  if (provider.loadStrategy === "failover") return text.value.failover;
-  return provider.loadStrategy === "round-robin" ? text.value.roundRobin : "—";
 }
 const groupKey = (group: { provider: ModelAuthProvider; method: AuthMethod }) => `${group.provider.id}/${group.method}`;
 const regionId = (group: { provider: ModelAuthProvider; method: AuthMethod }) => `${uid}-${groupKey(group)}`;
@@ -75,7 +69,7 @@ function modelCount(provider: ModelAuthProvider, method: AuthMethod, credential:
     <p v-if="!busy && !groups.length" class="model-auth-empty" data-part="no-connections">{{ text.noConnections }}</p>
     <article v-for="group in groups" :key="group.provider.id + '/' + group.method" class="model-auth-connection-card" data-part="connection-card" :data-provider-id="group.provider.id" :data-auth-method="group.method">
       <header class="model-auth-connections-heading">
-        <div class="model-auth-connection-title"><ProviderMark :provider="group.provider" /><div><h4>{{ group.provider.name }}</h4><span class="model-auth-connection-meta">{{ methodLabel(group.method) }} · {{ text.strategy }}：{{ strategy(group.provider) }}</span></div></div>
+        <div class="model-auth-connection-title"><ProviderMark :provider="group.provider" /><div><h4>{{ group.provider.name }}</h4><span class="model-auth-connection-meta">{{ methodLabel(group.method) }}</span></div></div>
         <button type="button" class="model-auth-secondary" :disabled="busy" :aria-label="text.viewConnection + ' · ' + group.provider.name + ' · ' + methodLabel(group.method)" data-part="view-connection" @click="emit('manage', { providerId: group.provider.id, method: group.method })">{{ text.viewConnection }}</button>
       </header>
       <p v-if="!group.provider.available && group.provider.unavailableReason" class="model-auth-connection-warning" role="status">{{ group.provider.unavailableReason }}</p>
@@ -89,10 +83,6 @@ function modelCount(provider: ModelAuthProvider, method: AuthMethod, credential:
             <span class="model-auth-connection-meta">{{ text.position }} {{ index + 1 }} · {{ modelCount(group.provider, group.method, credential) }} {{ text.modelCount }}<template v-if="credentialRemaining(credential) !== null"> · {{ fill(text.lowestRemaining, { percent: percent(credentialRemaining(credential)!) }) }}</template></span>
           </li>
         </ul>
-        <details class="model-auth-connection-models" data-part="connection-models">
-          <summary>{{ text.models }} ({{ group.models.length }})</summary>
-          <ModelList :models="group.models" :messages="text" />
-        </details>
       </div>
     </article>
   </section>

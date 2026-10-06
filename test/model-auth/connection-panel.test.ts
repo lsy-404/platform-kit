@@ -50,7 +50,7 @@ describe("model connection panel", () => {
     expect(document.querySelector('[data-part="connection-current-model"]')).toBeNull();
   });
 
-  it("expands to every account with its own remaining value and keeps models collapsed", async () => {
+  it("expands to every account with its own remaining value and without listing models", async () => {
     await mount();
     await click('[data-provider-id="oauth"] [data-part="toggle-connection"]');
     const toggle = get('[data-provider-id="oauth"] [data-part="toggle-connection"]');
@@ -63,7 +63,7 @@ describe("model connection panel", () => {
     expect(rows[1]).not.toContain("最低剩余");
     expect(rows[2]).toContain("已停用");
     expect(rows[2]).toContain("最低剩余 1%");
-    expect(get<HTMLDetailsElement>('[data-provider-id="oauth"] [data-part="connection-models"]').open).toBe(false);
+    expect(document.querySelector('[data-part="connection-models"], [data-part="models"]')).toBeNull();
     await click('[data-provider-id="oauth"] [data-part="toggle-connection"]');
     expect(document.querySelector('[data-part="connection-account"]')).toBeNull();
   });
@@ -94,19 +94,11 @@ describe("model connection panel", () => {
     expect(document.querySelector('[data-part="connections-panel"] input')).toBeNull();
   });
 
-  it("expands each card to a read-only model list, collapsed by default", async () => {
-    const { state } = await mount();
+  it("never renders model lists or the load strategy", async () => {
+    await mount();
     for (const id of ["oauth", "key", "offline"]) await click(`[data-provider-id="${id}"] [data-part="toggle-connection"]`);
-    const details = get<HTMLDetailsElement>('[data-provider-id="oauth"] [data-part="connection-models"]');
-    expect(details.open).toBe(false);
-    expect(details.querySelector("summary")!.textContent).toContain("(1)");
-    expect([...details.querySelectorAll('[data-part="model-row"]')].map(row => row.textContent)).toEqual(["o-model"]);
-    expect(details.querySelector("button")).toBeNull();
-    expect(get('[data-provider-id="offline"] [data-part="models"]').textContent).toContain("没有可用模型");
-    state.providers[1]!.models = Array.from({ length: 9 }, (_, index) => "m-" + index);
-    await nextTick();
-    expect(get('[data-provider-id="key"] [data-part="model-search"]')).toBeTruthy();
-    expect(document.querySelector('[data-provider-id="oauth"] [data-part="model-search"]')).toBeNull();
+    expect(document.querySelector('[data-part="connection-models"], [data-part="models"], [data-part="model-search"]')).toBeNull();
+    expect(document.body.textContent).not.toContain("负载策略");
   });
 
   it("emits an exact management target plus add and refresh commands", async () => {

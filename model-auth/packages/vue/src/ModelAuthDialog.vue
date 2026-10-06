@@ -1,16 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, reactive, ref, useId, watch } from "vue";
 import { defaultMessages, type ModelAuthMessages } from "./messages";
-import StrategyPicker from "./StrategyPicker.vue";
-import ModelList from "./ModelList.vue";
-import { connectionModels } from "./models";
 import ModelAuthIcon from "./ModelAuthIcon.vue";
 import ProviderMark from "./ProviderMark.vue";
 import { formatPercentage } from "./percentage";
 import { fill, windowRemaining } from "./usage";
 import type {
-  AddApiKeyPayload, AuthMethod, CredentialExtend, CredentialLoginInput, CredentialReorderPayload, CredentialUpdatePayload, CatalogStatus, LoadStrategy,
-  ModelAuthProvider, ModelConnectionTarget, ProviderAuthResponseRequest, ProviderAuthState, ProviderCredential, ProviderAuthNotice, ProviderUpdatePayload, StrategyUpdatePayload, Theme, CredentialUsageEstimate, CredentialUsageWindow,
+  AddApiKeyPayload, AuthMethod, CredentialExtend, CredentialLoginInput, CredentialReorderPayload, CredentialUpdatePayload, CatalogStatus, 
+  ModelAuthProvider, ModelConnectionTarget, ProviderAuthResponseRequest, ProviderAuthState, ProviderCredential, ProviderAuthNotice, ProviderUpdatePayload, Theme, CredentialUsageEstimate, CredentialUsageWindow,
 } from "./types";
 
 const props = withDefaults(defineProps<{
@@ -21,7 +18,6 @@ const props = withDefaults(defineProps<{
   initialMethod?: AuthMethod;
   separateAuthMethods?: boolean;
   initialConnection?: ModelConnectionTarget | null;
-  loadStrategy?: LoadStrategy;
   catalogStatus?: CatalogStatus;
   messages?: Partial<ModelAuthMessages>;
   percentagePrecision?: number;
@@ -30,7 +26,7 @@ const props = withDefaults(defineProps<{
   auth?: ProviderAuthState;
 }>(), {
   open: false, separateAuthMethods: false, providers: () => [], styled: true, theme: "system", initialMethod: "oauth", initialConnection: null,
-  loadStrategy: "round-robin", catalogStatus: () => ({ state: "loading" }),
+  catalogStatus: () => ({ state: "loading" }),
   messages: () => ({}), busy: false, error: null,
   percentagePrecision: 2,
   auth: () => ({ status: "idle", loginId: null, notices: [], prompt: null, error: null }),
@@ -45,8 +41,6 @@ const emit = defineEmits<{
   "update-provider": [payload: ProviderUpdatePayload];
   "add-api-key": [payload: AddApiKeyPayload];
   "remove-api-key": [providerId: string, credentialId: string];
-  "update-strategy": [strategy: LoadStrategy];
-  "update-provider-strategy": [payload: StrategyUpdatePayload];
   "refresh-catalog": [];
   "query-usage": [providerId: string, credentialId: string];
   logout: [providerId: string, credentialId: string];
@@ -111,18 +105,12 @@ const credentials = computed<ProviderCredential[]>(() => {
   const provider = selectedProvider.value;
   return (method.value === "oauth" ? provider?.oauthCredentials : provider?.apiKeyCredentials) ?? [];
 });
-const models = computed(() => selectedProvider.value ? connectionModels(selectedProvider.value, method.value) : []);
 const canUseMethod = computed(() => Boolean(selectedProvider.value?.available
   && selectedProvider.value.authMethods.includes(method.value)
   && (method.value !== "oauth" || selectedProvider.value.oauthEnabled !== false)));
 const eligibleCredentials = computed(() => canUseMethod.value ? credentials.value.filter(credential => credential.enabled && credential.healthy
   && (!credential.cooldownUntilUtc || Date.parse(credential.cooldownUntilUtc) <= Date.now())) : []);
 const authReady = computed(() => eligibleCredentials.value.length > 0);
-const strategyOptions = computed(() => [
-  { value: "round-robin" as const, label: text.value.roundRobin },
-  { value: "failover" as const, label: text.value.failover },
-]);
-const currentStrategy = computed(() => selectedProvider.value?.loadStrategy ?? props.loadStrategy);
 const activePrompt = computed(() => props.auth?.prompt?.prompt ?? null);
 const activePromptId = computed(() => props.auth?.prompt?.promptId ?? "");
 
@@ -397,11 +385,6 @@ function startNewConnection() {
   step.value = props.separateAuthMethods ? "method" : "providers"; selectedProviderId.value = ""; search.value = "";
   pendingRemoval.value = ""; localError.value = ""; clearSecret(); void focusHeading();
 }
-function updateStrategy(value: LoadStrategy) {
-  const provider = selectedProvider.value;
-  if (!provider || props.busy) return;
-  emit("update-provider-strategy", { providerId: provider.id, strategy: value });
-}
 function advanceToConfirmation() {
   if (step.value !== "detail" || !authReady.value || props.busy) return;
   awaitingVerification = false; clearSecret(); transitionName.value = "model-auth-step-forward";
@@ -620,10 +603,6 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
               </slot>
             </article>
             <p v-if="!credentials.length" class="model-auth-empty">{{ connectionMode ? text.noConnections : text.noCredentials }}</p>
-          </section>
-          <section v-if="connectionMode" class="model-auth-credential-section" data-part="connection-policy">
-            <details class="model-auth-connection-models" data-part="connection-models"><summary>{{ text.models }} ({{ models.length }})</summary><ModelList :models="models" :messages="text" /></details>
-            <details class="model-auth-connection-strategy" data-part="connection-strategy"><summary>{{ text.strategy }} · {{ strategyOptions.find(option => option.value === currentStrategy)?.label }}</summary><small>{{ text.strategyHint }}</small><StrategyPicker :model-value="currentStrategy" :options="strategyOptions" :label="text.strategy" :disabled="busy" @update:model-value="updateStrategy" /></details>
           </section>
 
         </div>
