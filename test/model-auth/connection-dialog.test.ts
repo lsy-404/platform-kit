@@ -89,12 +89,11 @@ describe("connection detail dialog", () => {
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("uses only the current authentication method and preserves explicit four-stage confirmation", async () => {
+  it("uses only the current authentication method and preserves explicit direct provider confirmation", async () => {
     const { state, events } = await mount(null);
     const provider = state.providers[0]!;
     provider.authMethods = ["oauth", "api-key"];
     provider.apiKeyCredentials = [{ id: "api", label: "Key", enabled: true, healthy: true, models: ["key-only"] }];
-    await click('[data-part="method-oauth"]');
     await click('[data-provider-id="oauth"]');
     expect(document.querySelector('[data-part="models"]')).toBeNull();
     await click('[data-part="continue-confirmation"]');
@@ -152,10 +151,10 @@ describe("connection detail dialog", () => {
     expect(get('[data-part="connection-empty"]').textContent).toContain("尚未接入账号");
     expect(document.querySelector('[data-part="method-list"]')).toBeNull();
     await click('[data-part="new-connection"]');
-    expect(document.querySelector('[data-part="method-list"]')).toBeTruthy();
+    expect(document.querySelector('[data-part="provider-step"]')).toBeTruthy();
   });
 
-  it("restores its target on close and reopen, while a dialog without a target keeps the four-stage flow", async () => {
+  it("restores its target on close and reopen, while a dialog without a target keeps the direct provider flow", async () => {
     const { state } = await mount({ providerId: "oauth", method: "oauth" });
     state.open = false; await nextTick();
     get<HTMLDialogElement>('[data-part="dialog"]').dispatchEvent(new AnimationEvent("animationend", { animationName: "model-auth-modal-exit" })); await nextTick();
@@ -163,7 +162,7 @@ describe("connection detail dialog", () => {
     expect(get("h2").textContent).toBe("接入信息");
     expect(document.querySelector('[part="progress"]')).toBeNull();
     const standard = await mount(null);
-    expect([...document.querySelectorAll("h2")].at(-1)?.textContent).toBe("选择方式");
+    expect([...document.querySelectorAll("h2")].at(-1)?.textContent).toBe("选择提供商");
     expect(document.querySelector('[part="progress"]')).toBeTruthy();
     void standard;
   });
@@ -224,16 +223,16 @@ describe("connection detail dialog", () => {
 
   describe("account login", () => {
     const withLogin = (login?: { username: string; passwordSaved: boolean }) => async () => {
-      const ctx = await mount({ providerId: "oauth", method: "oauth" });
-      ctx.state.providers[0]!.accountLogin = true;
-      if (login) ctx.state.providers[0]!.oauthCredentials![0]!.login = login;
+      const ctx = await mount({ providerId: "key", method: "api-key" });
+      ctx.state.providers[1]!.accountLogin = true; ctx.state.providers[1]!.apiKeyCredentials![0]!.enabled = true;
+      if (login) ctx.state.providers[1]!.apiKeyCredentials![0]!.login = login;
       await nextTick();
       return ctx;
     };
     const submit = async () => { get('[data-part="credential-login"]').dispatchEvent(new Event("submit", { cancelable: true })); await nextTick(); await nextTick(); };
 
     it("is absent unless the provider declares accountLogin", async () => {
-      await mount({ providerId: "oauth", method: "oauth" });
+      await mount({ providerId: "key", method: "api-key" });
       expect(document.querySelector('[data-part="credential-login"]')).toBeNull();
     });
 
@@ -245,7 +244,7 @@ describe("connection detail dialog", () => {
       await fillInput('[data-part="login-username"]', "person@example.test");
       await fillInput('[data-part="login-password"]', "fixture-password");
       await submit();
-      expect(events.at(-1)).toEqual({ name: "credential", payload: { providerId: "oauth", credentialId: "account", enabled: true, login: { username: "person@example.test", password: "fixture-password" } } });
+      expect(events.at(-1)).toEqual({ name: "credential", payload: { providerId: "key", credentialId: "key-1", enabled: true, login: { username: "person@example.test", password: "fixture-password" } } });
       expect(get<HTMLInputElement>('[data-part="login-password"]').value).toBe("");
       expect(document.body.innerHTML).not.toContain("fixture-password");
     });
@@ -294,7 +293,7 @@ describe("connection detail dialog", () => {
       await click('[data-part="clear-login"]');
       expect(events.some(event => event.name === "credential")).toBe(false);
       await click('[data-part="clear-login"]');
-      expect(events.at(-1)).toEqual({ name: "credential", payload: { providerId: "oauth", credentialId: "account", enabled: true, login: null } });
+      expect(events.at(-1)).toEqual({ name: "credential", payload: { providerId: "key", credentialId: "key-1", enabled: true, login: null } });
     });
   });
 

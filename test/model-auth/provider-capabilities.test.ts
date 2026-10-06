@@ -10,7 +10,7 @@ describe("model-auth provider capabilities", () => {
     expect(new Set(MODEL_AUTH_PROVIDER_CAPABILITIES.map((item) => item.id)).size).toBe(MODEL_AUTH_PROVIDER_CAPABILITIES.length);
   });
 
-  it("distinguishes renewable OAuth from an Ollama browser session", () => {
+  it("distinguishes renewable OAuth from an Ollama API key", () => {
     expect(modelAuthProviderCapability("workbuddy")?.access.usage).toBe(false);
     expect(modelAuthProviderCapability("grok")).toMatchObject({
       authorization: { kind: "browser-oauth", renewable: true, multiAccount: true },
@@ -18,7 +18,7 @@ describe("model-auth provider capabilities", () => {
       catalogProviderId: "xai",
     });
     expect(modelAuthProviderCapability("ollama-cloud")).toMatchObject({
-      authorization: { kind: "browser-web-session", renewable: false, multiAccount: false },
+      authorization: { kind: "api-key", renewable: false, multiAccount: false },
       access: { inference: false, modelCatalog: false, usage: true },
     });
     expect(modelAuthProviderCapability("missing")).toBeNull();

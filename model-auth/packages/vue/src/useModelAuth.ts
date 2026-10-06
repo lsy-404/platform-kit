@@ -15,7 +15,7 @@ export type ModelAuthAction =
   | { type: "logout"; providerId: string; credentialId: string }
   | { type: "query-usage"; providerId: string; credentialId: string }
   | { type: "add-api-key"; payload: AddApiKeyPayload }
-  | { type: "remove-credential"; providerId: string; credentialId: string; authMethod: "oauth" | "api-key" }
+  | { type: "remove-credential"; providerId: string; credentialId: string; authMethod: AuthMethod }
   | { type: "update-credential"; payload: CredentialUpdatePayload }
   | { type: "reorder-credentials"; providerId: string; method: AuthMethod; credentialIds: string[] }
   | { type: "update-provider"; payload: ProviderUpdatePayload }
@@ -44,17 +44,23 @@ export function useModelAuth(host: ModelAuthHost, options: { errorMessage?: stri
     if (pending) return action ? Promise.resolve(false) : pending;
     busy.value = true; error.value = null;
     const controller = new AbortController();
+    authorization = controller;
     if (action?.type === "authorize-oauth") {
-      authorization = controller;
       auth.value = { status: "running", loginId: null, notices: [], prompt: null, error: null };
     }
-    pending = Promise.resolve().then(async () => {
+    const cancelled = new Promise<never>((_, reject) => {
+      controller.signal.addEventListener("abort", () => reject(new Error("cancelled")), { once: true });
+    });
+    pending = Promise.race([cancelled, Promise.resolve().then(async () => {
       if (controller.signal.aborted) return false;
       if (action) await host.execute(action, { signal: controller.signal });
-      state.value = await host.getState();
+      if (controller.signal.aborted) return false;
+      const next = await host.getState();
+      if (controller.signal.aborted) return false;
+      state.value = next;
       if (action?.type === "authorize-oauth") auth.value = { ...auth.value, status: "complete", prompt: null, error: null };
       return true;
-    }).catch(() => {
+    })]).catch(() => {
       if (!controller.signal.aborted) {
         error.value = options.errorMessage ?? "操作未完成，请重试。";
         if (action?.type === "authorize-oauth") auth.value = { ...auth.value, status: "error", error: error.value };
@@ -75,7 +81,7 @@ export function useModelAuth(host: ModelAuthHost, options: { errorMessage?: stri
       auth.value = { ...auth.value, status: "running", loginId: event.loginId, notices: [...auth.value.notices, event.notice], error: null };
     }
   });
-  onBeforeUnmount(() => unsubscribeAuth?.());
+  onBeforeUnmount(() => { authorization?.abort(); unsubscribeAuth?.(); });
   const props = computed(() => ({ ...state.value, auth: auth.value, open: open.value, busy: busy.value, error: error.value }));
   const listeners = {
     close: () => {

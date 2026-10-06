@@ -121,3 +121,23 @@ it("forwards Pine-style authentication prompts, notices and cancellation through
   binding.listeners["cancel-auth"]("login-1");
   expect(cancelled).toBe("login-1");
 });
+
+
+it("cancels a stalled refresh immediately and ignores its late state after reopening", async () => {
+  let finish: ((state: ModelAuthState) => void) | undefined;
+  let calls = 0;
+  const binding = useModelAuth({
+    getState() { calls++; return calls === 1 ? new Promise(resolve => { finish = resolve; }) : Promise.resolve({ providers: [], catalogStatus: { state: "ready" } }); },
+    async execute() {},
+  });
+  const pending = binding.perform({ type: "refresh-catalog" });
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  binding.listeners.close();
+  expect(await pending).toBe(false);
+  expect(binding.busy.value).toBe(false);
+  binding.open.value = true;
+  expect(await binding.refresh()).toBe(true);
+  finish?.({ providers: [], catalogStatus: { state: "error", error: "late failure" } });
+  await Promise.resolve(); await Promise.resolve();
+  expect(binding.state.value.catalogStatus.state).toBe("ready");
+});

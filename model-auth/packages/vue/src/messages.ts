@@ -2,6 +2,7 @@ export const defaultMessages = {
   eyebrow: "模型连接", addConnection: "选择方式", chooseMethod: "选择一种认证方式开始。",
   progress: "认证进度", authenticationMethod: "认证方式", provider: "提供商", completeConfiguration: "完成配置", completeAuthorization: "完成授权", stepOf: "{current}/{total}",
   oauth: "OAuth", oauthDescription: "通过浏览器或客户端登录已有账号",
+  accountCount: "个账号",
   apiKey: "API Key", apiKeyDescription: "使用平台密钥连接模型提供商",
   chooseProvider: "选择提供商", chooseProviderDescription: "搜索并选择你要连接的提供商。",
   back: "上一步", close: "关闭", search: "搜索提供商", available: "可用", unavailable: "暂不可用",
@@ -24,8 +25,8 @@ export const defaultMessages = {
   configured: "已配置", strategyHint: "按凭据顺序生效：顺序故障转移始终从靠前的凭据开始尝试，顺序轮询按该顺序依次轮换。",
   connections: "已接入", connectionInfo: "接入信息", viewConnection: "查看接入信息", newConnection: "新增接入", noConnections: "尚未接入账号。", account: "账号", models: "可用模型", refreshConnections: "刷新接入信息",
   connectionSummary: "{count} 个账号 · {ready} 个可用", lowestRemaining: "最低剩余 {percent}", showDetails: "展开详情", hideDetails: "收起详情",
-  credentialSettings: "账号设置", saveLabel: "保存名称", accountLogin: "账号登录",
-  accountLoginHint: "会话过期时用它自动登录并刷新剩余额度。密码由宿主加密保存，不会回传到界面。",
+  credentialSettings: "账号设置", saveLabel: "保存名称", accountLogin: "用量查询附加信息（可选）",
+  accountLoginHint: "为这份凭据读取剩余额度。会话过期时自动登录；密码由宿主加密保存，不会回传到界面。",
   username: "邮箱或用户名", password: "密码", passwordSaved: "已保存（留空则不修改）", saveLogin: "保存账号", clearLogin: "清除账号",
   usageRemaining: "{label} · 剩余 {percent}",
 };

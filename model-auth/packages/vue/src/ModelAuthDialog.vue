@@ -54,8 +54,8 @@ const emit = defineEmits<{
   "open-auth-url": [url: string];
 }>();
 
-type Step = "method" | "providers" | "detail" | "confirmation";
-const step = ref<Step>("method");
+type Step = "providers" | "detail" | "confirmation";
+const step = ref<Step>("providers");
 const method = ref<AuthMethod>(props.initialMethod);
 const selectedProviderId = ref("");
 const search = ref("");
@@ -66,6 +66,9 @@ const heading = ref<HTMLElement>();
 const labelInput = ref("");
 const apiKeyInput = ref("");
 const revealApiKey = ref(false);
+const accountUsername = ref("");
+const accountPassword = ref("");
+const methodLabel = (value: AuthMethod) => value === "oauth" ? text.value.oauth : text.value.apiKey;
 const secretDrafts = reactive<Record<string, string>>({});
 const labelDrafts = reactive<Record<string, string>>({});
 const loginDrafts = reactive<Record<string, { username?: string; password?: string }>>({});
@@ -85,18 +88,18 @@ const promptValue = ref("");
 const modalState = ref<"opening" | "open" | "closing">("open");
 const transitionName = ref("model-auth-step-forward");
 const text = computed(() => ({ ...defaultMessages, ...props.messages }));
-const stepIndex = computed(() => ["method", "providers", "detail", "confirmation"].indexOf(step.value));
-const pageTitles = computed(() => [text.value.addConnection, text.value.chooseProvider, text.value.completeAuthorization, text.value.confirm]);
+const stepIndex = computed(() => ["providers", "detail", "confirmation"].indexOf(step.value));
+const pageTitles = computed(() => [text.value.chooseProvider, text.value.completeConfiguration, text.value.confirm]);
 const selectedProvider = computed(() => props.providers.find(provider => provider.id === selectedProviderId.value));
 const connectionMissing = computed(() => connectionMode.value && !selectedProvider.value);
 const matchingProviders = computed(() => {
   const query = search.value.trim().toLocaleLowerCase();
-  return props.providers.filter(provider => provider.authMethods.includes(method.value)
-    && [provider.name, provider.description, provider.id].some(value => value.toLocaleLowerCase().includes(query)));
+  return props.providers.flatMap(provider => provider.authMethods.map(method => ({ provider, method })))
+    .filter(entry => [entry.provider.name, entry.provider.description, entry.provider.id, methodLabel(entry.method)].some(value => value.toLocaleLowerCase().includes(query)));
 });
 const providerGroups = computed(() => [
-  { key: "available", label: text.value.available, providers: matchingProviders.value.filter(provider => provider.available) },
-  { key: "unavailable", label: text.value.unavailable, providers: matchingProviders.value.filter(provider => !provider.available) },
+  { key: "available", label: text.value.available, providers: matchingProviders.value.filter(entry => entry.provider.available) },
+  { key: "unavailable", label: text.value.unavailable, providers: matchingProviders.value.filter(entry => !entry.provider.available) },
 ].filter(group => group.providers.length));
 const orderedProviders = computed(() => providerGroups.value.flatMap(group => group.providers));
 const credentials = computed<ProviderCredential[]>(() => {
@@ -125,7 +128,7 @@ function activeElement(): Element | null {
 }
 function clearNewKey() { labelInput.value = ""; apiKeyInput.value = ""; revealApiKey.value = false; }
 function clearSecret() {
-  clearNewKey();
+  clearNewKey(); accountUsername.value = ""; accountPassword.value = "";
   for (const id of Object.keys(secretDrafts)) delete secretDrafts[id];
   for (const id of Object.keys(labelDrafts)) delete labelDrafts[id];
   for (const id of Object.keys(loginDrafts)) delete loginDrafts[id];
@@ -136,7 +139,7 @@ function resetState() {
   awaitingVerification = false;
   connectionMode.value = Boolean(props.initialConnection);
   method.value = props.initialConnection?.method ?? props.initialMethod;
-  step.value = props.initialConnection ? "detail" : "method";
+  step.value = props.initialConnection ? "detail" : "providers";
   selectedProviderId.value = props.initialConnection?.providerId ?? ""; search.value = "";
   focusedProviderIndex.value = -1; pendingRemoval.value = ""; localError.value = ""; clearSecret();
 }
@@ -171,12 +174,8 @@ function handleModalAnimationEnd(event: AnimationEvent) {
   if (event.animationName === "model-auth-modal-exit") finishClose();
 }
 function handleCancel(event: Event) { event.preventDefault(); close(); }
-function chooseMethod(value: AuthMethod) {
-  connectionMode.value = false;
-  transitionName.value = "model-auth-step-forward"; method.value = value; step.value = "providers"; search.value = ""; selectedProviderId.value = "";
-  clearSecret(); void nextTick(() => searchInput.value?.focus());
-}
-function chooseProvider(provider: ModelAuthProvider) {
+function chooseProvider(entry: { provider: ModelAuthProvider; method: AuthMethod }) {
+  const { provider, method: chosenMethod } = entry; method.value = chosenMethod;
   transitionName.value = "model-auth-step-forward"; clearSecret(); selectedProviderId.value = provider.id; step.value = "detail";
   pendingRemoval.value = ""; localError.value = ""; void focusHeading();
 }
@@ -187,7 +186,7 @@ function back() {
   transitionName.value = "model-auth-step-backward";
   if (step.value === "confirmation") { step.value = "detail"; void focusHeading(); }
   else if (step.value === "detail") { step.value = "providers"; void nextTick(() => searchInput.value?.focus()); }
-  else { step.value = "method"; selectedProviderId.value = ""; void focusHeading(); }
+  else { step.value = "providers"; selectedProviderId.value = ""; void focusHeading(); }
 }
 function close() {
   awaitingVerification = false;
@@ -370,7 +369,10 @@ function removeCredential(credential: ProviderCredential) {
 function addApiKey() {
   const provider = selectedProvider.value;
   if (!provider || !canUseMethod.value || props.busy || !apiKeyInput.value.trim()) return;
-  const payload = { providerId: provider.id, label: labelInput.value.trim(), apiKey: apiKeyInput.value.trim() };
+  if (provider.accountLogin && Boolean(accountUsername.value.trim()) !== Boolean(accountPassword.value)) return;
+  const payload = { providerId: provider.id, label: labelInput.value.trim(), apiKey: apiKeyInput.value.trim(),
+    ...(provider.accountLogin && accountUsername.value.trim() && accountPassword.value ? { login: { username: accountUsername.value.trim(), password: accountPassword.value } } : {}) };
+  accountUsername.value = ""; accountPassword.value = "";
   clearNewKey(); awaitingVerification = true; emit("add-api-key", payload); void nextTick(checkVerification);
 }
 function authorize(credentialId?: string) {
@@ -383,7 +385,7 @@ function authorize(credentialId?: string) {
 function startNewConnection() {
   connectionMode.value = false;
   transitionName.value = "model-auth-step-forward";
-  step.value = "method"; selectedProviderId.value = ""; search.value = "";
+  step.value = "providers"; selectedProviderId.value = ""; search.value = "";
   pendingRemoval.value = ""; localError.value = ""; clearSecret(); void focusHeading();
 }
 function updateStrategy(value: LoadStrategy) {
@@ -449,14 +451,14 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
     <div class="model-auth-root">
       <section class="model-auth-dialog" role="document" tabindex="-1">
         <header class="model-auth-header" part="header" data-part="navigation">
-          <button v-if="step !== 'method' && !connectionMode" type="button" class="model-auth-back" part="back" data-part="back" :aria-label="text.back" @click="back"><ModelAuthIcon name="back" /></button>
+          <button v-if="step !== 'providers' && !connectionMode" type="button" class="model-auth-back" part="back" data-part="back" :aria-label="text.back" @click="back"><ModelAuthIcon name="back" /></button>
           <h2 :id="titleId" ref="heading" class="model-auth-title" tabindex="-1">{{ connectionMode ? text.connectionInfo : pageTitles[stepIndex] }}</h2>
           <button type="button" class="model-auth-close" part="close" data-part="close" :aria-label="text.close" @click="close"><ModelAuthIcon name="close" /></button>
         </header>
-        <div v-if="!connectionMode" class="model-auth-progress" part="progress" role="progressbar" :aria-label="text.progress" :aria-valuemin="0" :aria-valuemax="3" :aria-valuenow="stepIndex" :aria-valuetext="pageTitles[stepIndex]">
-          <div v-for="segment in 3" :key="segment" class="model-auth-progress-segment"><div class="model-auth-progress-fill" :style="{ width: (segment <= stepIndex ? 100 : 0) + '%' }" /></div>
+        <div v-if="!connectionMode" class="model-auth-progress" part="progress" role="progressbar" :aria-label="text.progress" :aria-valuemin="0" :aria-valuemax="2" :aria-valuenow="stepIndex" :aria-valuetext="pageTitles[stepIndex]">
+          <div v-for="segment in 2" :key="segment" class="model-auth-progress-segment"><div class="model-auth-progress-fill" :style="{ width: (segment <= stepIndex ? 100 : 0) + '%' }" /></div>
         </div>
-        <p v-if="!connectionMode" class="model-auth-step-caption">{{ text.stepOf.replace('{current}', String(stepIndex)).replace('{total}', '3') }}</p>
+        <p v-if="!connectionMode" class="model-auth-step-caption">{{ text.stepOf.replace('{current}', String(stepIndex)).replace('{total}', '2') }}</p>
         <div v-if="error || localError" class="model-auth-error" role="alert" part="error">{{ error || localError }}</div>
         <p v-if="busy" class="model-auth-busy" role="status">{{ text.working }}</p>
         <section v-if="auth && auth.status === 'running' && (auth.notices.length || activePrompt)" class="model-auth-auth-interaction" data-part="auth-interaction" aria-live="polite">
@@ -482,19 +484,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
           </form>
         </section>
 
-        <div v-if="step === 'method'" key="method" :class="['model-auth-methods', transitionName]" part="method-list" data-part="method-list">
-          <button v-for="choice in (['oauth', 'api-key'] as const)" :key="choice" type="button" class="model-auth-method-card" part="method-card" :data-part="'method-' + choice" @click="chooseMethod(choice)">
-            <slot name="method-card" :method="choice" :choose="() => chooseMethod(choice)">
-              <span class="model-auth-method-icon" aria-hidden="true">
-                <ModelAuthIcon :name="choice === 'oauth' ? 'oauth' : 'key'" />
-              </span>
-              <span><strong>{{ choice === 'oauth' ? text.oauth : text.apiKey }}</strong><small>{{ choice === 'oauth' ? text.oauthDescription : text.apiKeyDescription }}</small></span>
-              <ModelAuthIcon name="next" />
-            </slot>
-          </button>
-        </div>
-
-        <div v-else-if="step === 'providers'" key="providers" :class="['model-auth-provider-step', transitionName]" part="provider-step" data-part="provider-step">
+        <div v-if="step === 'providers'" key="providers" :class="['model-auth-provider-step', transitionName]" part="provider-step" data-part="provider-step">
           <div class="model-auth-provider-search">
             <input ref="searchInput" v-model="search" class="model-auth-search" part="search" data-part="search" type="search" :placeholder="text.search" :aria-label="text.search" autocomplete="off" @keydown="handleProviderKeydown" />
             <button type="button" class="model-auth-secondary" data-part="refresh-catalog" :disabled="catalogStatus.state === 'loading'" @click="emit('refresh-catalog')">{{ catalogStatus.state === 'loading' ? text.refreshingCatalog : text.refreshCatalog }}</button>
@@ -503,11 +493,11 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
           <div class="model-auth-provider-list" part="provider-list">
             <section v-for="group in providerGroups" :key="group.key" class="model-auth-provider-group" :data-part="group.key + '-group'" :aria-label="group.label">
               <h3 class="model-auth-group-label">{{ group.label }}</h3>
-              <button v-for="provider in group.providers" :key="provider.id" type="button" class="model-auth-provider-row" part="provider-row" :class="{ focused: orderedProviders.indexOf(provider) === focusedProviderIndex, unavailable: !provider.available }" :data-provider-id="provider.id" @click="chooseProvider(provider)">
-                <slot name="provider-row" :provider="provider" :method="method">
-                  <ProviderMark :provider="provider" />
-                  <span class="model-auth-row-main"><strong>{{ provider.name }}</strong><small>{{ provider.available ? provider.id : provider.unavailableReason || text.unavailable }}</small></span>
-                  <span class="model-auth-badge">{{ provider.available ? (method === 'oauth' ? (provider.oauthCredentials?.length || 0) + ' ' + text.oauthCount : (provider.apiKeyCredentials?.length || 0) + ' ' + text.apiKeyCount) : text.unavailable }}</span>
+              <button v-for="entry in group.providers" :key="entry.provider.id + '/' + entry.method" type="button" class="model-auth-provider-row" part="provider-row" :class="{ focused: orderedProviders.indexOf(entry) === focusedProviderIndex, unavailable: !entry.provider.available }" :data-provider-id="entry.provider.id" :data-auth-method="entry.method" @click="chooseProvider(entry)">
+                <slot name="provider-row" :provider="entry.provider" :method="entry.method">
+                  <ProviderMark :provider="entry.provider" />
+                  <span class="model-auth-row-main"><strong>{{ entry.provider.name }} ({{ entry.method === 'oauth' ? 'OAuth' : 'Key' }})</strong><small>{{ entry.provider.available ? entry.provider.id : entry.provider.unavailableReason || text.unavailable }}</small></span>
+                  <span class="model-auth-badge">{{ entry.provider.available ? ((entry.method === 'oauth' ? entry.provider.oauthCredentials?.length : entry.provider.apiKeyCredentials?.length) || 0) + ' ' + (entry.method === 'api-key' ? text.apiKeyCount : text.accountCount) : text.unavailable }}</span>
                   <ModelAuthIcon name="next" />
                 </slot>
               </button>
@@ -522,7 +512,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
         </div>
         <div v-else-if="step === 'detail' && selectedProvider" key="detail" :class="['model-auth-detail', transitionName, { 'model-auth-connection-detail': connectionMode }]" part="detail" :data-part="connectionMode ? 'connection-info' : 'detail'">
           <strong class="model-auth-selected-provider">{{ selectedProvider.name }}</strong>
-          <p v-if="connectionMode" class="model-auth-connection-meta">{{ text.authenticationMethod }}：{{ method === 'oauth' ? text.oauth : text.apiKey }}</p>
+          <p v-if="connectionMode" class="model-auth-connection-meta">{{ text.authenticationMethod }}：{{ methodLabel(method) }}</p>
           <p v-if="!selectedProvider.available" class="model-auth-error" role="status">{{ selectedProvider.unavailableReason || text.unavailable }}</p>
           <button v-if="connectionMode" type="button" class="model-auth-secondary" data-part="refresh-connections" :disabled="busy" @click="emit('refresh-catalog')">{{ text.refreshCatalog }}</button>
           <section v-if="method === 'oauth'" class="model-auth-credential-section" data-part="oauth-config">
@@ -543,7 +533,13 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                 <input v-model="apiKeyInput" :disabled="busy || !canUseMethod" :type="revealApiKey ? 'text' : 'password'" autocomplete="off" :spellcheck="false" :placeholder="text.apiKeyPlaceholder" :aria-label="text.apiKey" />
                 <button type="button" class="model-auth-subtle model-auth-with-icon" :aria-pressed="revealApiKey" @click="revealApiKey = !revealApiKey"><ModelAuthIcon :name="revealApiKey ? 'eye-off' : 'eye'" />{{ revealApiKey ? text.hide : text.show }}</button>
               </label>
-              <button type="submit" class="model-auth-primary" :disabled="busy || !canUseMethod || !apiKeyInput.trim()">{{ text.saveAndVerify }}</button>
+              <details v-if="selectedProvider.accountLogin" class="model-auth-credential-login" data-part="key-login-info">
+                <summary>{{ text.accountLogin }}</summary>
+                <small>{{ text.accountLoginHint }}</small>
+                <input v-model="accountUsername" :disabled="busy" autocomplete="username" :placeholder="text.username" :aria-label="text.username" />
+                <input v-model="accountPassword" :disabled="busy" type="password" autocomplete="current-password" :placeholder="text.password" :aria-label="text.password" />
+              </details>
+              <button type="submit" class="model-auth-primary" :disabled="busy || !canUseMethod || !apiKeyInput.trim() || (selectedProvider.accountLogin && Boolean(accountUsername.trim()) !== Boolean(accountPassword))">{{ text.saveAndVerify }}</button>
             </form>
           </section>
 
@@ -580,7 +576,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                     </label>
                     <button type="button" class="model-auth-secondary" data-part="save-secret" :disabled="busy || !secretChanged(credential)" @click="saveSecret(credential)">{{ text.saveSecret }}</button>
                   </div>
-                  <form v-if="selectedProvider.accountLogin === true" class="model-auth-credential-login" data-part="credential-login" @submit.prevent="submitLogin(credential)">
+                  <form v-if="method === 'api-key' && selectedProvider.accountLogin === true" class="model-auth-credential-login" data-part="credential-login" @submit.prevent="submitLogin(credential)">
                     <div><strong>{{ text.accountLogin }}</strong><small>{{ text.accountLoginHint }}</small></div>
                     <input :value="loginUsername(credential)" :disabled="busy" type="text" inputmode="email" autocomplete="username" data-part="login-username" :placeholder="text.username" :aria-label="text.username" @input="setLoginDraft(credential, 'username', ($event.target as HTMLInputElement).value)" />
                     <input :value="loginPassword(credential)" :disabled="busy" type="password" autocomplete="current-password" data-part="login-password" :placeholder="credential.login?.passwordSaved ? text.passwordSaved : text.password" :aria-label="text.password" @input="setLoginDraft(credential, 'password', ($event.target as HTMLInputElement).value)" />
@@ -616,7 +612,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
           <strong class="model-auth-selected-provider">{{ selectedProvider.name }}</strong>
           <section data-part="authorization-result" role="status">
             <p>{{ text.authorizationComplete }}</p>
-            <p>{{ method === 'oauth' ? text.oauth : text.apiKey }} · {{ text.verified }}</p>
+            <p>{{ methodLabel(method) }} · {{ text.verified }}</p>
           </section>
         </div>
         <footer v-if="!connectionMode && step === 'detail' && authReady" class="model-auth-actions">

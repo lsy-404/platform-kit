@@ -4,7 +4,7 @@
  * before presenting a provider as available.
  */
 export type ModelAuthProviderId = "anthropic" | "openai-codex" | "workbuddy" | "traecode" | "grok" | "ollama-cloud" | "github-copilot" | "kimi-coding" | "openrouter" | "xai" | "meta" | "radius";
-export type ProviderAuthorizationKind = "browser-oauth" | "browser-web-session" | "runtime-oauth";
+export type ProviderAuthorizationKind = "browser-oauth" | "browser-web-session" | "runtime-oauth" | "api-key";
 
 export interface ModelAuthProviderCapability {
   readonly id: ModelAuthProviderId;
@@ -31,7 +31,7 @@ export const MODEL_AUTH_PROVIDER_CAPABILITIES: readonly ModelAuthProviderCapabil
   { id: "workbuddy", displayName: "WorkBuddy", authorization: { kind: "browser-oauth", renewable: true, multiAccount: true }, access: { inference: true, modelCatalog: true, usage: false }, catalogProviderIds: ["zhipuai", "tencent-tokenhub", "deepseek"], catalogProviderId: "zhipuai" },
   { id: "traecode", displayName: "TRAE", authorization: { kind: "browser-oauth", renewable: true, multiAccount: false }, access: { inference: true, modelCatalog: true, usage: false }, catalogProviderIds: [], catalogProviderId: null },
   { id: "grok", displayName: "Grok", authorization: { kind: "browser-oauth", renewable: true, multiAccount: true }, access: { inference: true, modelCatalog: true, usage: true }, catalogProviderIds: ["xai"], catalogProviderId: "xai" },
-  { id: "ollama-cloud", displayName: "Ollama", authorization: { kind: "browser-web-session", renewable: false, multiAccount: false }, access: { inference: false, modelCatalog: false, usage: true }, catalogProviderIds: ["ollama"], catalogProviderId: "ollama" },
+  { id: "ollama-cloud", displayName: "Ollama", authorization: { kind: "api-key", renewable: false, multiAccount: false }, access: { inference: false, modelCatalog: false, usage: true }, catalogProviderIds: ["ollama"], catalogProviderId: "ollama" },
   { id: "github-copilot", displayName: "GitHub Copilot", authorization: { kind: "runtime-oauth", renewable: true, multiAccount: true }, access: { inference: true, modelCatalog: true, usage: false }, catalogProviderIds: ["github-copilot"], catalogProviderId: "github-copilot" },
   { id: "kimi-coding", displayName: "Kimi Coding", authorization: { kind: "runtime-oauth", renewable: true, multiAccount: true }, access: { inference: true, modelCatalog: true, usage: false }, catalogProviderIds: ["kimi-code-plan-cn", "kimi-code-plan-global"], catalogProviderId: "kimi-code-plan-cn" },
   { id: "openrouter", displayName: "OpenRouter", authorization: { kind: "runtime-oauth", renewable: false, multiAccount: true }, access: { inference: true, modelCatalog: true, usage: false }, catalogProviderIds: ["openrouter"], catalogProviderId: "openrouter" },

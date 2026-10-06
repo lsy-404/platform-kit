@@ -59,12 +59,13 @@ runInContext(browserScript, browser, { timeout: 5000 });
 browser.registerModelAuthElement();
 const element = browser.document.createElement("model-auth-dialog");
 browser.document.body.append(element);
+element.providers = [{ id: "sample", name: "Sample", description: "", authMethods: ["oauth", "api-key"], available: true, models: [], oauthCredentials: [], apiKeyCredentials: [] }];
 element.open = true;
 await browser.happyDOM.waitUntilComplete();
-assert.ok(element.shadowRoot.textContent.includes("OAuth"), "Raw standalone asset must start without Node globals or a Vite transform");
-assert.ok(element.shadowRoot.textContent.includes("API Key"));
+assert.ok(element.shadowRoot.textContent.includes("Sample (OAuth)"), "Raw standalone asset must start without Node globals or a Vite transform");
+assert.ok(element.shadowRoot.textContent.includes("Sample (Key)"));
 assert.equal(element.shadowRoot.querySelector("dialog")?.open, true, "Packed custom element must open a native modal");
-assert.equal(element.shadowRoot.querySelectorAll(".model-auth-progress-segment").length, 3);
+assert.equal(element.shadowRoot.querySelectorAll(".model-auth-progress-segment").length, 2);
 element.remove();
 await browser.happyDOM.close();
 writeFileSync(join(consumer, "entry.ts"), `
