@@ -479,3 +479,51 @@ it("attaches optional usage login information to one API key and clears its secr
   expect(events.at(-1)).toEqual({ name: "key", payload: { providerId: "ollama-cloud", label: "", apiKey: "api-key", login: { username: "owner@example.test", password: "test-password" } } });
   expect(get<HTMLInputElement>('[data-part="key-login-info"] input[type="password"]').value).toBe("");
 });
+
+
+it("explicit false keeps OAuth and Key in the same provider list", async () => {
+  await mount({ separateAuthMethods: false });
+  expect(document.querySelector('[data-part="method-list"]')).toBeNull();
+  expect(document.querySelector('[data-provider-id="provider-a"][data-auth-method="oauth"]')).toBeTruthy();
+  expect(document.querySelector('[data-provider-id="provider-a"][data-auth-method="api-key"]')).toBeTruthy();
+  expectStage("选择提供商", "0/2", ["0%", "0%"]);
+});
+
+it("true starts with authentication choice, filters providers and supports every back step", async () => {
+  await mount({ separateAuthMethods: true });
+  expectStage("选择方式", "0/3", ["0%", "0%", "0%"]);
+  expect(document.querySelector('[data-part="provider-step"]')).toBeNull();
+  await click('[data-part="method-api-key"]');
+  expectStage("选择提供商", "1/3", ["100%", "0%", "0%"]);
+  expect(document.querySelector('[data-auth-method="oauth"]')).toBeNull();
+  expect(document.querySelector('[data-provider-id="workbuddy"]')).toBeNull();
+  await details("api-key");
+  expectStage("完成配置", "2/3", ["100%", "100%", "0%"]);
+  await click('[data-part="continue-confirmation"]');
+  expectStage("确认", "3/3", ["100%", "100%", "100%"]);
+  await click('[data-part="back"]');
+  await click('[data-part="back"]');
+  await click('[data-part="back"]');
+  expect(document.querySelector('[data-part="method-list"]')).toBeTruthy();
+  await click('[data-part="method-oauth"]');
+  expect(document.querySelector('[data-auth-method="api-key"]')).toBeNull();
+  expect(document.querySelector('[data-provider-id="workbuddy"]')).toBeTruthy();
+});
+
+it("changing view mode resets new-connection navigation and clears secret drafts", async () => {
+  const { state } = await mount({ separateAuthMethods: false });
+  await details("api-key");
+  await fill('[data-part="api-key-form"] input[type="password"]', "discarded-key");
+  state.separateAuthMethods = true; await nextTick();
+  expect(document.querySelector('[data-part="method-list"]')).toBeTruthy();
+  await click('[data-part="method-api-key"]'); await details("api-key");
+  expect(get<HTMLInputElement>('[data-part="api-key-form"] input[type="password"]').value).toBe("");
+});
+
+it("separated authentication does not add a choice page to an existing connection", async () => {
+  await mount({ separateAuthMethods: true, initialConnection: { providerId: "provider-a", method: "api-key" } });
+  expect(document.querySelector('[data-part="connection-info"]')).toBeTruthy();
+  expect(document.querySelector('[data-part="method-list"]')).toBeNull();
+  expect(document.querySelector('[part="progress"]')).toBeNull();
+  expect(document.querySelector('[data-part="back"]')).toBeNull();
+});

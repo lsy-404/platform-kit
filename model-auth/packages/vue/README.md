@@ -24,3 +24,5 @@ Each connection card in the panel expands to list its models, and the connection
 Provider icons for known ids are bundled as inline SVG and never fetched. `ModelAuthProvider.iconUrl` overrides the built-in icon (http(s) or same-origin only); unknown providers show a letter mark.
 
 New connections start with one searchable provider list. Each entry identifies its OAuth or Key method. For a provider with `accountLogin: true`, each API key can include an optional `login` payload for host-side usage queries. Return only `username` and `passwordSaved` in the credential view; keep the password in the host's encrypted store.
+
+`ModelAuthDialog.separateAuthMethods` defaults to `false`, showing OAuth and Key provider entries together. Set it to `true` to choose the authentication method before the provider. Existing connections still open directly through `initialConnection`. For custom elements, set `element.separateAuthMethods = true`.

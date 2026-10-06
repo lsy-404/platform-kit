@@ -19,6 +19,7 @@ const props = withDefaults(defineProps<{
   styled?: boolean;
   theme?: Theme;
   initialMethod?: AuthMethod;
+  separateAuthMethods?: boolean;
   initialConnection?: ModelConnectionTarget | null;
   loadStrategy?: LoadStrategy;
   catalogStatus?: CatalogStatus;
@@ -28,7 +29,7 @@ const props = withDefaults(defineProps<{
   error?: string | null;
   auth?: ProviderAuthState;
 }>(), {
-  open: false, providers: () => [], styled: true, theme: "system", initialMethod: "oauth", initialConnection: null,
+  open: false, separateAuthMethods: false, providers: () => [], styled: true, theme: "system", initialMethod: "oauth", initialConnection: null,
   loadStrategy: "round-robin", catalogStatus: () => ({ state: "loading" }),
   messages: () => ({}), busy: false, error: null,
   percentagePrecision: 2,
@@ -54,7 +55,7 @@ const emit = defineEmits<{
   "open-auth-url": [url: string];
 }>();
 
-type Step = "providers" | "detail" | "confirmation";
+type Step = "method" | "providers" | "detail" | "confirmation";
 const step = ref<Step>("providers");
 const method = ref<AuthMethod>(props.initialMethod);
 const selectedProviderId = ref("");
@@ -88,13 +89,17 @@ const promptValue = ref("");
 const modalState = ref<"opening" | "open" | "closing">("open");
 const transitionName = ref("model-auth-step-forward");
 const text = computed(() => ({ ...defaultMessages, ...props.messages }));
-const stepIndex = computed(() => ["providers", "detail", "confirmation"].indexOf(step.value));
-const pageTitles = computed(() => [text.value.chooseProvider, text.value.completeConfiguration, text.value.confirm]);
+const steps = computed<Step[]>(() => props.separateAuthMethods ? ["method", "providers", "detail", "confirmation"] : ["providers", "detail", "confirmation"]);
+const stepIndex = computed(() => steps.value.indexOf(step.value));
+const stageCount = computed(() => steps.value.length - 1);
+const pageTitles = computed(() => props.separateAuthMethods
+  ? [text.value.addConnection, text.value.chooseProvider, text.value.completeConfiguration, text.value.confirm]
+  : [text.value.chooseProvider, text.value.completeConfiguration, text.value.confirm]);
 const selectedProvider = computed(() => props.providers.find(provider => provider.id === selectedProviderId.value));
 const connectionMissing = computed(() => connectionMode.value && !selectedProvider.value);
 const matchingProviders = computed(() => {
   const query = search.value.trim().toLocaleLowerCase();
-  return props.providers.flatMap(provider => provider.authMethods.map(method => ({ provider, method })))
+  return props.providers.flatMap(provider => provider.authMethods.filter(value => !props.separateAuthMethods || value === method.value).map(method => ({ provider, method })))
     .filter(entry => [entry.provider.name, entry.provider.description, entry.provider.id, methodLabel(entry.method)].some(value => value.toLocaleLowerCase().includes(query)));
 });
 const providerGroups = computed(() => [
@@ -139,7 +144,7 @@ function resetState() {
   awaitingVerification = false;
   connectionMode.value = Boolean(props.initialConnection);
   method.value = props.initialConnection?.method ?? props.initialMethod;
-  step.value = props.initialConnection ? "detail" : "providers";
+  step.value = props.initialConnection ? "detail" : props.separateAuthMethods ? "method" : "providers";
   selectedProviderId.value = props.initialConnection?.providerId ?? ""; search.value = "";
   focusedProviderIndex.value = -1; pendingRemoval.value = ""; localError.value = ""; clearSecret();
 }
@@ -174,6 +179,10 @@ function handleModalAnimationEnd(event: AnimationEvent) {
   if (event.animationName === "model-auth-modal-exit") finishClose();
 }
 function handleCancel(event: Event) { event.preventDefault(); close(); }
+function chooseMethod(value: AuthMethod) {
+  method.value = value; step.value = "providers"; search.value = ""; selectedProviderId.value = "";
+  transitionName.value = "model-auth-step-forward"; clearSecret(); void nextTick(() => searchInput.value?.focus());
+}
 function chooseProvider(entry: { provider: ModelAuthProvider; method: AuthMethod }) {
   const { provider, method: chosenMethod } = entry; method.value = chosenMethod;
   transitionName.value = "model-auth-step-forward"; clearSecret(); selectedProviderId.value = provider.id; step.value = "detail";
@@ -186,7 +195,7 @@ function back() {
   transitionName.value = "model-auth-step-backward";
   if (step.value === "confirmation") { step.value = "detail"; void focusHeading(); }
   else if (step.value === "detail") { step.value = "providers"; void nextTick(() => searchInput.value?.focus()); }
-  else { step.value = "providers"; selectedProviderId.value = ""; void focusHeading(); }
+  else { step.value = props.separateAuthMethods ? "method" : "providers"; selectedProviderId.value = ""; void focusHeading(); }
 }
 function close() {
   awaitingVerification = false;
@@ -385,7 +394,7 @@ function authorize(credentialId?: string) {
 function startNewConnection() {
   connectionMode.value = false;
   transitionName.value = "model-auth-step-forward";
-  step.value = "providers"; selectedProviderId.value = ""; search.value = "";
+  step.value = props.separateAuthMethods ? "method" : "providers"; selectedProviderId.value = ""; search.value = "";
   pendingRemoval.value = ""; localError.value = ""; clearSecret(); void focusHeading();
 }
 function updateStrategy(value: LoadStrategy) {
@@ -426,6 +435,7 @@ watch(() => props.open, open => {
     clearSecret(); startClose();
   }
 }, { immediate: true });
+watch(() => props.separateAuthMethods, () => { if (!connectionMode.value) resetState(); });
 watch(search, () => { focusedProviderIndex.value = -1; });
 watch(activePromptId, () => { promptValue.value = ""; });
 watch([authReady, () => props.busy, () => props.error], () => {
@@ -451,14 +461,14 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
     <div class="model-auth-root">
       <section class="model-auth-dialog" role="document" tabindex="-1">
         <header class="model-auth-header" part="header" data-part="navigation">
-          <button v-if="step !== 'providers' && !connectionMode" type="button" class="model-auth-back" part="back" data-part="back" :aria-label="text.back" @click="back"><ModelAuthIcon name="back" /></button>
+          <button v-if="stepIndex > 0 && !connectionMode" type="button" class="model-auth-back" part="back" data-part="back" :aria-label="text.back" @click="back"><ModelAuthIcon name="back" /></button>
           <h2 :id="titleId" ref="heading" class="model-auth-title" tabindex="-1">{{ connectionMode ? text.connectionInfo : pageTitles[stepIndex] }}</h2>
           <button type="button" class="model-auth-close" part="close" data-part="close" :aria-label="text.close" @click="close"><ModelAuthIcon name="close" /></button>
         </header>
-        <div v-if="!connectionMode" class="model-auth-progress" part="progress" role="progressbar" :aria-label="text.progress" :aria-valuemin="0" :aria-valuemax="2" :aria-valuenow="stepIndex" :aria-valuetext="pageTitles[stepIndex]">
-          <div v-for="segment in 2" :key="segment" class="model-auth-progress-segment"><div class="model-auth-progress-fill" :style="{ width: (segment <= stepIndex ? 100 : 0) + '%' }" /></div>
+        <div v-if="!connectionMode" class="model-auth-progress" part="progress" role="progressbar" :aria-label="text.progress" :aria-valuemin="0" :aria-valuemax="stageCount" :aria-valuenow="stepIndex" :aria-valuetext="pageTitles[stepIndex]">
+          <div v-for="segment in stageCount" :key="segment" class="model-auth-progress-segment"><div class="model-auth-progress-fill" :style="{ width: (segment <= stepIndex ? 100 : 0) + '%' }" /></div>
         </div>
-        <p v-if="!connectionMode" class="model-auth-step-caption">{{ text.stepOf.replace('{current}', String(stepIndex)).replace('{total}', '2') }}</p>
+        <p v-if="!connectionMode" class="model-auth-step-caption">{{ text.stepOf.replace('{current}', String(stepIndex)).replace('{total}', String(stageCount)) }}</p>
         <div v-if="error || localError" class="model-auth-error" role="alert" part="error">{{ error || localError }}</div>
         <p v-if="busy" class="model-auth-busy" role="status">{{ text.working }}</p>
         <section v-if="auth && auth.status === 'running' && (auth.notices.length || activePrompt)" class="model-auth-auth-interaction" data-part="auth-interaction" aria-live="polite">
@@ -484,7 +494,16 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
           </form>
         </section>
 
-        <div v-if="step === 'providers'" key="providers" :class="['model-auth-provider-step', transitionName]" part="provider-step" data-part="provider-step">
+        <div v-if="step === 'method'" key="method" :class="['model-auth-methods', transitionName]" part="method-list" data-part="method-list">
+          <button v-for="choice in (['oauth', 'api-key'] as const)" :key="choice" type="button" class="model-auth-method-card" part="method-card" :data-part="'method-' + choice" @click="chooseMethod(choice)">
+            <slot name="method-card" :method="choice" :choose="() => chooseMethod(choice)">
+              <span class="model-auth-method-icon" aria-hidden="true"><ModelAuthIcon :name="choice === 'oauth' ? 'oauth' : 'key'" /></span>
+              <span><strong>{{ methodLabel(choice) }}</strong><small>{{ choice === 'oauth' ? text.oauthDescription : text.apiKeyDescription }}</small></span>
+              <ModelAuthIcon name="next" />
+            </slot>
+          </button>
+        </div>
+        <div v-else-if="step === 'providers'" key="providers" :class="['model-auth-provider-step', transitionName]" part="provider-step" data-part="provider-step">
           <div class="model-auth-provider-search">
             <input ref="searchInput" v-model="search" class="model-auth-search" part="search" data-part="search" type="search" :placeholder="text.search" :aria-label="text.search" autocomplete="off" @keydown="handleProviderKeydown" />
             <button type="button" class="model-auth-secondary" data-part="refresh-catalog" :disabled="catalogStatus.state === 'loading'" @click="emit('refresh-catalog')">{{ catalogStatus.state === 'loading' ? text.refreshingCatalog : text.refreshCatalog }}</button>

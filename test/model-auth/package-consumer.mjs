@@ -66,6 +66,17 @@ assert.ok(element.shadowRoot.textContent.includes("Sample (OAuth)"), "Raw standa
 assert.ok(element.shadowRoot.textContent.includes("Sample (Key)"));
 assert.equal(element.shadowRoot.querySelector("dialog")?.open, true, "Packed custom element must open a native modal");
 assert.equal(element.shadowRoot.querySelectorAll(".model-auth-progress-segment").length, 2);
+element.open = false;
+await browser.happyDOM.waitUntilComplete();
+element.separateAuthMethods = true;
+element.open = true;
+await browser.happyDOM.waitUntilComplete();
+assert.ok(element.shadowRoot.querySelector('[data-part="method-list"]'), "Packed custom element must accept the separated-authentication property");
+assert.equal(element.shadowRoot.querySelectorAll(".model-auth-progress-segment").length, 3);
+element.shadowRoot.querySelector('[data-part="method-api-key"]').click();
+await browser.happyDOM.waitUntilComplete();
+assert.equal(element.shadowRoot.querySelectorAll('[data-auth-method="oauth"]').length, 0);
+assert.ok(element.shadowRoot.querySelector('[data-auth-method="api-key"]'));
 element.remove();
 await browser.happyDOM.close();
 writeFileSync(join(consumer, "entry.ts"), `
@@ -81,6 +92,8 @@ import { authorizeGrok, queryGrokUsage } from "@model-auth/providers/grok";
 import { authorizeOllamaWeb, queryOllamaUsage } from "@model-auth/providers/ollama";
 import { queryProviderUsage } from "@model-auth/providers/usage";
 const providers: ModelAuthProvider[] = [];
+const dialogProps: InstanceType<typeof ModelAuthDialog>["$props"] = { separateAuthMethods: false };
+void dialogProps;
 const target: ClientVersionTarget = "codex";
 const pending: Promise<string> = latestClientVersion(target);
 const models: readonly OpenAICodexModel[] = parseOpenAICodexModels({ models: [] });
