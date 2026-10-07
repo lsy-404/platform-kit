@@ -34,7 +34,7 @@ try {
   assert.equal(await page.locator(".fluent-progress-bar__indicator").first().textContent(), "62%");
   assert.equal(await page.locator(".fluent-progress-bar--snap .fluent-progress-bar__indicator").textContent(), "60%");
   assert.equal(await page.locator(".fluent-progress-bar--snap .fluent-progress-bar__tick").count(), 11);
-  assert.equal(await page.locator(".fluent-progress-ring").count(), 3);
+  assert.equal(await page.locator(".fluent-progress-ring").count(), 4);
   assert.equal(await page.locator(".fluent-navigation").count(), 1);
   assert.equal(await page.locator("#choices").getByRole("checkbox").count(), 3);
   assert.equal(await page.getByRole("checkbox", { name: "Partially selected" }).evaluate(node => node.indeterminate), true);
@@ -61,6 +61,16 @@ try {
   assert.equal(await transform(secondary), "none", "button hover changed its geometry");
   const invalid = page.locator("#native input[aria-invalid=true]");
   assert.notEqual(await invalid.evaluate(node => getComputedStyle(node).borderTopColor), await page.locator("#native input[type=text]").first().evaluate(node => getComputedStyle(node).borderTopColor), "native invalid state is not visible");
+  const invalidField = page.getByLabel("Invalid field");
+  const invalidRest = await invalidField.evaluate(node => getComputedStyle(node).borderBottomColor);
+  await invalidField.focus(); await page.keyboard.press("Shift+Tab"); await page.keyboard.press("Tab");
+  const invalidFocus = await invalidField.evaluate(node => { const style = getComputedStyle(node); return { border: style.borderBottomColor, outline: style.outlineStyle }; });
+  assert.equal(invalidFocus.border, invalidRest, "focus replaced the invalid field danger border");
+  assert.equal(invalidFocus.outline, "solid", "focused invalid field lost its focus ring");
+  const busyDisabled = page.getByRole("button", { name: "Disabled saving" });
+  const idleDisabled = page.getByRole("button", { name: "Disabled", exact: true });
+  const look = locator => locator.evaluate(node => { const style = getComputedStyle(node); return [style.opacity, style.cursor, style.color, style.backgroundColor].join("|"); });
+  assert.equal(await look(busyDisabled), await look(idleDisabled), "disabled busy button does not read as disabled");
   const primary = page.getByTestId("button-primary");
   const restColor = await primary.evaluate(node => getComputedStyle(node).backgroundColor);
   await primary.hover();
@@ -209,7 +219,7 @@ try {
   const pickerInput = page.locator(".fluent-file-picker__input");
   await pickerInput.setInputFiles([{ name: "notes.md", mimeType: "text/markdown", buffer: Buffer.from("notes") }]);
   assert.equal(await page.locator(".fluent-file-picker__file").textContent(), "notes.md");
-  assert.equal(await page.getByRole("button", { name: "Disabled" }).isDisabled(), true);
+  assert.equal(await page.getByRole("button", { name: "Disabled", exact: true }).isDisabled(), true);
   await page.getByTestId("fluent-select").click();
   assert.equal(await page.getByRole("listbox").count(), 1);
   assert.equal(await page.getByRole("option", { name: "Unavailable" }).isDisabled(), true);

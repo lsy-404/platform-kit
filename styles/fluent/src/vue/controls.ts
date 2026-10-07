@@ -108,6 +108,7 @@ export const FluentButton = defineComponent({
           class: ["fluent-button", `fluent-button--${props.tone}`, { "fluent-button--busy": props.busy }, attrs.class],
           disabled: props.disabled || props.busy,
           "aria-busy": props.busy || undefined,
+          "data-disabled": props.disabled || undefined,
           "aria-pressed": props.toggle ? String(props.pressed) : undefined,
           "data-icon-only": props.iconOnly || undefined,
           onClick: (event: MouseEvent) => emit("click", event),

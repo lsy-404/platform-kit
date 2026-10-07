@@ -38,6 +38,7 @@
   box-shadow: none;
 }
 .fluent-button:disabled:not(.fluent-button--busy),
+.fluent-button--busy[data-disabled],
 .fluent-field__input:disabled,
 .fluent-switch:disabled,
 .fluent-slider__input:disabled {
@@ -429,7 +430,8 @@
   min-width: 32px;
   padding: 0;
 }
-.fluent-button:disabled:not(.fluent-button--busy) {
+.fluent-button:disabled:not(.fluent-button--busy),
+.fluent-button--busy[data-disabled] {
   border-color: var(--fluent-border);
   color: var(--fluent-muted);
   background: var(--fluent-control);
@@ -439,8 +441,8 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  cursor: progress;
 }
+.fluent-button--busy:not([data-disabled]) { cursor: progress; }
 .fluent-button--busy .fluent-progress-ring { color: currentColor; }
 .fluent-button--busy .fluent-progress-ring__track { stroke: color-mix(in srgb, currentColor 30%, transparent); }
 
@@ -462,9 +464,17 @@ textarea.fluent-field__input {
   background: var(--fluent-control);
 }
 .fluent-field__input[data-invalid],
-.fluent-field__input:invalid {
+.fluent-field__input:invalid,
+.fluent-field__input[data-invalid]:focus-visible:not(:disabled),
+.fluent-field__input:invalid:focus-visible:not(:disabled) {
   border-color: var(--fluent-input-invalid);
+  border-bottom-color: var(--fluent-input-invalid);
   box-shadow: inset 0 -1px 0 var(--fluent-input-invalid);
+}
+.fluent-field__input[data-invalid]:focus-visible:not(:disabled),
+.fluent-field__input:invalid:focus-visible:not(:disabled) {
+  outline: 2px solid var(--fluent-focus-outer);
+  outline-offset: -2px;
 }
 .fluent-field__input[readonly] {
   color: var(--fluent-muted);

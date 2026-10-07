@@ -61,6 +61,15 @@ describe("Fluent control states", () => {
     expect(css).toContain('.fluent-checkbox:hover .fluent-checkbox__box:is(.fluent-checkbox__box--checked, .fluent-checkbox__box--indeterminate)');
   });
 
+  it("keeps the invalid state and disabled look over focus and busy", async () => {
+    const css = await readFile(new URL("../styles/fluent/src/styles/controls.css", import.meta.url), "utf8");
+    expect(css).toMatch(/\.fluent-field__input\[data-invalid\]:focus-visible:not\(:disabled\)[^{]*\{[^}]*border-bottom-color: var\(--fluent-input-invalid\)/);
+    expect(css).toMatch(/\.fluent-field__input\[data-invalid\]:focus-visible:not\(:disabled\),\n\.fluent-field__input:invalid:focus-visible:not\(:disabled\) \{\n  outline: 2px solid/);
+    expect(css).toMatch(/\.fluent-button--busy\[data-disabled\] \{\n  border-color: var\(--fluent-border\)/);
+    const { node } = render(FluentButton, { tone: "primary", type: "button", disabled: true, busy: true });
+    expect(node.props).toMatchObject({ disabled: true, "data-disabled": true, "aria-busy": true });
+  });
+
   it("keeps focus, elevation and select sizing in single sources", async () => {
     const read = (name: string) => readFile(new URL(`../styles/fluent/src/styles/${name}.css`, import.meta.url), "utf8");
     const [tokens, controls, selection] = await Promise.all([read("tokens"), read("controls"), read("selection")]);
