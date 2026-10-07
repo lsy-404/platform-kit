@@ -1,6 +1,6 @@
 export const defaultMessages = {
   eyebrow: "模型连接", addConnection: "选择方式", chooseMethod: "选择一种认证方式开始。",
-  progress: "认证进度", authenticationMethod: "认证方式", provider: "提供商", completeConfiguration: "完成配置", completeAuthorization: "完成授权",
+  progress: "认证进度", provider: "提供商", completeConfiguration: "完成配置", completeAuthorization: "完成授权",
   oauth: "OAuth", oauthDescription: "通过浏览器或客户端登录已有账号",
   accountCount: "个账号",
   apiKey: "API Key", apiKeyDescription: "使用平台密钥连接模型提供商",

@@ -191,6 +191,15 @@ describe("authentication dialog", () => {
     expect(get('[data-part="confirmation-step"] h3').textContent).toBe("WorkBuddy");
   });
 
+  it("does not advance from detail when the catalog changes without a new credential", async () => {
+    const { state } = await mount();
+    await details("oauth", "workbuddy");
+    state.providers[2]!.models = ["changed-without-action"];
+    await nextTick();
+    expectStage("完成配置", ["100%", "0%"]);
+    expect(document.querySelector('[data-part="confirmation-step"]')).toBeNull();
+  });
+
   it("moves back to detail when an authorized account is revoked", async () => {
     const { state } = await mount();
     await details("oauth", "provider-a");

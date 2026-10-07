@@ -37,7 +37,8 @@
 .model-auth-connection-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .model-auth-connection-title h3 { margin: 0; font-size: 16px; font-weight: 600; }
 .model-auth-connection-title .model-auth-connection-meta { display: block; }
-.model-auth-connection-title > button { margin-left: auto; }
+.model-auth-connection-title > div { min-width: 0; overflow-wrap: anywhere; }
+.model-auth-connection-title > button { margin-left: auto; flex: none; white-space: nowrap; }
 .model-auth-row-main { min-width: 0; overflow-wrap: anywhere; }
 .model-auth-row-main strong { overflow: hidden; text-overflow: ellipsis; }
 .model-auth-badge { white-space: nowrap; }
@@ -51,7 +52,8 @@
 .model-auth-credential-summary { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 10px; align-items: center; }
 .model-auth-credential-actions { display: flex; justify-content: flex-end; gap: 8px; align-items: center; flex-wrap: wrap; }
 .model-auth-toggle { display: inline-flex; align-items: center; gap: 8px; position: relative; }
-.model-auth-move-spacer { width: 32px; flex: none; }
+.model-auth-move-spacer, .model-auth-subtle.model-auth-move { width: 32px; flex: none; }
+.model-auth-subtle.model-auth-move { padding: 8px; }
 .model-auth-switch-track { display: none; }
 .model-auth-health { width: 7px; height: 7px; border-radius: 50%; }
 .model-auth-credential-secret { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }

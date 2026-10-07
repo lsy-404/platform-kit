@@ -577,9 +577,9 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                 <div v-if="credentials.length > 1 || (method === 'oauth' && needsReconnect(credential))" class="model-auth-credential-actions">
                   <button v-if="method === 'oauth' && needsReconnect(credential)" type="button" class="model-auth-primary" data-part="reconnect" :disabled="busy || !canUseMethod" @click="authorize(credential.id)">{{ text.reconnect }}</button>
                   <template v-if="credentials.length > 1">
-                    <button v-if="index > 0" type="button" class="model-auth-subtle model-auth-with-icon" data-part="move-up" :disabled="busy" :aria-label="text.moveUp + ' ' + credential.label" @click="moveCredential(index, -1)"><ModelAuthIcon name="arrow-up" /></button>
+                    <button v-if="index > 0" type="button" class="model-auth-subtle model-auth-with-icon model-auth-move" data-part="move-up" :disabled="busy" :aria-label="text.moveUp + ' ' + credential.label" @click="moveCredential(index, -1)"><ModelAuthIcon name="arrow-up" /></button>
                     <span v-else class="model-auth-move-spacer" aria-hidden="true"></span>
-                    <button v-if="index < credentials.length - 1" type="button" class="model-auth-subtle model-auth-with-icon" data-part="move-down" :disabled="busy" :aria-label="text.moveDown + ' ' + credential.label" @click="moveCredential(index, 1)"><ModelAuthIcon name="arrow-down" /></button>
+                    <button v-if="index < credentials.length - 1" type="button" class="model-auth-subtle model-auth-with-icon model-auth-move" data-part="move-down" :disabled="busy" :aria-label="text.moveDown + ' ' + credential.label" @click="moveCredential(index, 1)"><ModelAuthIcon name="arrow-down" /></button>
                     <span v-else class="model-auth-move-spacer" aria-hidden="true"></span>
                   </template>
                 </div>

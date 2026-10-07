@@ -8,7 +8,7 @@ const root = process.cwd();
 const dist = join(root, "model-auth/packages/vue/dist");
 const artifact = join(root, "test/artifacts");
 const fixture = JSON.stringify([
-  { id: "oauth", name: "OAuth service", description: "OAuth", authMethods: ["oauth"], available: true, models: Array.from({ length: 30 }, (_, index) => `very-long-model-name-${index}-abcdefghijklmnopqrstuvwxyz`), loadStrategy: "round-robin", oauthCredentials: [{ id: "oauth-1", label: "Primary", account: "person@example.test", enabled: true, healthy: true, models: ["o-model"] }, { id: "oauth-2", label: "Paused", enabled: false, healthy: false, models: ["o-model"] }] },
+  { id: "oauth", name: "OAuth service with an exceptionally long provider display name", description: "OAuth", authMethods: ["oauth"], available: true, models: Array.from({ length: 30 }, (_, index) => `very-long-model-name-${index}-abcdefghijklmnopqrstuvwxyz`), loadStrategy: "round-robin", oauthCredentials: [{ id: "oauth-1", label: "Primary", account: "person@example.test", enabled: true, healthy: true, models: ["o-model"] }, { id: "oauth-2", label: "Paused", enabled: false, healthy: false, models: ["o-model"] }] },
   { id: "key", name: "Key service", description: "API Key", authMethods: ["api-key"], available: true, models: ["k-model"], loadStrategy: "failover", apiKeyCredentials: [{ id: "key-1", label: "Workspace", enabled: true, healthy: false, models: ["k-model"] }] },
   { id: "offline", name: "Offline service", description: "Unavailable", authMethods: ["oauth"], available: false, unavailableReason: "Host integration unavailable", models: [], oauthCredentials: [{ id: "offline-1", label: "Offline account", enabled: true, healthy: false, models: [] }] },
 ]);
@@ -73,6 +73,11 @@ try {
   assert.equal(await page.locator("fixture-dialog").locator('[data-part="models"], [data-part="connection-policy"], [part="strategy"]').count(), 0, "dialog shows neither models nor strategy");
   const dialogSize = await page.locator("fixture-dialog").evaluate(element => { const root = element.shadowRoot.querySelector('[data-part="connection-info"]'); return { width: root.clientWidth, scroll: root.scrollWidth }; });
   assert.ok(dialogSize.scroll <= dialogSize.width, `long models overflow: ${dialogSize.scroll}/${dialogSize.width}`);
+  const refreshBox = await page.locator("fixture-dialog").locator('[data-part="refresh-connections"]').boundingBox();
+  assert.ok(refreshBox.height < 48 && refreshBox.width > 48, `refresh button squeezed to ${refreshBox.width}x${refreshBox.height}`);
+  const downSlots = await page.locator("fixture-dialog").evaluate(element => [...element.shadowRoot.querySelectorAll('[data-part="move-down"], .model-auth-move-spacer')].map(node => { const box = node.getBoundingClientRect(); return [Math.round(box.x), Math.round(box.width)]; }));
+  const downButton = downSlots[1], spacerBox = downSlots.at(-1);
+  assert.deepEqual(spacerBox, downButton, "reorder spacer matches the arrow button width and column");
   await page.screenshot({ path: join(artifact, "connection-panel-detail.png"), fullPage: true });
   const wizard = page.locator("fixture-dialog");
   await wizard.locator('[data-part="close"]').click();
