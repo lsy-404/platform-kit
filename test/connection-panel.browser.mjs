@@ -80,6 +80,8 @@ try {
   assert.deepEqual(spacerBox, downButton, "reorder spacer matches the arrow button width and column");
   const arrowsInSummary = await page.locator("fixture-dialog").evaluate(element => [...element.shadowRoot.querySelectorAll(".model-auth-move")].every(button => button.closest(".model-auth-credential-summary")));
   assert.ok(arrowsInSummary, "reorder arrows sit on the credential status line");
+  const summaryHeights = await page.locator("fixture-dialog").evaluate(element => [...element.shadowRoot.querySelectorAll(".model-auth-credential-summary")].map(node => ({ height: node.getBoundingClientRect().height, label: node.querySelector(".model-auth-row-main").getBoundingClientRect().width })));
+  for (const summary of summaryHeights) assert.ok(summary.height < 120 && summary.label > 100, `credential summary squeezed: ${JSON.stringify(summary)}`);
   await page.screenshot({ path: join(artifact, "connection-panel-detail.png"), fullPage: true });
   const wizard = page.locator("fixture-dialog");
   await wizard.locator('[data-part="close"]').click();

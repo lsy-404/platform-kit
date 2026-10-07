@@ -4,7 +4,7 @@ import { defaultMessages, type ModelAuthMessages } from "./messages";
 import ModelAuthIcon from "./ModelAuthIcon.vue";
 import ProviderMark from "./ProviderMark.vue";
 import { formatPercentage } from "./percentage";
-import { fill, formatCooldown, windowRemaining } from "./usage";
+import { credentialReady, fill, formatCooldown, windowRemaining } from "./usage";
 import type {
   AddApiKeyPayload, AuthMethod, CredentialExtend, CredentialLoginInput, CredentialReorderPayload, CredentialUpdatePayload, CatalogStatus, 
   ModelAuthProvider, ModelConnectionTarget, ProviderAuthResponseRequest, ProviderAuthState, ProviderCredential, ProviderAuthNotice, ProviderUpdatePayload, Theme, CredentialUsageEstimate, CredentialUsageWindow,
@@ -342,7 +342,6 @@ function credentialCount(entry: { provider: ModelAuthProvider; method: AuthMetho
   return ((entry.method === "oauth" ? entry.provider.oauthCredentials : entry.provider.apiKeyCredentials) ?? []).length;
 }
 const needsReconnect = (credential: ProviderCredential) => credential.enabled && !credential.healthy;
-const isHealthy = (credential: ProviderCredential) => credential.enabled && credential.healthy && !credential.cooldownUntilUtc;
 function noticeText(notice: ProviderAuthNotice): string {
   if (notice.type === "device_code") return `${text.value.authDeviceCode}: ${notice.userCode} · ${notice.verificationUri}`;
   if (notice.type === "auth_url") return notice.instructions || text.value.authOpenBrowser;
@@ -557,7 +556,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
             <article v-for="(credential, index) in credentials" :key="credential.id" class="model-auth-credential-row" part="credential-row" :data-part="method === 'oauth' ? 'oauth-credential' : 'api-key-credential'">
               <slot name="credential-row" :credential="credential" :provider="selectedProvider" :method="method" :update="(enabled: boolean) => updateCredential(credential, enabled)" :remove="() => removeCredential(credential)" :rename="(label: string) => rename(credential, label)" :save-login="(login: CredentialLoginInput | null) => saveLogin(credential, login)">
                 <div class="model-auth-credential-summary">
-                  <span class="model-auth-health" :class="{ healthy: isHealthy(credential), attention: needsReconnect(credential) }" aria-hidden="true"></span>
+                  <span class="model-auth-health" :class="{ healthy: credentialReady(credential), attention: needsReconnect(credential) }" aria-hidden="true"></span>
                   <span class="model-auth-row-main"><strong>{{ credential.label }}</strong><small :class="{ 'model-auth-connection-attention': needsReconnect(credential) }" :title="credential.cooldownUntilUtc ?? undefined">{{ connectionMode && credential.account ? text.account + ' · ' + credential.account + ' · ' : '' }}{{ credentialStatus(credential) }}</small></span>
                   <span v-if="credentials.length > 1" class="model-auth-move-group">
                     <button v-if="index > 0" type="button" class="model-auth-subtle model-auth-with-icon model-auth-move" data-part="move-up" :disabled="busy" :aria-label="text.moveUp + ' ' + credential.label" @click="moveCredential(index, -1)"><ModelAuthIcon name="arrow-up" /></button>

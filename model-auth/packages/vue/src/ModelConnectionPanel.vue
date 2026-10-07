@@ -81,7 +81,7 @@ function modelCount(provider: ModelAuthProvider, method: AuthMethod, credential:
         <ul class="model-auth-connection-accounts">
           <li v-for="(credential, index) in group.credentials" :key="credential.id" data-part="connection-account">
             <div><strong>{{ credential.label }}</strong><small v-if="credential.account && credential.account !== credential.label">{{ text.account }}：{{ credential.account }}</small></div>
-            <span class="model-auth-connection-status" :class="{ 'model-auth-connection-attention': credential.enabled && !credential.healthy }" :title="credential.cooldownUntilUtc ?? undefined"><span class="model-auth-health" :class="{ healthy: credential.enabled && credential.healthy && !credential.cooldownUntilUtc, attention: credential.enabled && !credential.healthy }" aria-hidden="true"></span>{{ status(credential) }}</span>
+            <span class="model-auth-connection-status" :class="{ 'model-auth-connection-attention': credential.enabled && !credential.healthy }" :title="credential.cooldownUntilUtc ?? undefined"><span class="model-auth-health" :class="{ healthy: credentialReady(credential), attention: credential.enabled && !credential.healthy }" aria-hidden="true"></span>{{ status(credential) }}</span>
             <span class="model-auth-connection-meta"><template v-if="group.credentials.length > 1">{{ text.position }} {{ index + 1 }} · </template>{{ modelCount(group.provider, group.method, credential) }} {{ text.modelCount }}<template v-if="credentialRemaining(credential) !== null"> · {{ fill(text.lowestRemaining, { percent: percent(credentialRemaining(credential)!) }) }}</template></span>
           </li>
         </ul>
