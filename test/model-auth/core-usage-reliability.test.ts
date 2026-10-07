@@ -131,6 +131,12 @@ describe("describeOAuthCredential", () => {
     });
   });
 
+  it("never falls back to an internal account id for the display account", () => {
+    expect(describeOAuthCredential("anthropic", { access: "a", accountId: "5f0c3d2e-0000-4000-8000-000000000000", account_id: "internal" }, NOW).account).toBeUndefined();
+    const access = `h.${Buffer.from(JSON.stringify({ "https://api.openai.com/auth": { chatgpt_account_id: "acct-1" } })).toString("base64url")}.s`;
+    expect(describeOAuthCredential("openai-codex", { access, accountId: "acct-1" }, NOW).account).toBeUndefined();
+  });
+
   it("reports reauth when the refresh token has expired and unknown when nothing is known", () => {
     expect(describeOAuthCredential("anthropic", { expires: NOW + 1000, refreshExpiresAt: NOW - 1 }, NOW).status).toBe("reauth");
     expect(describeOAuthCredential("anthropic", null, NOW)).toEqual({ status: "unknown" });

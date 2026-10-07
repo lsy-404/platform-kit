@@ -21,6 +21,12 @@ export function credentialReady(c: ProviderCredential): boolean {
   return c.enabled && c.healthy && !c.cooldownUntilUtc;
 }
 
+export function formatCooldown(utc: string): string {
+  const date = new Date(utc);
+  if (Number.isNaN(date.getTime())) return utc;
+  return date.toDateString() === new Date().toDateString() ? date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : date.toLocaleString();
+}
+
 export function fill(template: string, values: Record<string, string | number>): string {
   return template.replace(/\{(\w+)\}/g, (match, key: string) => key in values ? String(values[key]) : match);
 }

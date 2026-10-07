@@ -43,8 +43,8 @@ describe("model connection panel", () => {
     expect(document.querySelectorAll('[data-part="connection-card"]')).toHaveLength(3);
     expect(get<HTMLImageElement>('[data-provider-id="oauth"] img').src).toBe("https://assets.example.test/oauth.svg");
     expect(get('[data-provider-id="oauth"] [data-part="connection-summary"]').textContent).toBe("3 个账号 · 2 个可用 · Pro · 最低剩余 40%");
-    expect(document.querySelector('[data-part="connection-account"]')).toBeNull();
-    expect(document.querySelector('[data-part="connection-details"]')).toBeNull();
+    expect(document.querySelector('[data-provider-id="oauth"] [data-part="connection-account"]')).toBeNull();
+    expect(document.querySelector('[data-provider-id="oauth"] [data-part="connection-details"]')).toBeNull();
     expect(get('[data-provider-id="oauth"] [data-part="toggle-connection"]').getAttribute("aria-expanded")).toBe("false");
     expect(get('[data-provider-id="offline"]').textContent).toContain("Host integration unavailable");
     expect(document.querySelector('[data-part="connection-current-model"]')).toBeNull();
@@ -55,7 +55,7 @@ describe("model connection panel", () => {
     await click('[data-provider-id="oauth"] [data-part="toggle-connection"]');
     const toggle = get('[data-provider-id="oauth"] [data-part="toggle-connection"]');
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
-    expect(document.getElementById(toggle.getAttribute("aria-controls")!)).toBe(get('[data-part="connection-details"]'));
+    expect(document.getElementById(toggle.getAttribute("aria-controls")!)).toBe(get('[data-provider-id="oauth"] [data-part="connection-details"]'));
     const rows = [...document.querySelectorAll('[data-provider-id="oauth"] [data-part="connection-account"]')].map(row => row.textContent!);
     expect(rows).toHaveLength(3);
     expect(rows[0]).toContain("Primary");
@@ -65,21 +65,29 @@ describe("model connection panel", () => {
     expect(rows[2]).toContain("最低剩余 1%");
     expect(document.querySelector('[data-part="connection-models"], [data-part="models"]')).toBeNull();
     await click('[data-provider-id="oauth"] [data-part="toggle-connection"]');
-    expect(document.querySelector('[data-part="connection-account"]')).toBeNull();
+    expect(document.querySelector('[data-provider-id="oauth"] [data-part="connection-account"]')).toBeNull();
+  });
+
+  it("renders a single credential directly without a toggle or count summary", async () => {
+    await mount();
+    expect(document.querySelector('[data-provider-id="key"] [data-part="toggle-connection"]')).toBeNull();
+    expect(document.querySelector('[data-provider-id="key"] [data-part="connection-summary"]')).toBeNull();
+    expect(get('[data-provider-id="key"] [data-part="connection-account"]').textContent).toContain("Workspace");
   });
 
   it("keeps the expanded state across provider refreshes", async () => {
     const { state } = await mount();
-    await click('[data-provider-id="key"] [data-part="toggle-connection"]');
+    await click('[data-provider-id="oauth"] [data-part="toggle-connection"]');
     state.providers = fixture();
     await nextTick();
-    expect(get('[data-provider-id="key"] [data-part="toggle-connection"]').getAttribute("aria-expanded")).toBe("true");
-    expect(get('[data-provider-id="key"] [data-part="connection-details"]').textContent).toContain("Workspace");
+    expect(get('[data-provider-id="oauth"] [data-part="toggle-connection"]').getAttribute("aria-expanded")).toBe("true");
+    expect(get('[data-provider-id="oauth"] [data-part="connection-details"]').textContent).toContain("Primary");
   });
 
   it("flags enabled accounts that need reconnecting", async () => {
     await mount();
-    expect(get('[data-provider-id="key"] [data-part="connection-attention"]').textContent).toBe("需要重新连接");
+    expect(get('[data-provider-id="key"] .model-auth-connection-attention').textContent).toBe("需要重新连接");
+    expect(get('[data-provider-id="key"] .model-auth-health').classList.contains("attention")).toBe(true);
     expect(document.querySelector('[data-provider-id="oauth"] [data-part="connection-attention"]')).toBeNull();
   });
 
@@ -96,7 +104,7 @@ describe("model connection panel", () => {
 
   it("never renders model lists or the load strategy", async () => {
     await mount();
-    for (const id of ["oauth", "key", "offline"]) await click(`[data-provider-id="${id}"] [data-part="toggle-connection"]`);
+    for (const id of ["oauth"]) await click(`[data-provider-id="${id}"] [data-part="toggle-connection"]`);
     expect(document.querySelector('[data-part="connection-models"], [data-part="models"], [data-part="model-search"]')).toBeNull();
     expect(document.body.textContent).not.toContain("负载策略");
   });
