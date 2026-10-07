@@ -38,8 +38,8 @@ describe("Fluent selection controls", () => {
       items: [{ value: "copy", label: "Copy" }],
     });
     const menu = menuTree.children.default();
-    expect(menu.children[0].children[0].type).toBe("svg");
-    expect(menu.children[0].children[0].props["data-icon"]).toBe("check");
+    expect(menu.children[0].children[0].children[0].type).toBe("svg");
+    expect(menu.children[0].children[0].children[0].props["data-icon"]).toBe("check");
 
     const fluentRoot = new URL("../styles/fluent/src/", import.meta.url);
     const fluentFiles = (await readdir(fluentRoot, { recursive: true }))

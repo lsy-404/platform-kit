@@ -20,8 +20,12 @@
 }
 .fluent-dialog__header {
   flex: none;
-  padding: 20px 24px 0;
+  padding: 24px 24px 0;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
 }
+.fluent-dialog__header + .fluent-dialog__content { padding-top: 12px; }
 .fluent-dialog__content {
   flex: 1 1 auto;
   min-height: 0;
@@ -34,7 +38,8 @@
   flex: none;
   justify-content: flex-end;
   gap: 8px;
-  padding: 12px 24px 20px;
+  padding: 24px;
+  background: var(--fluent-bg);
   border-top: 1px solid var(--fluent-border);
 }
 .fluent-popover {

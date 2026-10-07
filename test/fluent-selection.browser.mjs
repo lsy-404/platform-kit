@@ -65,8 +65,8 @@ try {
   await menuTrigger.press("Enter");
   const shareItem = page.getByRole("menuitemcheckbox", { name: "Share" });
   await assert.equal(await shareItem.getAttribute("aria-checked"), "true");
-  await assert.equal(await shareItem.locator(".fluent-menu__check").evaluate(el => el.tagName), "svg");
-  await assert.equal(await shareItem.locator(".fluent-menu__check").getAttribute("data-icon"), "check");
+  await assert.equal(await shareItem.locator(".fluent-menu__check svg").count(), 1);
+  await assert.equal(await shareItem.locator(".fluent-menu__check svg").getAttribute("data-icon"), "check");
   await assert.equal(await page.getByRole("menu").count(), 1);
   await page.keyboard.press("Escape");
   await assert.equal(await page.getByRole("menu").count(), 0);

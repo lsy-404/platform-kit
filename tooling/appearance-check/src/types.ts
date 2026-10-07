@@ -34,6 +34,7 @@ export interface AuditOptions {
   urls: string[];
   checks?: CheckId[];
   viewports?: Viewport[];
+  colorSchemes?: Array<"light" | "dark">;
   ignores?: Ignore[];
   executablePath?: string;
   maxControls?: number;

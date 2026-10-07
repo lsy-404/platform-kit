@@ -60,4 +60,14 @@ describe("Fluent control states", () => {
     expect(css).not.toContain("transform: scale(0.99)");
     expect(css).toContain('.fluent-checkbox:hover .fluent-checkbox__box:is(.fluent-checkbox__box--checked, .fluent-checkbox__box--indeterminate)');
   });
+
+  it("keeps focus, elevation and select sizing in single sources", async () => {
+    const read = (name: string) => readFile(new URL(`../styles/fluent/src/styles/${name}.css`, import.meta.url), "utf8");
+    const [tokens, controls, selection] = await Promise.all([read("tokens"), read("controls"), read("selection")]);
+    expect(tokens).toContain("outline: 2px solid var(--fluent-focus-outer)");
+    expect(tokens).toContain("--fluent-accent-hover: color-mix");
+    expect(controls).not.toMatch(/fluent-select__control/);
+    expect(controls).not.toMatch(/outline-offset: [23]px/);
+    expect(selection).toMatch(/\.fluent-select__control \{[^}]*min-height: 32px;[^}]*padding: 0 10px/);
+  });
 });

@@ -34,7 +34,7 @@ try {
   assert.equal(await page.locator(".fluent-progress-bar__indicator").first().textContent(), "62%");
   assert.equal(await page.locator(".fluent-progress-bar--snap .fluent-progress-bar__indicator").textContent(), "60%");
   assert.equal(await page.locator(".fluent-progress-bar--snap .fluent-progress-bar__tick").count(), 11);
-  assert.equal(await page.locator(".fluent-progress-ring").count(), 2);
+  assert.equal(await page.locator(".fluent-progress-ring").count(), 3);
   assert.equal(await page.locator(".fluent-navigation").count(), 1);
   assert.equal(await page.locator("#choices").getByRole("checkbox").count(), 3);
   assert.equal(await page.getByRole("checkbox", { name: "Partially selected" }).evaluate(node => node.indeterminate), true);
@@ -221,7 +221,7 @@ try {
   const selectedMenuRest = await background(selectedMenuItem);
   await selectedMenuItem.hover(); await waitForHover();
   assert.equal(await background(selectedMenuItem), selectedMenuRest, "selected menu item was overwritten by hover");
-  assert.notEqual(await background(selectedMenuItem), controlHover, "selected menu item looks like an unselected item");
+  assert.equal(await selectedMenuItem.locator(".fluent-menu__check svg").count(), 1, "selected multi-select item must show a check");
   await page.getByRole("menuitemcheckbox", { name: "Pin" }).click();
   assert.equal(await page.getByRole("menuitemcheckbox", { name: "Pin" }).getAttribute("aria-checked"), "true");
   assert.equal(await page.getByRole("menuitemcheckbox", { name: "Delete" }).isDisabled(), true);

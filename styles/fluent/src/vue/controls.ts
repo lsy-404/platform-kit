@@ -1,4 +1,5 @@
 import { computed, defineComponent, h, mergeProps, onBeforeUnmount, ref, watch, type PropType } from "vue";
+import { FluentProgressRing } from "./feedback.js";
 import { fluentIcon } from "./icon.js";
 
 export type FluentButtonTone = "primary" | "secondary" | "danger" | "subtle";
@@ -104,14 +105,16 @@ export const FluentButton = defineComponent({
         {
           ...attrs,
           type: props.type,
-          class: ["fluent-button", `fluent-button--${props.tone}`, attrs.class],
+          class: ["fluent-button", `fluent-button--${props.tone}`, { "fluent-button--busy": props.busy }, attrs.class],
           disabled: props.disabled || props.busy,
           "aria-busy": props.busy || undefined,
           "aria-pressed": props.toggle ? String(props.pressed) : undefined,
           "data-icon-only": props.iconOnly || undefined,
           onClick: (event: MouseEvent) => emit("click", event),
         },
-        slots.default?.(),
+        props.busy
+          ? [h(FluentProgressRing, { size: 16, "aria-hidden": "true" }), slots.default?.()]
+          : slots.default?.(),
       );
   },
 });
@@ -476,7 +479,7 @@ export const FluentSlider = defineComponent({
         "data-value": tick,
         style: markPosition(tick),
       })));
-      return h("label", { class: ["fluent-slider", {
+      return h("label", { style: labelled.length ? { "--fluent-slider-stops": labelled.length } : undefined, class: ["fluent-slider", {
         "fluent-slider--disabled": props.disabled,
         "fluent-slider--vertical": props.orientation === "vertical",
         "fluent-slider--neutral": props.tone === "neutral",

@@ -39,6 +39,8 @@ describe("Fluent controls", () => {
       "aria-busy": true,
     });
     expect(node.props.class).toContain("fluent-button--primary");
+    expect(String(node.props.class)).toContain("fluent-button--busy");
+    expect(node.children[0].type.name).toBe("FluentProgressRing");
   });
 
   it("reports switch changes through its model event", () => {
@@ -138,6 +140,7 @@ describe("Fluent controls", () => {
       disabled: false,
     }, emit);
     expect(String(node.props.class)).toContain("fluent-slider--neutral");
+    expect(node.props.style).toEqual({ "--fluent-slider-stops": 5 });
     const labels = node.children.at(-1).children;
     expect(labels.map((l: { children: string }) => l.children)).toEqual(["A", "B", "C", "D", "E"]);
     const input = node.children[1].children[0];
@@ -255,12 +258,13 @@ describe("Fluent controls", () => {
       "border",
       "danger",
       "radius",
-      "shadow",
+      "focus-outer",
       "fast",
       "ease",
     ]) {
       expect(css).toContain(`--fluent-${token}`);
     }
+    expect(css).not.toContain("--fluent-shadow");
     for (const selector of [
       ".fluent-button",
       ".fluent-field",

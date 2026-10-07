@@ -31,8 +31,9 @@
   background: var(--fluent-control-pressed);
 }
 .fluent-navigation__item:focus-visible {
-  outline: 2px solid var(--fluent-accent);
+  outline: 2px solid var(--fluent-focus-outer);
   outline-offset: -2px;
+  box-shadow: inset 0 0 0 1px var(--fluent-focus-inner);
 }
 .fluent-navigation__item:disabled {
   opacity: 0.45;

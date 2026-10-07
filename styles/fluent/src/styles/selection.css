@@ -12,7 +12,8 @@
   gap: 10px;
   min-height: 32px;
   width: 100%;
-  padding: 5px 10px;
+  padding: 0 10px;
+  line-height: 20px;
   border: 1px solid var(--fluent-border);
   border-radius: var(--fluent-radius);
   color: var(--fluent-text);
@@ -29,6 +30,7 @@
 .fluent-icon { display: block; flex: none; width: 16px; height: 16px; }
 .fluent-select__chevron { width: 16px; height: 16px; }
 .fluent-popover:has(.fluent-select__listbox), .fluent-popover:has(.fluent-menu) { width: max-content; min-width: min(220px, calc(100vw - 16px)); max-width: min(420px, calc(100vw - 16px)); padding: 4px; }
+.fluent-popover:has(.fluent-select__listbox) { max-width: none; }
 .fluent-select__listbox, .fluent-menu { display: grid; gap: 2px; min-width: 100%; }
 .fluent-select__option, .fluent-menu__item {
   display: flex;
@@ -36,7 +38,7 @@
   gap: 8px;
   min-height: 32px;
   width: 100%;
-  padding: 6px 8px;
+  padding: 0 8px;
   border: 1px solid transparent;
   border-radius: 4px;
   color: var(--fluent-text);
@@ -55,7 +57,8 @@
 .fluent-select__option.is-active.is-selected, .fluent-menu__item.is-active.is-selected { border-color: color-mix(in srgb, var(--fluent-accent) 42%, transparent); }
 .fluent-select__option:disabled, .fluent-menu__item:disabled { opacity: 0.55; cursor: not-allowed; }
 .fluent-menu__separator { height: 1px; margin: 4px 8px; background: var(--fluent-border); }
-.fluent-menu__check { color: var(--fluent-accent); }
+.fluent-menu__check { flex: none; width: 16px; height: 16px; color: var(--fluent-accent-link); }
+.fluent-select__option:focus-visible, .fluent-menu__item:focus-visible { outline-offset: -2px; box-shadow: inset 0 0 0 1px var(--fluent-focus-inner); }
 .fluent-menu__item-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (forced-colors: active) {
   .fluent-select__control, .fluent-select__option, .fluent-menu__item { forced-color-adjust: auto; }

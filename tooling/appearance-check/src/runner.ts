@@ -55,8 +55,8 @@ export async function auditAppearance(options: AuditOptions): Promise<Report> {
   const report: Report = { findings: [], suppressed: [], coverage: [], pages: [] };
   const browser = await chromium.launch({ headless: true, executablePath: options.executablePath });
   try {
-    for (const url of options.urls) for (const viewport of options.viewports ?? [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
-      const context = await browser.newContext({ viewport });
+    for (const url of options.urls) for (const viewport of options.viewports ?? [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) for (const colorScheme of options.colorSchemes ?? [undefined]) {
+      const context = await browser.newContext({ viewport, colorScheme });
       const page = await context.newPage();
       page.setDefaultTimeout(options.timeoutMs ?? 15000);
       const errors: string[] = [];

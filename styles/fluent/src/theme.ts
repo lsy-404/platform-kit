@@ -23,6 +23,17 @@ export interface FluentThemeState {
 export const fluentThemeKey: InjectionKey<ComputedRef<FluentThemeState>> =
   Symbol("fluent-theme");
 
+function accentTextFor(color: string): string | undefined {
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color.trim())?.[1];
+  if (!hex) return undefined;
+  const full = hex.length === 3 ? [...hex].map((c) => c + c).join("") : hex;
+  const [r, g, b] = [0, 2, 4].map((i) => {
+    const channel = parseInt(full.slice(i, i + 2), 16) / 255;
+    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  }) as [number, number, number];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.179 ? "#fff" : "#000";
+}
+
 export const FluentTheme = defineComponent({
   name: "FluentTheme",
   inheritAttrs: false,
@@ -58,6 +69,7 @@ export const FluentTheme = defineComponent({
       media.addEventListener("change", sync);
     });
     onBeforeUnmount(() => media?.removeEventListener("change", sync));
+    const accentText = computed(() => props.accentText ?? (props.accent ? accentTextFor(props.accent) : undefined));
     const theme = computed<FluentThemeState>(() => ({
       mode:
         props.mode === "system"
@@ -66,7 +78,7 @@ export const FluentTheme = defineComponent({
             : "light"
           : props.mode,
       ...(props.accent ? { accent: props.accent } : {}),
-      ...(props.accentText ? { accentText: props.accentText } : {}),
+      ...(accentText.value ? { accentText: accentText.value } : {}),
       resolveTokens: () => tokens.value,
     }));
     provide(fluentThemeKey, theme);

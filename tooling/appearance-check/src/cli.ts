@@ -11,6 +11,7 @@ const help = `appearance-check --url http://localhost:5173 [options]
   --checks AP003,AP005   Run selected check IDs
   --ignore-check AP003   Disable a check (repeatable)
   --viewport 390x844     Viewport (repeatable; default desktop + mobile)
+  --color-scheme light|dark  Emulate prefers-color-scheme (repeatable)
   --executable-path FILE Chromium executable; default Playwright Chromium
   --max-controls N      Hover/focus limit per page (default 40)
   --timeout N           Page timeout in milliseconds (default 15000)
@@ -24,7 +25,7 @@ try {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
     url: { type: "string", multiple: true }, config: { type: "string" }, checks: { type: "string" },
     "ignore-check": { type: "string", multiple: true }, viewport: { type: "string", multiple: true },
-    "executable-path": { type: "string" }, "max-controls": { type: "string" }, timeout: { type: "string" },
+    "color-scheme": { type: "string", multiple: true }, "executable-path": { type: "string" }, "max-controls": { type: "string" }, timeout: { type: "string" },
     json: { type: "boolean" }, output: { type: "string" }, "warn-only": { type: "boolean" }, list: { type: "boolean" }, help: { type: "boolean", short: "h" },
   } });
   if (values.help) console.log(help);
@@ -46,6 +47,10 @@ try {
       if (!/^\d+x\d+$/.test(value)) throw new Error("Viewport must be WIDTHxHEIGHT");
       const [width, height] = value.split("x").map(Number);
       return { width: width!, height: height! };
+    });
+    if (values["color-scheme"]) options.colorSchemes = values["color-scheme"].map(value => {
+      if (value !== "light" && value !== "dark") throw new Error("Color scheme must be light or dark");
+      return value;
     });
     if (values["executable-path"]) options.executablePath = values["executable-path"];
     if (values["max-controls"]) options.maxControls = Number(values["max-controls"]);

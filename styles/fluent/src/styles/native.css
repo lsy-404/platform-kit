@@ -53,7 +53,7 @@
 :where(.fluent-theme, [data-fluent-theme]) :where(input[type="color"])::-webkit-color-swatch-wrapper { padding: 0; }
 :where(.fluent-theme, [data-fluent-theme]) :where(input[type="color"])::-webkit-color-swatch { border: 0; border-radius: 2px; }
 :where(.fluent-theme, [data-fluent-theme]) :where(input[type="date"], input[type="time"], input[type="datetime-local"], input[type="month"], input[type="week"])::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .75; }
-:where(.fluent-theme, [data-fluent-theme]) :where(a[href]) { color: var(--fluent-accent); text-underline-offset: 3px; }
+:where(.fluent-theme, [data-fluent-theme]) :where(a[href]) { color: var(--fluent-accent-link); text-underline-offset: 3px; }
 :where(.fluent-theme, [data-fluent-theme]) :where(a[href]):hover { color: var(--fluent-accent-hover); }
 :where(.fluent-theme, [data-fluent-theme]) :where(a[href]):active { color: var(--fluent-accent-pressed); }
 :where(.fluent-theme, [data-fluent-theme]) :where(a[aria-disabled="true"]) { color: var(--fluent-muted); cursor: not-allowed; }
@@ -74,7 +74,7 @@
 :where(.fluent-theme, [data-fluent-theme]) :where(tbody tr):hover { background: var(--fluent-control-hover); }
 :where(.fluent-theme, [data-fluent-theme]) :where(tr[aria-selected="true"]) { background: var(--fluent-selection); }
 :where(.fluent-theme, [data-fluent-theme]) :where(tbody tr[aria-selected="true"]):hover { background: var(--fluent-selection); }
-:where(.fluent-theme, [data-fluent-theme]) :where(button, input, select, textarea, a[href], summary, [tabindex]):focus-visible { outline: 2px solid var(--fluent-accent); outline-offset: 2px; }
+:where(.fluent-theme, [data-fluent-theme]) :where(button, input, select, textarea, a[href], summary, [tabindex]):focus-visible { outline: 2px solid var(--fluent-focus-outer); outline-offset: 1px; box-shadow: 0 0 0 1px var(--fluent-focus-inner); }
 @media (forced-colors: active) {
   :where(.fluent-theme, [data-fluent-theme]) :where(button, input, textarea, select, progress, meter, a, summary) { forced-color-adjust: auto; }
 }

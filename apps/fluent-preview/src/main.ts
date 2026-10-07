@@ -5,13 +5,14 @@ import "./preview.css";
 
 type ThemeMode = "light" | "dark" | "system";
 const accents = ["#0067c0", "#8e4585", "#107c10", "#ca5010"];
+const query = new URLSearchParams(location.search);
 const options = [{ value: "alpha", label: "Alpha" }, { value: "beta", label: "Beta" }, { value: "locked", label: "Unavailable", disabled: true }];
 const menuItems = [{ value: "copy", label: "Copy" }, { separator: true }, { value: "pin", label: "Pin" }, { value: "delete", label: "Delete", disabled: true }];
 
 const Catalog = defineComponent({
   setup() {
-    const theme = ref<ThemeMode>("system"), accent = ref(accents[0]), toggle = ref(false), switched = ref(true), checked = ref(true), partial = ref(false), indeterminate = ref(true), radio = ref("compact"), text = ref("Sample text"), number = ref<number | null>(42), range = ref(55), selected = ref("alpha"), files = ref<File[]>([]), menuOpen = ref(false), menuValues = ref<string[]>(["copy"]), dialogOpen = ref(false), popoverOpen = ref(false), activeNav = ref("catalog");
-    const continuousSlider = ref(42.5), integerSlider = ref(4), availableSlider = ref(25), freeAvailableSlider = ref(42.5), customRangeSlider = ref(800), verticalSlider = ref(10);
+    const theme = ref<ThemeMode>(["light", "dark"].includes(query.get("theme") ?? "") ? query.get("theme") as ThemeMode : "system"), accent = ref<string | undefined>(query.get("accent") ?? undefined), toggle = ref(false), switched = ref(true), checked = ref(true), partial = ref(false), indeterminate = ref(true), radio = ref("compact"), text = ref("Sample text"), number = ref<number | null>(42), range = ref(55), selected = ref("alpha"), files = ref<File[]>([]), menuOpen = ref(false), menuValues = ref<string[]>(["copy"]), dialogOpen = ref(false), popoverOpen = ref(false), activeNav = ref("catalog");
+    const continuousSlider = ref(42.5), integerSlider = ref(4), availableSlider = ref(25), freeAvailableSlider = ref(42.5), customRangeSlider = ref(800), verticalSlider = ref(10), labelledSlider = ref(2);
     const availableSliderValues = [0, 8, 25, 60, 100];
     const menuAnchor = ref<HTMLElement | null>(null), popoverAnchor = ref<HTMLElement | null>(null);
     const card = (id: string, title: string, children: any[]) => h("section", { class: "catalog-card", id, "aria-labelledby": `${id}-title` }, [h("h2", { id: `${id}-title` }, title), ...children]);
@@ -20,7 +21,7 @@ const Catalog = defineComponent({
     return () => h(FluentTheme, { mode: theme.value, accent: accent.value, class: "catalog-theme" }, { default: () => h("div", { class: "catalog-page" }, [
       h("header", { class: "catalog-header" }, [h("div", [h("p", { class: "catalog-kicker" }, "@platform-kit/fluent 0.2.8"), h("h1", "Fluent control catalog")]), h("div", { class: "catalog-settings", "aria-label": "Catalog settings" }, [
         h(FluentSelect, { label: "Theme", "data-testid": "theme-mode", modelValue: theme.value, options: [{ value: "light", label: "Light" }, { value: "dark", label: "Dark" }, { value: "system", label: "System" }], "onUpdate:modelValue": (value: string) => theme.value = value as ThemeMode }),
-        h(FluentSelect, { label: "Accent", "data-testid": "accent-select", modelValue: accent.value, options: accents.map(value => ({ value, label: value })), "onUpdate:modelValue": (value: string) => accent.value = value })
+        h(FluentSelect, { label: "Accent", "data-testid": "accent-select", modelValue: accent.value ?? "", options: [{ value: "", label: "Default" }, ...accents.map(value => ({ value, label: value }))], "onUpdate:modelValue": (value: string) => accent.value = value || undefined })
       ])]),
       h("div", { class: "catalog-layout" }, [h("aside", { class: "catalog-sidebar" }, [h(FluentNavigation, { label: "Catalog sections", modelValue: activeNav.value, items: [{ key: "catalog", label: "Controls" }, { key: "native", label: "Native inputs" }, { key: "semantic", label: "Semantic HTML" }, { key: "overlays", label: "Overlays" }], "onUpdate:modelValue": (v: string) => activeNav.value = v, onSelect: (v: string) => document.getElementById(v)?.scrollIntoView({ behavior: "smooth" }) }), h("p", "Every card uses package CSS or semantic native elements.")]),
         h("main", { class: "catalog-main" }, [
@@ -34,6 +35,7 @@ const Catalog = defineComponent({
               h(FluentSlider, { modelValue: integerSlider.value, min: 0, max: 10, label: "Snap to integers", tickFrequency: 1, tickPlacement: "end", snap: "integer", "data-testid": "slider-integer", "onUpdate:modelValue": (value: number) => integerSlider.value = value }),
               h(FluentSlider, { modelValue: availableSlider.value, label: "Snap to available values", availableValues: availableSliderValues, snap: "available", "data-testid": "slider-available", "onUpdate:modelValue": (value: number) => availableSlider.value = value }),
               h(FluentSlider, { modelValue: freeAvailableSlider.value, label: "Available marks without snapping", availableValues: availableSliderValues, formatValue: (value: number) => `${value.toFixed(1)}%`, "data-testid": "slider-free-available", "onUpdate:modelValue": (value: number) => freeAvailableSlider.value = value }),
+              h("div", { style: "display:inline-flex" }, [h(FluentSlider, { modelValue: labelledSlider.value, min: 0, max: 4, label: "标签滑块", stops: ["最低", "较低", "中等", "较高", "最高"].map((label, value) => ({ value, label })), snap: "available", "data-testid": "slider-labelled", "onUpdate:modelValue": (value: number) => labelledSlider.value = value })]),
               h(FluentSlider, { modelValue: verticalSlider.value, min: -50, max: 50, label: "Vertical with ticks", orientation: "vertical", tickFrequency: 10, majorTickFrequency: 20, formatValue: (value: number) => value.toFixed(1), "data-testid": "slider-vertical", "onUpdate:modelValue": (value: number) => verticalSlider.value = value }),
             ])]),
             card("fields", "Fluent fields", [h(FluentField, { modelValue: text.value, label: "Text field", placeholder: "Type here", "onUpdate:modelValue": (v: string) => text.value = v }), h(FluentField, { modelValue: "read only", label: "Read-only field", readonly: true }), h(FluentField, { modelValue: "invalid", label: "Invalid field", invalid: true }), h(FluentField, { modelValue: "disabled", label: "Disabled field", disabled: true }), h(FluentPasswordField, { modelValue: "secret", label: "Password" }), h(FluentNumberField, { modelValue: number.value, label: "Number", "onUpdate:modelValue": (v: number | null) => number.value = v }), h(FluentTextArea, { modelValue: "A multiline value.", label: "Textarea" })]),

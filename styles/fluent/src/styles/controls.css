@@ -5,8 +5,9 @@
   border: 1px solid var(--fluent-border);
   border-radius: var(--fluent-radius);
   color: var(--fluent-text);
+  border-bottom-color: var(--fluent-button-edge);
   background: var(--fluent-control);
-  box-shadow: var(--fluent-shadow);
+  box-shadow: var(--fluent-button-highlight);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -22,15 +23,13 @@
 }
 .fluent-button--primary {
   border-color: var(--fluent-accent);
+  border-bottom-color: color-mix(in srgb, var(--fluent-accent) 70%, #000);
   color: var(--fluent-accent-text);
   background: var(--fluent-accent);
 }
-.fluent-button--primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--fluent-accent) 88%, #000);
-}
 .fluent-button--danger {
   border-color: var(--fluent-danger);
-  color: var(--fluent-accent-text);
+  color: var(--fluent-danger-text);
   background: var(--fluent-danger);
 }
 .fluent-button--subtle {
@@ -38,11 +37,10 @@
   background: transparent;
   box-shadow: none;
 }
-.fluent-button:disabled,
+.fluent-button:disabled:not(.fluent-button--busy),
 .fluent-field__input:disabled,
 .fluent-switch:disabled,
-.fluent-slider__input:disabled,
-.fluent-select__control:disabled {
+.fluent-slider__input:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
@@ -61,8 +59,7 @@
   font-size: 0.875rem;
   font-weight: 600;
 }
-.fluent-field__input,
-.fluent-select__control {
+.fluent-field__input {
   min-height: 32px;
   box-sizing: border-box;
   width: 100%;
@@ -76,12 +73,8 @@
     background var(--fluent-fast) var(--fluent-ease),
     border-color var(--fluent-fast) var(--fluent-ease);
 }
-.fluent-field__input:hover:not(:disabled),
-.fluent-select__control:hover:not(:disabled) {
+.fluent-field__input:hover:not(:disabled) {
   background: var(--fluent-control-hover);
-}
-.fluent-select__control {
-  padding-right: 30px;
 }
 
 .fluent-file-picker {
@@ -234,7 +227,6 @@
   border: 2px solid var(--fluent-accent-text);
   border-radius: 50%;
   background: var(--fluent-accent);
-  box-shadow: var(--fluent-shadow);
   -webkit-appearance: none;
 }
 .fluent-slider__input::-moz-range-track {
@@ -253,7 +245,6 @@
   border: 2px solid var(--fluent-accent-text);
   border-radius: 50%;
   background: var(--fluent-accent);
-  box-shadow: var(--fluent-shadow);
 }
 .fluent-slider:dir(rtl):not(.fluent-slider--vertical) .fluent-slider__input::-webkit-slider-runnable-track {
   background: linear-gradient(to left, var(--fluent-accent) 0 var(--fluent-slider-position), var(--fluent-border) var(--fluent-slider-position) 100%);
@@ -313,7 +304,6 @@
   border-radius: var(--fluent-radius);
   color: var(--fluent-text);
   background: var(--fluent-surface);
-  box-shadow: var(--fluent-shadow);
 }
 .fluent-notice--success {
   border-inline-start-color: var(--fluent-success);
@@ -323,15 +313,6 @@
 }
 .fluent-notice--danger {
   border-inline-start-color: var(--fluent-danger);
-}
-
-.fluent-button:focus-visible,
-.fluent-field__input:focus-visible,
-.fluent-switch:focus-visible,
-.fluent-slider__input:focus-visible,
-.fluent-select__control:focus-visible {
-  outline: 2px solid var(--fluent-accent);
-  outline-offset: 2px;
 }
 
 .fluent-checkbox {
@@ -379,8 +360,8 @@
 }
 .fluent-progress-bar--indeterminate .fluent-progress-bar__value {
   width: 40%;
-  background: linear-gradient(to right, transparent, var(--fluent-accent), transparent);
-  animation: fluent-progress-slide 1.5s linear infinite;
+  background: var(--fluent-accent);
+  animation: fluent-progress-slide 1.5s var(--fluent-ease) infinite;
 }
 .fluent-progress-bar--with-indicator { grid-template-columns: minmax(0, 1fr) auto; }
 .fluent-progress-bar__indicator {
@@ -419,7 +400,7 @@
 }
 .fluent-scroll-viewer--horizontal { overflow-x: auto; }
 @keyframes fluent-progress-spin { to { transform: rotate(270deg); } }
-@keyframes fluent-progress-slide { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@keyframes fluent-progress-slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
 @media (prefers-reduced-motion: reduce) {
   .fluent-progress-ring--indeterminate svg,
   .fluent-progress-bar--indeterminate .fluent-progress-bar__value { animation: none; }
@@ -434,7 +415,7 @@
 .fluent-button--subtle:active:not(:disabled) { background: var(--fluent-control-pressed); }
 .fluent-button[aria-pressed="true"] {
   border-color: var(--fluent-accent);
-  color: var(--fluent-accent);
+  color: var(--fluent-accent-link);
   background: color-mix(in srgb, var(--fluent-accent) 14%, var(--fluent-control));
 }
 .fluent-button[aria-pressed="true"]:hover:not(:disabled) {
@@ -448,17 +429,25 @@
   min-width: 32px;
   padding: 0;
 }
-.fluent-button:disabled {
+.fluent-button:disabled:not(.fluent-button--busy) {
   border-color: var(--fluent-border);
   color: var(--fluent-muted);
   background: var(--fluent-control);
   box-shadow: none;
 }
+.fluent-button--busy {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: progress;
+}
+.fluent-button--busy .fluent-progress-ring { color: currentColor; }
+.fluent-button--busy .fluent-progress-ring__track { stroke: color-mix(in srgb, currentColor 30%, transparent); }
 
 .fluent-field__input {
   min-height: 32px;
   line-height: 20px;
-  box-shadow: inset 0 -1px 0 var(--fluent-border);
+  border-bottom-color: var(--fluent-muted);
 }
 textarea.fluent-field__input {
   min-height: 80px;
@@ -466,8 +455,11 @@ textarea.fluent-field__input {
   resize: vertical;
 }
 .fluent-field__input:focus-visible {
-  border-color: var(--fluent-accent);
+  outline: none;
+  border-color: var(--fluent-border);
+  border-bottom-color: var(--fluent-accent);
   box-shadow: inset 0 -1px 0 var(--fluent-accent);
+  background: var(--fluent-control);
 }
 .fluent-field__input[data-invalid],
 .fluent-field__input:invalid {
@@ -500,7 +492,7 @@ textarea.fluent-field__input {
 .fluent-switch:disabled .fluent-switch__track { border-color: var(--fluent-border); background: var(--fluent-bg); }
 .fluent-switch:disabled .fluent-switch__thumb { background: var(--fluent-muted); }
 
-.fluent-slider__input:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--fluent-accent); outline-offset: 3px; }
+.fluent-slider__input:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--fluent-focus-outer); outline-offset: 1px; }
 .fluent-slider__input:disabled { opacity: 0.45; cursor: not-allowed; }
 .fluent-slider__input:disabled::-webkit-slider-runnable-track {
   background: linear-gradient(to right, var(--fluent-muted) 0 var(--fluent-slider-position), var(--fluent-border) var(--fluent-slider-position) 100%);
@@ -511,7 +503,7 @@ textarea.fluent-field__input {
 .fluent-slider--vertical .fluent-slider__input:disabled::-webkit-slider-runnable-track {
   background: linear-gradient(to top, var(--fluent-muted) 0 var(--fluent-slider-position), var(--fluent-border) var(--fluent-slider-position) 100%);
 }
-.fluent-slider__input:disabled::-webkit-slider-thumb { background: var(--fluent-muted); box-shadow: none; }
+.fluent-slider__input:disabled::-webkit-slider-thumb { background: var(--fluent-muted); }
 
 .fluent-checkbox,
 .fluent-radio { position: relative; min-height: 20px; }
@@ -561,8 +553,6 @@ textarea.fluent-field__input {
   border-color: var(--fluent-accent-hover);
   background: var(--fluent-accent-hover);
 }
-.fluent-checkbox__input:focus-visible + .fluent-checkbox__box,
-.fluent-radio__input:focus-visible { outline: 2px solid var(--fluent-accent); outline-offset: 2px; }
 .fluent-checkbox:has(:disabled),
 .fluent-radio:has(:disabled) { color: var(--fluent-muted); opacity: 0.55; cursor: not-allowed; }
 
@@ -595,10 +585,8 @@ textarea.fluent-field__input {
   .fluent-radio__input { transition-duration: 0ms; }
 }
 
-.fluent-button--subtle { box-shadow: none; }
-.fluent-notice { box-shadow: none; }
-.fluent-slider__input:focus-visible::-moz-range-thumb { outline: 2px solid var(--fluent-accent); outline-offset: 3px; }
-.fluent-slider__input:disabled::-moz-range-thumb { background: var(--fluent-muted); box-shadow: none; }
+.fluent-slider__input:focus-visible::-moz-range-thumb { outline: 2px solid var(--fluent-focus-outer); outline-offset: 1px; }
+.fluent-slider__input:disabled::-moz-range-thumb { background: var(--fluent-muted); }
 .fluent-slider__input:disabled::-moz-range-progress { background: var(--fluent-muted); }
 @media (forced-colors: active) {
   .fluent-slider__tick { background: CanvasText; }
@@ -611,6 +599,7 @@ textarea.fluent-field__input {
   .fluent-slider__input:disabled::-moz-range-track { background: GrayText !important; }
 }
 
+.fluent-slider--labelled { min-inline-size: calc(var(--fluent-slider-stops) * 4.5em); }
 .fluent-slider--neutral {
   --fluent-accent: var(--fluent-text);
   --fluent-accent-text: var(--fluent-surface);
