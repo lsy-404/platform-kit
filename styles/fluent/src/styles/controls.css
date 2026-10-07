@@ -474,7 +474,7 @@ textarea.fluent-field__input {
 .fluent-field__input[data-invalid]:focus-visible:not(:disabled),
 .fluent-field__input:invalid:focus-visible:not(:disabled) {
   outline: 2px solid var(--fluent-focus-outer);
-  outline-offset: -2px;
+  outline-offset: 1px;
 }
 .fluent-field__input[readonly] {
   color: var(--fluent-muted);

@@ -64,7 +64,7 @@ describe("Fluent control states", () => {
   it("keeps the invalid state and disabled look over focus and busy", async () => {
     const css = await readFile(new URL("../styles/fluent/src/styles/controls.css", import.meta.url), "utf8");
     expect(css).toMatch(/\.fluent-field__input\[data-invalid\]:focus-visible:not\(:disabled\)[^{]*\{[^}]*border-bottom-color: var\(--fluent-input-invalid\)/);
-    expect(css).toMatch(/\.fluent-field__input\[data-invalid\]:focus-visible:not\(:disabled\),\n\.fluent-field__input:invalid:focus-visible:not\(:disabled\) \{\n  outline: 2px solid/);
+    expect(css).toMatch(/\.fluent-field__input\[data-invalid\]:focus-visible:not\(:disabled\),\n\.fluent-field__input:invalid:focus-visible:not\(:disabled\) \{\n  outline: 2px solid[^}]*outline-offset: 1px/);
     expect(css).toMatch(/\.fluent-button--busy\[data-disabled\] \{\n  border-color: var\(--fluent-border\)/);
     const { node } = render(FluentButton, { tone: "primary", type: "button", disabled: true, busy: true });
     expect(node.props).toMatchObject({ disabled: true, "data-disabled": true, "aria-busy": true });

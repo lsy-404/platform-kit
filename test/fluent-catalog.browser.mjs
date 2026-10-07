@@ -64,9 +64,10 @@ try {
   const invalidField = page.getByLabel("Invalid field");
   const invalidRest = await invalidField.evaluate(node => getComputedStyle(node).borderBottomColor);
   await invalidField.focus(); await page.keyboard.press("Shift+Tab"); await page.keyboard.press("Tab");
-  const invalidFocus = await invalidField.evaluate(node => { const style = getComputedStyle(node); return { border: style.borderBottomColor, outline: style.outlineStyle }; });
+  const invalidFocus = await invalidField.evaluate(node => { const style = getComputedStyle(node); return { border: style.borderBottomColor, outline: style.outlineStyle, offset: parseFloat(style.outlineOffset) }; });
   assert.equal(invalidFocus.border, invalidRest, "focus replaced the invalid field danger border");
   assert.equal(invalidFocus.outline, "solid", "focused invalid field lost its focus ring");
+  assert.ok(invalidFocus.offset >= 0, "focus ring paints over the invalid danger border");
   const busyDisabled = page.getByRole("button", { name: "Disabled saving" });
   const idleDisabled = page.getByRole("button", { name: "Disabled", exact: true });
   const look = locator => locator.evaluate(node => { const style = getComputedStyle(node); return [style.opacity, style.cursor, style.color, style.backgroundColor].join("|"); });
