@@ -44,6 +44,7 @@ jobs:
       - run: node test/appearance-build.browser.mjs
       - run: node test/fluent-selection.browser.mjs
       - run: node test/fluent-catalog.browser.mjs
+      - run: node test/fluent-dark.browser.mjs
       - run: node test/connection-panel.browser.mjs
       - run: pnpm run pack:release
       - run: node test/release-consumer.mjs

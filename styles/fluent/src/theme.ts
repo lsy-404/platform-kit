@@ -24,11 +24,19 @@ export const fluentThemeKey: InjectionKey<ComputedRef<FluentThemeState>> =
   Symbol("fluent-theme");
 
 function accentTextFor(color: string): string | undefined {
-  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color.trim())?.[1];
-  if (!hex) return undefined;
-  const full = hex.length === 3 ? [...hex].map((c) => c + c).join("") : hex;
-  const [r, g, b] = [0, 2, 4].map((i) => {
-    const channel = parseInt(full.slice(i, i + 2), 16) / 255;
+  if (typeof document === "undefined") return undefined;
+  const context = document.createElement("canvas").getContext("2d");
+  if (!context) return undefined;
+  context.fillStyle = "#000";
+  context.fillStyle = color.trim();
+  const resolved = context.fillStyle;
+  const hex = /^#([0-9a-f]{6})$/i.exec(resolved)?.[1];
+  const rgb = hex
+    ? [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16))
+    : /^rgba?\((\d+), (\d+), (\d+)/.exec(resolved)?.slice(1, 4).map(Number);
+  if (!rgb) return undefined;
+  const [r, g, b] = rgb.map((value) => {
+    const channel = value / 255;
     return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
   }) as [number, number, number];
   return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.179 ? "#fff" : "#000";

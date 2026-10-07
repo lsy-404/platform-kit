@@ -454,7 +454,7 @@ textarea.fluent-field__input {
   padding-block: 6px;
   resize: vertical;
 }
-.fluent-field__input:focus-visible {
+.fluent-field__input:focus-visible:not(:disabled) {
   outline: none;
   border-color: var(--fluent-border);
   border-bottom-color: var(--fluent-accent);

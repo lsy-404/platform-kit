@@ -54,8 +54,8 @@
 :where(.fluent-theme, [data-fluent-theme]) :where(input[type="color"])::-webkit-color-swatch { border: 0; border-radius: 2px; }
 :where(.fluent-theme, [data-fluent-theme]) :where(input[type="date"], input[type="time"], input[type="datetime-local"], input[type="month"], input[type="week"])::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .75; }
 :where(.fluent-theme, [data-fluent-theme]) :where(a[href]) { color: var(--fluent-accent-link); text-underline-offset: 3px; }
-:where(.fluent-theme, [data-fluent-theme]) :where(a[href]):hover { color: var(--fluent-accent-hover); }
-:where(.fluent-theme, [data-fluent-theme]) :where(a[href]):active { color: var(--fluent-accent-pressed); }
+:where(.fluent-theme, [data-fluent-theme]) :where(a[href]):hover { color: color-mix(in srgb, var(--fluent-accent-link) 85%, var(--fluent-text)); }
+:where(.fluent-theme, [data-fluent-theme]) :where(a[href]):active { color: color-mix(in srgb, var(--fluent-accent-link) 70%, var(--fluent-text)); }
 :where(.fluent-theme, [data-fluent-theme]) :where(a[aria-disabled="true"]) { color: var(--fluent-muted); cursor: not-allowed; }
 :where(.fluent-theme, [data-fluent-theme]) :where(fieldset) { min-width: 0; border: 1px solid var(--fluent-border); border-radius: var(--fluent-panel-radius); }
 :where(.fluent-theme, [data-fluent-theme]) :where(legend) { padding-inline: 6px; color: var(--fluent-muted); }
