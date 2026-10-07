@@ -49,9 +49,11 @@
 .model-auth-key-input input { flex: 1; min-width: 0; }
 .model-auth-api-form > button { justify-self: start; }
 .model-auth-credential-row { display: grid; gap: 12px; }
-.model-auth-credential-summary { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 10px; align-items: center; }
+.model-auth-credential-summary { display: flex; gap: 10px; align-items: center; }
+.model-auth-credential-summary > .model-auth-row-main { flex: 1; min-width: 0; }
 .model-auth-credential-actions { display: flex; justify-content: flex-end; gap: 8px; align-items: center; flex-wrap: wrap; }
 .model-auth-toggle { display: inline-flex; align-items: center; gap: 8px; position: relative; }
+.model-auth-move-group { display: inline-flex; gap: 4px; }
 .model-auth-move-spacer, .model-auth-subtle.model-auth-move { width: 32px; flex: none; }
 .model-auth-subtle.model-auth-move { padding: 8px; }
 .model-auth-switch-track { display: none; }

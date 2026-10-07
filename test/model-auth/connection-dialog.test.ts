@@ -57,6 +57,15 @@ describe("connection detail dialog", () => {
     expect(document.querySelector('[data-part="continue-confirmation"]')).toBeNull();
   });
 
+  it("does not show a cooling credential as healthy", async () => {
+    const { state } = await mount({ providerId: "oauth", method: "oauth" });
+    const dot = () => get('[data-part="oauth-credential"] .model-auth-health').classList;
+    expect(dot().contains("healthy")).toBe(true);
+    state.providers[0]!.oauthCredentials![0]!.cooldownUntilUtc = "2030-01-01T00:00:00Z"; await nextTick();
+    expect(dot().contains("healthy")).toBe(false);
+    expect(dot().contains("attention")).toBe(false);
+  });
+
   it("keeps reconnect in detail after a successful host refresh", async () => {
     const { state, events } = await mount({ providerId: "oauth", method: "oauth" });
     state.providers[0]!.oauthCredentials![0]!.healthy = false; await nextTick();

@@ -181,8 +181,7 @@ function back() {
   awaitingVerification = false;
   clearSecret(); pendingRemoval.value = ""; localError.value = "";
   transitionName.value = "model-auth-step-backward";
-  if (step.value === "confirmation") { step.value = "detail"; void focusHeading(); }
-  else if (step.value === "detail") { step.value = "providers"; void nextTick(() => searchInput.value?.focus()); }
+  if (step.value === "detail") { step.value = "providers"; void nextTick(() => searchInput.value?.focus()); }
   else { step.value = props.separateAuthMethods ? "method" : "providers"; selectedProviderId.value = ""; void focusHeading(); }
 }
 function close() {
@@ -343,6 +342,7 @@ function credentialCount(entry: { provider: ModelAuthProvider; method: AuthMetho
   return ((entry.method === "oauth" ? entry.provider.oauthCredentials : entry.provider.apiKeyCredentials) ?? []).length;
 }
 const needsReconnect = (credential: ProviderCredential) => credential.enabled && !credential.healthy;
+const isHealthy = (credential: ProviderCredential) => credential.enabled && credential.healthy && !credential.cooldownUntilUtc;
 function noticeText(notice: ProviderAuthNotice): string {
   if (notice.type === "device_code") return `${text.value.authDeviceCode}: ${notice.userCode} · ${notice.verificationUri}`;
   if (notice.type === "auth_url") return notice.instructions || text.value.authOpenBrowser;
@@ -557,8 +557,14 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
             <article v-for="(credential, index) in credentials" :key="credential.id" class="model-auth-credential-row" part="credential-row" :data-part="method === 'oauth' ? 'oauth-credential' : 'api-key-credential'">
               <slot name="credential-row" :credential="credential" :provider="selectedProvider" :method="method" :update="(enabled: boolean) => updateCredential(credential, enabled)" :remove="() => removeCredential(credential)" :rename="(label: string) => rename(credential, label)" :save-login="(login: CredentialLoginInput | null) => saveLogin(credential, login)">
                 <div class="model-auth-credential-summary">
-                  <span class="model-auth-health" :class="{ healthy: credential.enabled && credential.healthy, attention: needsReconnect(credential) }" aria-hidden="true"></span>
+                  <span class="model-auth-health" :class="{ healthy: isHealthy(credential), attention: needsReconnect(credential) }" aria-hidden="true"></span>
                   <span class="model-auth-row-main"><strong>{{ credential.label }}</strong><small :class="{ 'model-auth-connection-attention': needsReconnect(credential) }" :title="credential.cooldownUntilUtc ?? undefined">{{ connectionMode && credential.account ? text.account + ' · ' + credential.account + ' · ' : '' }}{{ credentialStatus(credential) }}</small></span>
+                  <span v-if="credentials.length > 1" class="model-auth-move-group">
+                    <button v-if="index > 0" type="button" class="model-auth-subtle model-auth-with-icon model-auth-move" data-part="move-up" :disabled="busy" :aria-label="text.moveUp + ' ' + credential.label" @click="moveCredential(index, -1)"><ModelAuthIcon name="arrow-up" /></button>
+                    <span v-else class="model-auth-move-spacer" aria-hidden="true"></span>
+                    <button v-if="index < credentials.length - 1" type="button" class="model-auth-subtle model-auth-with-icon model-auth-move" data-part="move-down" :disabled="busy" :aria-label="text.moveDown + ' ' + credential.label" @click="moveCredential(index, 1)"><ModelAuthIcon name="arrow-down" /></button>
+                    <span v-else class="model-auth-move-spacer" aria-hidden="true"></span>
+                  </span>
                   <label class="model-auth-toggle">
                     <input :checked="credential.enabled" :disabled="busy" type="checkbox" role="switch" :aria-label="text.enable + ' ' + credential.label" @change="updateCredential(credential, ($event.target as HTMLInputElement).checked)" />
                     <span class="model-auth-switch-track" aria-hidden="true"></span>{{ text.enable }}
@@ -574,14 +580,8 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                   </template>
                   <button type="button" class="model-auth-subtle" data-part="query-usage" :disabled="busy" @click="queryUsage(credential)">{{ credential.usage ? text.refreshUsage : text.queryUsage }}</button>
                 </div>
-                <div v-if="credentials.length > 1 || (method === 'oauth' && needsReconnect(credential))" class="model-auth-credential-actions">
-                  <button v-if="method === 'oauth' && needsReconnect(credential)" type="button" class="model-auth-primary" data-part="reconnect" :disabled="busy || !canUseMethod" @click="authorize(credential.id)">{{ text.reconnect }}</button>
-                  <template v-if="credentials.length > 1">
-                    <button v-if="index > 0" type="button" class="model-auth-subtle model-auth-with-icon model-auth-move" data-part="move-up" :disabled="busy" :aria-label="text.moveUp + ' ' + credential.label" @click="moveCredential(index, -1)"><ModelAuthIcon name="arrow-up" /></button>
-                    <span v-else class="model-auth-move-spacer" aria-hidden="true"></span>
-                    <button v-if="index < credentials.length - 1" type="button" class="model-auth-subtle model-auth-with-icon model-auth-move" data-part="move-down" :disabled="busy" :aria-label="text.moveDown + ' ' + credential.label" @click="moveCredential(index, 1)"><ModelAuthIcon name="arrow-down" /></button>
-                    <span v-else class="model-auth-move-spacer" aria-hidden="true"></span>
-                  </template>
+                <div v-if="method === 'oauth' && needsReconnect(credential)" class="model-auth-credential-actions">
+                  <button type="button" class="model-auth-primary" data-part="reconnect" :disabled="busy || !canUseMethod" @click="authorize(credential.id)">{{ text.reconnect }}</button>
                 </div>
                 <details class="model-auth-credential-settings" data-part="credential-settings">
                   <summary>{{ text.credentialSettings }}</summary>

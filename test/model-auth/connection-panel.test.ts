@@ -91,6 +91,13 @@ describe("model connection panel", () => {
     expect(document.querySelector('[data-provider-id="oauth"] [data-part="connection-attention"]')).toBeNull();
   });
 
+  it("does not mark a cooling account healthy", async () => {
+    const { state } = await mount();
+    await click('[data-provider-id="oauth"] [data-part="toggle-connection"]');
+    state.providers[0]!.oauthCredentials![0]!.cooldownUntilUtc = "2030-01-01T00:00:00Z"; await nextTick();
+    expect(get('[data-provider-id="oauth"] .model-auth-health').classList.contains("healthy")).toBe(false);
+  });
+
   it("renders only credential metadata and never adds a secret input or fixture secret", async () => {
     const { state } = await mount();
     Object.assign(state.providers[1]!.apiKeyCredentials![0] as object, { apiKey: "fixture-secret-must-not-render" });

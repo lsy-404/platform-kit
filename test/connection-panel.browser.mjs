@@ -78,6 +78,8 @@ try {
   const downSlots = await page.locator("fixture-dialog").evaluate(element => [...element.shadowRoot.querySelectorAll('[data-part="move-down"], .model-auth-move-spacer')].map(node => { const box = node.getBoundingClientRect(); return [Math.round(box.x), Math.round(box.width)]; }));
   const downButton = downSlots[1], spacerBox = downSlots.at(-1);
   assert.deepEqual(spacerBox, downButton, "reorder spacer matches the arrow button width and column");
+  const arrowsInSummary = await page.locator("fixture-dialog").evaluate(element => [...element.shadowRoot.querySelectorAll(".model-auth-move")].every(button => button.closest(".model-auth-credential-summary")));
+  assert.ok(arrowsInSummary, "reorder arrows sit on the credential status line");
   await page.screenshot({ path: join(artifact, "connection-panel-detail.png"), fullPage: true });
   const wizard = page.locator("fixture-dialog");
   await wizard.locator('[data-part="close"]').click();
