@@ -57,8 +57,18 @@ describe("connection detail dialog", () => {
     expect(document.querySelector('[data-part="continue-confirmation"]')).toBeNull();
   });
 
+  it("does not show a cooling credential as healthy", async () => {
+    const { state } = await mount({ providerId: "oauth", method: "oauth" });
+    const dot = () => get('[data-part="oauth-credential"] .model-auth-health').classList;
+    expect(dot().contains("healthy")).toBe(true);
+    state.providers[0]!.oauthCredentials![0]!.cooldownUntilUtc = "2030-01-01T00:00:00Z"; await nextTick();
+    expect(dot().contains("healthy")).toBe(false);
+    expect(dot().contains("attention")).toBe(false);
+  });
+
   it("keeps reconnect in detail after a successful host refresh", async () => {
     const { state, events } = await mount({ providerId: "oauth", method: "oauth" });
+    state.providers[0]!.oauthCredentials![0]!.healthy = false; await nextTick();
     await click('[data-part="oauth-credential"] [data-part="reconnect"]');
     expect(events.at(-1)).toEqual({ name: "reconnect", payload: ["oauth", "account"] });
     state.providers[0]!.oauthCredentials![0]!.healthy = true;
@@ -241,6 +251,6 @@ describe("connection detail dialog", () => {
     state.percentagePrecision = 0; await nextTick();
     const spans = [...document.querySelectorAll<HTMLElement>('[data-part="credential-usage"] span')];
     expect(spans.map(span => span.textContent)).toEqual(["Weekly · 剩余 40%", "Unknown · 剩余 —"]);
-    expect(spans[0]!.title).toBe("2030-01-01T00:00:00.000Z");
+    expect(spans[0]!.title).toBe(new Date(Date.UTC(2030, 0, 1)).toLocaleString());
   });
 });

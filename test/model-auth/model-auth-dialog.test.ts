@@ -51,9 +51,8 @@ function progress() {
   return [...document.querySelectorAll<HTMLElement>(".model-auth-progress-fill")].map(node => node.style.width);
 }
 
-function expectStage(title: string, caption: string, widths: string[]) {
+function expectStage(title: string, widths: string[]) {
   expect(get("h2").textContent).toBe(title);
-  expect(get(".model-auth-step-caption").textContent).toBe(caption);
   expect(progress()).toEqual(widths);
 }
 
@@ -69,10 +68,10 @@ describe("authentication dialog", () => {
   it("confirms verified authorization without any discovered models", async () => {
     const { state, events } = await mount();
     await details("oauth", "workbuddy");
-    await click('[data-part="oauth-config"] button');
+    await click('[data-part="authorize"]');
     state.providers[2]!.oauthCredentials = [{ id: "verified", label: "Verified", healthy: true, enabled: true }];
     await nextTick();
-    expectStage("确认", "2/2", ["100%", "100%"]);
+    expectStage("确认", ["100%", "100%"]);
     expect(document.querySelector('[part="models"]')).toBeNull();
     expect(get<HTMLButtonElement>('[data-part="confirm"]').disabled).toBe(false);
     await click('[data-part="confirm"]');
@@ -80,17 +79,17 @@ describe("authentication dialog", () => {
   });
   it("exposes provider, configuration and confirmation states and only confirms from the final state", async () => {
     const { state, events } = await mount();
-    expectStage("选择提供商", "0/2", ["0%", "0%"]);
-    expectStage("选择提供商", "0/2", ["0%", "0%"]);
+    expectStage("选择提供商", ["0%", "0%"]);
+    expectStage("选择提供商", ["0%", "0%"]);
     await click('[data-provider-id="workbuddy"]');
-    expectStage("完成配置", "1/2", ["100%", "0%"]);
+    expectStage("完成配置", ["100%", "0%"]);
     expect(document.querySelector('[data-part="models"]')).toBeNull();
     expect(document.querySelector('[data-part="confirm"]')).toBeNull();
-    await click('[data-part="oauth-config"] button');
+    await click('[data-part="authorize"]');
     state.providers[2]!.models = ["test-model"];
     state.providers[2]!.oauthCredentials = [{ id: "verified", label: "Verified", healthy: true, enabled: true }];
     await nextTick();
-    expectStage("确认", "2/2", ["100%", "100%"]);
+    expectStage("确认", ["100%", "100%"]);
     expect(get('[data-part="confirmation-step"]')).toBeTruthy();
     expect(get('[data-part="authorization-result"]').textContent).toContain("凭据已验证并保存");
     expect(document.querySelector('[data-part="models"]')).toBeNull();
@@ -131,11 +130,11 @@ describe("authentication dialog", () => {
     const { state, events } = await mount();
     state.providers[0]!.apiKeyCredentials = [];
     await details("api-key");
-    expectStage("完成配置", "1/2", ["100%", "0%"]);
+    expectStage("完成配置", ["100%", "0%"]);
     await fill('input[type="password"]', "test-only-value");
     get("form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     await nextTick();
-    expectStage("完成配置", "1/2", ["100%", "0%"]);
+    expectStage("完成配置", ["100%", "0%"]);
     expect(document.querySelector('[data-part="confirm"]')).toBeNull();
     state.error = "验证失败";
     await nextTick();
@@ -150,7 +149,7 @@ describe("authentication dialog", () => {
     state.busy = false;
     state.error = null;
     await nextTick();
-    expectStage("确认", "2/2", ["100%", "100%"]);
+    expectStage("确认", ["100%", "100%"]);
     await click('[data-part="confirm"]');
     expect(events.at(-1)?.name).toBe("close");
   });
@@ -158,60 +157,67 @@ describe("authentication dialog", () => {
   it("keeps a healthy account at detail until an authorization action is armed", async () => {
     const { state } = await mount();
     await details("oauth", "provider-a");
-    expectStage("完成配置", "1/2", ["100%", "0%"]);
+    expectStage("完成配置", ["100%", "0%"]);
     state.providers[0]!.models = ["shared"];
     await nextTick();
-    expectStage("完成配置", "1/2", ["100%", "0%"]);
+    expectStage("完成配置", ["100%", "0%"]);
     expect(document.querySelector('[data-part="continue-confirmation"]')).toBeTruthy();
   });
 
   it("advances after reconnect only when the host reports verified metadata", async () => {
     const { state, events } = await mount();
+    state.providers[0]!.oauthCredentials![0]!.healthy = false;
     await details("oauth", "provider-a");
     await click('[data-part="oauth-credential"] [data-part="reconnect"]');
     expect(events.at(-1)).toEqual({ name: "reconnect-oauth", payload: ["provider-a", "oauth-1"] });
-    expectStage("完成配置", "1/2", ["100%", "0%"]);
+    expectStage("完成配置", ["100%", "0%"]);
+    state.providers[0]!.oauthCredentials![0]!.healthy = true;
     state.providers[0]!.models = ["reconnected"];
     state.busy = false;
     await nextTick();
-    expectStage("确认", "2/2", ["100%", "100%"]);
+    expectStage("确认", ["100%", "100%"]);
   });
 
-  it("returns from confirmation to detail and continues only on explicit request", async () => {
+  it("finishes from confirmation with the done button and no back button", async () => {
     const { state } = await mount();
     await details("oauth", "workbuddy");
-    await click('[data-part="oauth-config"] button');
+    await click('[data-part="authorize"]');
     state.providers[2]!.models = ["test-model"];
     state.providers[2]!.oauthCredentials = [{ id: "verified", label: "Verified", healthy: true, enabled: true }];
     await nextTick();
-    expectStage("确认", "2/2", ["100%", "100%"]);
-    await click('[data-part="back"]');
-    expectStage("完成配置", "1/2", ["100%", "0%"]);
+    expectStage("确认", ["100%", "100%"]);
+    expect(document.querySelector('[data-part="back"]')).toBeNull();
+    expect(get('[data-part="confirm"]').textContent).toBe("完成");
+    expect(get('[data-part="confirmation-step"] h3').textContent).toBe("WorkBuddy");
+  });
+
+  it("does not advance from detail when the catalog changes without a new credential", async () => {
+    const { state } = await mount();
+    await details("oauth", "workbuddy");
     state.providers[2]!.models = ["changed-without-action"];
     await nextTick();
-    expectStage("完成配置", "1/2", ["100%", "0%"]);
-    await click('[data-part="continue-confirmation"]');
-    expectStage("确认", "2/2", ["100%", "100%"]);
+    expectStage("完成配置", ["100%", "0%"]);
+    expect(document.querySelector('[data-part="confirmation-step"]')).toBeNull();
   });
 
   it("moves back to detail when an authorized account is revoked", async () => {
     const { state } = await mount();
     await details("oauth", "provider-a");
-    await click('[data-part="oauth-config"] button');
+    await click('[data-part="authorize"]');
     state.providers[0]!.models = ["shared"];
     await nextTick();
-    expectStage("确认", "2/2", ["100%", "100%"]);
+    expectStage("确认", ["100%", "100%"]);
     state.providers[0]!.oauthCredentials = [];
     await nextTick();
-    expectStage("完成配置", "1/2", ["100%", "0%"]);
+    expectStage("完成配置", ["100%", "0%"]);
     await click('[data-part="back"]');
-    expectStage("选择提供商", "0/2", ["0%", "0%"]);
+    expectStage("选择提供商", ["0%", "0%"]);
   });
 
   it("opens searchable mixed provider entries and follows visible keyboard order", async () => {
     const { events } = await mount();
     expect(document.querySelector('[data-part="method-list"]')).toBeNull();
-    expect([...document.querySelectorAll('.model-auth-row-main strong')].map(node => node.textContent)).toContain('Provider A (Key)');
+    expect([...document.querySelectorAll('.model-auth-row-main strong')].map(node => node.textContent)).toContain('Provider A');
     expect(document.querySelector('[data-part="method-list"]')).toBeNull();
     get('[data-part="search"]').focus();
     expect(document.activeElement).toBe(get('[data-part="search"]'));
@@ -224,12 +230,12 @@ describe("authentication dialog", () => {
     search.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     await nextTick();
     expect(get("h2").textContent).toBe("完成配置");
-    expect(get('[data-part="detail"] strong').textContent).toBe("WorkBuddy");
+    expect(get('[data-part="detail"] h3').textContent).toBe("WorkBuddy");
     await click('[data-part="back"]');
     await fill('[data-part="search"]', "Unavailable");
     search.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     await nextTick();
-    expect(get<HTMLButtonElement>('[data-part="oauth-config"] button').disabled).toBe(true);
+    expect(get<HTMLButtonElement>('[data-part="authorize"]').disabled).toBe(true);
   });
 
   it("keeps the provider search focus ring inside the fixed header while only the list scrolls", async () => {
@@ -273,19 +279,21 @@ describe("authentication dialog", () => {
     const { events, state } = await mount();
     state.providers[0]!.oauthCredentials![0]!.healthy = false;
     await details();
-    expectStage("完成配置", "1/2", ["100%", "0%"]);
+    expectStage("完成配置", ["100%", "0%"]);
     expect(document.querySelector('[data-part="models"]')).toBeNull();
     expect(document.querySelector('[aria-haspopup="listbox"]')).toBeNull();
     const toggle = get<HTMLInputElement>('[data-part="oauth-credential"] input[role="switch"]');
     toggle.checked = false; toggle.dispatchEvent(new Event("change", { bubbles: true }));
     expect(events.at(-1)).toEqual({ name: "credential", payload: { providerId: "provider-a", credentialId: "oauth-1", enabled: false } });
     expect(document.querySelector('input[type="number"]')).toBeNull();
-    expect(get('[data-part="credential-position"]').textContent).toContain("1");
-    expect(get<HTMLButtonElement>('[data-part="move-up"]').disabled).toBe(true);
+    expect(document.querySelector('[data-part="credential-position"]')).toBeNull();
+    expect(document.querySelectorAll('[data-part="move-up"]')).toHaveLength(1);
+    expect(document.querySelectorAll('[data-part="move-down"]')).toHaveLength(1);
+    expect(get('[data-part="move-down"]').getAttribute("aria-label")).toBe("下移 Primary");
     await click('[data-part="move-down"]');
     expect(events.at(-1)).toEqual({ name: "reorder", payload: { providerId: "provider-a", method: "oauth", credentialIds: ["oauth-2", "oauth-1"] } });
     state.providers[0]!.oauthEnabled = false; await nextTick();
-    expect(get<HTMLButtonElement>('[data-part="oauth-config"] button').disabled).toBe(true);
+    expect(get<HTMLButtonElement>('[data-part="authorize"]').disabled).toBe(true);
   });
 
   it("edits per-key extend metadata and exposes a usage query action", async () => {
@@ -400,7 +408,7 @@ describe("authentication dialog", () => {
     expect(get('[data-part="back"]').parentElement).toBe(navigation);
     expect(get('[data-part="close"]').parentElement).toBe(navigation);
     expect(document.querySelector(".model-auth-progress-labels")).toBeNull();
-    expect(get(".model-auth-step-caption").textContent).toBe("1/2");
+    expect(document.querySelector(".model-auth-step-caption")).toBeNull();
     expect(document.querySelectorAll(".model-auth-progress-segment")).toHaveLength(2);
     expect(get("h2").parentElement).toBe(navigation);
     expect(document.querySelector(".model-auth-eyebrow")).toBeNull();
@@ -432,7 +440,7 @@ describe("authentication dialog", () => {
     const nativeDialog = get<HTMLDialogElement>('[data-part="dialog"]');
     nativeDialog.dispatchEvent(new AnimationEvent("animationend", { animationName: "model-auth-modal-exit" })); await nextTick();
     state.open = true; await nextTick(); await nextTick();
-    expectStage("选择提供商", "0/2", ["0%", "0%"]);
+    expectStage("选择提供商", ["0%", "0%"]);
   });
 
   it("supports unstyled appearance, message overrides and slots without losing navigation", async () => {
@@ -458,7 +466,7 @@ describe("authentication dialog", () => {
     let selected = "";
     element.addEventListener("authorize-oauth", (event) => { selected = (event as CustomEvent).detail[0]; });
     shadow.querySelector<HTMLElement>('[data-provider-id="provider-a"]')!.click(); await nextTick();
-    shadow.querySelector<HTMLElement>('[data-part="oauth-config"] button')!.click();
+    shadow.querySelector<HTMLElement>('[data-part="authorize"]')!.click();
     expect(selected).toBe("provider-a");
     element.remove(); await nextTick();
   });
@@ -467,7 +475,7 @@ describe("authentication dialog", () => {
 
 it("attaches optional usage login information to one API key and clears its secret drafts", async () => {
   const { events } = await mount({ providers: [{ id: "ollama-cloud", name: "Ollama", description: "", authMethods: ["api-key"], available: true, accountLogin: true, models: [], apiKeyCredentials: [] }] });
-  expect(get('[data-provider-id="ollama-cloud"]').textContent).toContain("Ollama (Key)");
+  expect(get('[data-provider-id="ollama-cloud"]').textContent).toContain("Ollama");
   await details("api-key", "ollama-cloud");
   expect(document.querySelector('[data-part="authorize"]')).toBeNull();
   get<HTMLDetailsElement>('[data-part="key-login-info"]').open = true;
@@ -486,22 +494,19 @@ it("explicit false keeps OAuth and Key in the same provider list", async () => {
   expect(document.querySelector('[data-part="method-list"]')).toBeNull();
   expect(document.querySelector('[data-provider-id="provider-a"][data-auth-method="oauth"]')).toBeTruthy();
   expect(document.querySelector('[data-provider-id="provider-a"][data-auth-method="api-key"]')).toBeTruthy();
-  expectStage("选择提供商", "0/2", ["0%", "0%"]);
+  expectStage("选择提供商", ["0%", "0%"]);
 });
 
 it("true starts with authentication choice, filters providers and supports every back step", async () => {
   await mount({ separateAuthMethods: true });
-  expectStage("选择方式", "0/3", ["0%", "0%", "0%"]);
+  expectStage("选择方式", ["0%", "0%", "0%"]);
   expect(document.querySelector('[data-part="provider-step"]')).toBeNull();
   await click('[data-part="method-api-key"]');
-  expectStage("选择提供商", "1/3", ["100%", "0%", "0%"]);
+  expectStage("选择提供商", ["100%", "0%", "0%"]);
   expect(document.querySelector('[data-auth-method="oauth"]')).toBeNull();
   expect(document.querySelector('[data-provider-id="workbuddy"]')).toBeNull();
   await details("api-key");
-  expectStage("完成配置", "2/3", ["100%", "100%", "0%"]);
-  await click('[data-part="continue-confirmation"]');
-  expectStage("确认", "3/3", ["100%", "100%", "100%"]);
-  await click('[data-part="back"]');
+  expectStage("完成配置", ["100%", "100%", "0%"]);
   await click('[data-part="back"]');
   await click('[data-part="back"]');
   expect(document.querySelector('[data-part="method-list"]')).toBeTruthy();

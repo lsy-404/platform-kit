@@ -901,7 +901,7 @@ interface OAuthFieldMap {
 }
 
 const BASE_OAUTH_FIELDS: OAuthFieldMap = {
-  account: ["email", "accountEmail", "username", "login", "accountId", "account_id"],
+  account: ["email", "accountEmail", "username", "login"],
   organization: ["organizationName", "organization", "orgName", "organizationId", "organization_id", "orgId"],
   plan: ["subscriptionType", "plan", "planType", "plan_type"],
   tier: ["rateLimitTier", "rate_limit_tier", "tier"],
@@ -957,7 +957,7 @@ export function describeOAuthCredential(provider: string, credential: unknown, n
   const claims = provider === "openai-codex" ? jwtClaims(source.access) : {};
   const profileClaims = (claims["https://api.openai.com/profile"] ?? {}) as Record<string, unknown>;
   const authClaims = (claims["https://api.openai.com/auth"] ?? {}) as Record<string, unknown>;
-  const account = (pick(fields.account) ?? text(profileClaims.email) ?? text(source.accountId) ?? text(authClaims.chatgpt_account_id)) as string | undefined;
+  const account = (pick(fields.account) ?? text(profileClaims.email)) as string | undefined;
   const organization = pick(fields.organization) as string | undefined;
   let plan = (pick(fields.plan) ?? text(authClaims.chatgpt_plan_type)) as string | undefined;
   let planMultiplier: number | undefined;

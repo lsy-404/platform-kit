@@ -4,7 +4,7 @@ import { defaultMessages, type ModelAuthMessages } from "./messages";
 import ModelAuthIcon from "./ModelAuthIcon.vue";
 import ProviderMark from "./ProviderMark.vue";
 import { formatPercentage } from "./percentage";
-import { fill, windowRemaining } from "./usage";
+import { credentialReady, fill, formatCooldown, windowRemaining } from "./usage";
 import type {
   AddApiKeyPayload, AuthMethod, CredentialExtend, CredentialLoginInput, CredentialReorderPayload, CredentialUpdatePayload, CatalogStatus, 
   ModelAuthProvider, ModelConnectionTarget, ProviderAuthResponseRequest, ProviderAuthState, ProviderCredential, ProviderAuthNotice, ProviderUpdatePayload, Theme, CredentialUsageEstimate, CredentialUsageWindow,
@@ -181,8 +181,7 @@ function back() {
   awaitingVerification = false;
   clearSecret(); pendingRemoval.value = ""; localError.value = "";
   transitionName.value = "model-auth-step-backward";
-  if (step.value === "confirmation") { step.value = "detail"; void focusHeading(); }
-  else if (step.value === "detail") { step.value = "providers"; void nextTick(() => searchInput.value?.focus()); }
+  if (step.value === "detail") { step.value = "providers"; void nextTick(() => searchInput.value?.focus()); }
   else { step.value = props.separateAuthMethods ? "method" : "providers"; selectedProviderId.value = ""; void focusHeading(); }
 }
 function close() {
@@ -334,8 +333,15 @@ function windowText(window: CredentialUsageWindow): string {
   return fill(text.value.usageRemaining, { label: window.label, percent: usagePercentText(windowRemaining(window)) });
 }
 function windowTitle(window: CredentialUsageWindow): string | undefined {
-  return window.resetAt ? new Date(window.resetAt).toISOString() : undefined;
+  return window.resetAt ? new Date(window.resetAt).toLocaleString() : undefined;
 }
+function windowLow(window: CredentialUsageWindow): boolean {
+  return window.status === "exhausted" || (windowRemaining(window) ?? 100) <= 10;
+}
+function credentialCount(entry: { provider: ModelAuthProvider; method: AuthMethod }): number {
+  return ((entry.method === "oauth" ? entry.provider.oauthCredentials : entry.provider.apiKeyCredentials) ?? []).length;
+}
+const needsReconnect = (credential: ProviderCredential) => credential.enabled && !credential.healthy;
 function noticeText(notice: ProviderAuthNotice): string {
   if (notice.type === "device_code") return `${text.value.authDeviceCode}: ${notice.userCode} · ${notice.verificationUri}`;
   if (notice.type === "auth_url") return notice.instructions || text.value.authOpenBrowser;
@@ -400,7 +406,7 @@ function confirmConnection() {
 }
 function credentialStatus(credential: ProviderCredential) {
   if (!credential.enabled) return text.value.disabled;
-  if (credential.cooldownUntilUtc) return text.value.cooling + " " + credential.cooldownUntilUtc;
+  if (credential.cooldownUntilUtc) return text.value.cooling + " " + formatCooldown(credential.cooldownUntilUtc);
   return credential.healthy ? text.value.ready : text.value.needsReconnect;
 }
 watch(() => props.open, open => {
@@ -444,14 +450,13 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
     <div class="model-auth-root">
       <section class="model-auth-dialog" role="document" tabindex="-1">
         <header class="model-auth-header" part="header" data-part="navigation">
-          <button v-if="stepIndex > 0 && !connectionMode" type="button" class="model-auth-back" part="back" data-part="back" :aria-label="text.back" @click="back"><ModelAuthIcon name="back" /></button>
+          <button v-if="stepIndex > 0 && !connectionMode && step !== 'confirmation'" type="button" class="model-auth-back" part="back" data-part="back" :aria-label="text.back" @click="back"><ModelAuthIcon name="back" /></button>
           <h2 :id="titleId" ref="heading" class="model-auth-title" tabindex="-1">{{ connectionMode ? text.connectionInfo : pageTitles[stepIndex] }}</h2>
           <button type="button" class="model-auth-close" part="close" data-part="close" :aria-label="text.close" @click="close"><ModelAuthIcon name="close" /></button>
         </header>
         <div v-if="!connectionMode" class="model-auth-progress" part="progress" role="progressbar" :aria-label="text.progress" :aria-valuemin="0" :aria-valuemax="stageCount" :aria-valuenow="stepIndex" :aria-valuetext="pageTitles[stepIndex]">
           <div v-for="segment in stageCount" :key="segment" class="model-auth-progress-segment"><div class="model-auth-progress-fill" :style="{ width: (segment <= stepIndex ? 100 : 0) + '%' }" /></div>
         </div>
-        <p v-if="!connectionMode" class="model-auth-step-caption">{{ text.stepOf.replace('{current}', String(stepIndex)).replace('{total}', String(stageCount)) }}</p>
         <div v-if="error || localError" class="model-auth-error" role="alert" part="error">{{ error || localError }}</div>
         <p v-if="busy" class="model-auth-busy" role="status">{{ text.working }}</p>
         <section v-if="auth && auth.status === 'running' && (auth.notices.length || activePrompt)" class="model-auth-auth-interaction" data-part="auth-interaction" aria-live="polite">
@@ -498,9 +503,9 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
               <button v-for="entry in group.providers" :key="entry.provider.id + '/' + entry.method" type="button" class="model-auth-provider-row" part="provider-row" :class="{ focused: orderedProviders.indexOf(entry) === focusedProviderIndex, unavailable: !entry.provider.available }" :data-provider-id="entry.provider.id" :data-auth-method="entry.method" @click="chooseProvider(entry)">
                 <slot name="provider-row" :provider="entry.provider" :method="entry.method">
                   <ProviderMark :provider="entry.provider" />
-                  <span class="model-auth-row-main"><strong>{{ entry.provider.name }} ({{ entry.method === 'oauth' ? 'OAuth' : 'Key' }})</strong><small>{{ entry.provider.available ? entry.provider.id : entry.provider.unavailableReason || text.unavailable }}</small></span>
-                  <span class="model-auth-badge">{{ entry.provider.available ? ((entry.method === 'oauth' ? entry.provider.oauthCredentials?.length : entry.provider.apiKeyCredentials?.length) || 0) + ' ' + (entry.method === 'api-key' ? text.apiKeyCount : text.accountCount) : text.unavailable }}</span>
-                  <ModelAuthIcon name="next" />
+                  <span class="model-auth-row-main"><strong>{{ entry.provider.name }}</strong><small>{{ entry.provider.available ? methodLabel(entry.method) : entry.provider.unavailableReason || text.unavailable }}</small></span>
+                  <span v-if="entry.provider.available && credentialCount(entry) > 0" class="model-auth-badge">{{ credentialCount(entry) }} {{ entry.method === 'api-key' ? text.apiKeyCount : text.accountCount }}</span>
+                  <ModelAuthIcon name="next" class="model-auth-row-chevron" />
                 </slot>
               </button>
             </section>
@@ -513,16 +518,18 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
           <button type="button" class="model-auth-primary" data-part="new-connection" :disabled="busy" @click="startNewConnection">{{ text.newConnection }}</button>
         </div>
         <div v-else-if="step === 'detail' && selectedProvider" key="detail" :class="['model-auth-detail', transitionName, { 'model-auth-connection-detail': connectionMode }]" part="detail" :data-part="connectionMode ? 'connection-info' : 'detail'">
-          <strong class="model-auth-selected-provider">{{ selectedProvider.name }}</strong>
-          <p v-if="connectionMode" class="model-auth-connection-meta">{{ text.authenticationMethod }}：{{ methodLabel(method) }}</p>
+          <div class="model-auth-connection-title">
+            <ProviderMark :provider="selectedProvider" />
+            <div><h3>{{ selectedProvider.name }}</h3><span class="model-auth-connection-meta">{{ methodLabel(method) }}</span></div>
+            <button v-if="connectionMode" type="button" class="model-auth-secondary" data-part="refresh-connections" :disabled="busy" @click="emit('refresh-catalog')">{{ text.refreshCatalog }}</button>
+          </div>
           <p v-if="!selectedProvider.available" class="model-auth-error" role="status">{{ selectedProvider.unavailableReason || text.unavailable }}</p>
-          <button v-if="connectionMode" type="button" class="model-auth-secondary" data-part="refresh-connections" :disabled="busy" @click="emit('refresh-catalog')">{{ text.refreshCatalog }}</button>
           <section v-if="method === 'oauth'" class="model-auth-credential-section" data-part="oauth-config">
-            <div class="model-auth-section-heading">
-              <div><strong>{{ connectionMode ? text.connections : text.oauth }}</strong><small>{{ text.credentialHint }}</small></div>
+            <div v-if="connectionMode || credentials.length" class="model-auth-section-heading">
+              <small v-if="credentials.length > 1">{{ text.credentialHint }}</small>
               <button type="button" class="model-auth-primary" data-part="authorize" :disabled="busy || !canUseMethod" @click="authorize()">{{ selectedProvider.authorizeLabel || text.authorize }}</button>
             </div>
-            <label class="model-auth-toggle model-auth-provider-toggle">
+            <label v-if="connectionMode || credentials.length || selectedProvider.oauthEnabled === false" class="model-auth-toggle model-auth-provider-toggle">
               <input type="checkbox" role="switch" :checked="selectedProvider.oauthEnabled !== false" :disabled="busy" :aria-label="text.oauthEnabled" @change="emit('update-provider', { providerId: selectedProvider.id, oauthEnabled: ($event.target as HTMLInputElement).checked })" />
               <span class="model-auth-switch-track" aria-hidden="true"></span>{{ text.oauthEnabled }}
             </label>
@@ -549,21 +556,31 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
             <article v-for="(credential, index) in credentials" :key="credential.id" class="model-auth-credential-row" part="credential-row" :data-part="method === 'oauth' ? 'oauth-credential' : 'api-key-credential'">
               <slot name="credential-row" :credential="credential" :provider="selectedProvider" :method="method" :update="(enabled: boolean) => updateCredential(credential, enabled)" :remove="() => removeCredential(credential)" :rename="(label: string) => rename(credential, label)" :save-login="(login: CredentialLoginInput | null) => saveLogin(credential, login)">
                 <div class="model-auth-credential-summary">
-                  <span class="model-auth-health" :class="{ healthy: credential.enabled && credential.healthy }" aria-hidden="true"></span>
-                  <span class="model-auth-row-main"><strong>{{ credential.label }}</strong><small>{{ connectionMode && credential.account ? text.account + ' · ' + credential.account + ' · ' : '' }}{{ credentialStatus(credential) }}</small></span>
+                  <span class="model-auth-health" :class="{ healthy: credentialReady(credential), attention: needsReconnect(credential) }" aria-hidden="true"></span>
+                  <span class="model-auth-row-main"><strong>{{ credential.label }}</strong><small :class="{ 'model-auth-connection-attention': needsReconnect(credential) }" :title="credential.cooldownUntilUtc ?? undefined">{{ connectionMode && credential.account ? text.account + ' · ' + credential.account + ' · ' : '' }}{{ credentialStatus(credential) }}</small></span>
+                  <span v-if="credentials.length > 1" class="model-auth-move-group">
+                    <button v-if="index > 0" type="button" class="model-auth-subtle model-auth-with-icon model-auth-move" data-part="move-up" :disabled="busy" :aria-label="text.moveUp + ' ' + credential.label" @click="moveCredential(index, -1)"><ModelAuthIcon name="arrow-up" /></button>
+                    <span v-else class="model-auth-move-spacer" aria-hidden="true"></span>
+                    <button v-if="index < credentials.length - 1" type="button" class="model-auth-subtle model-auth-with-icon model-auth-move" data-part="move-down" :disabled="busy" :aria-label="text.moveDown + ' ' + credential.label" @click="moveCredential(index, 1)"><ModelAuthIcon name="arrow-down" /></button>
+                    <span v-else class="model-auth-move-spacer" aria-hidden="true"></span>
+                  </span>
                   <label class="model-auth-toggle">
                     <input :checked="credential.enabled" :disabled="busy" type="checkbox" role="switch" :aria-label="text.enable + ' ' + credential.label" @change="updateCredential(credential, ($event.target as HTMLInputElement).checked)" />
                     <span class="model-auth-switch-track" aria-hidden="true"></span>{{ text.enable }}
                   </label>
                 </div>
-                <div class="model-auth-credential-actions">
-                  <span class="model-auth-position" data-part="credential-position">{{ text.position }} {{ index + 1 }}</span>
-                  <button type="button" class="model-auth-secondary model-auth-with-icon" data-part="move-up" :disabled="busy || index === 0" :aria-label="text.moveUp + ' ' + credential.label" @click="moveCredential(index, -1)"><ModelAuthIcon name="arrow-up" />{{ text.moveUp }}</button>
-                  <button type="button" class="model-auth-secondary model-auth-with-icon" data-part="move-down" :disabled="busy || index === credentials.length - 1" :aria-label="text.moveDown + ' ' + credential.label" @click="moveCredential(index, 1)"><ModelAuthIcon name="arrow-down" />{{ text.moveDown }}</button>
-                  <button v-if="method === 'oauth'" type="button" class="model-auth-secondary" data-part="reconnect" :disabled="busy || !canUseMethod" @click="authorize(credential.id)">{{ text.reconnect }}</button>
-                  <button v-if="selectedProvider.usageEnabled || credential.usage" type="button" class="model-auth-secondary" data-part="query-usage" :disabled="busy" @click="queryUsage(credential)">{{ credential.usage ? text.refreshUsage : text.queryUsage }}</button>
-                  <button v-if="method === 'oauth' && selectedProvider.logoutEnabled" type="button" class="model-auth-secondary" data-part="logout" :disabled="busy" @click="emit('logout', selectedProvider!.id, credential.id)">{{ text.logout }}</button>
-                  <button type="button" class="model-auth-danger" :disabled="busy" :data-confirmed="pendingRemoval === credential.id" @click="removeCredential(credential)">{{ pendingRemoval === credential.id ? text.confirmRemove : text.remove }}</button>
+                <div v-if="credential.usage || selectedProvider.usageEnabled" class="model-auth-usage" data-part="credential-usage">
+                  <template v-if="credential.usage">
+                    <span v-if="credential.usage.plan">{{ credential.usage.plan }}</span>
+                    <span v-if="credential.usage.balance">{{ credential.usage.balance.amount }} {{ credential.usage.balance.unit }}</span>
+                    <span v-for="window in credential.usage.windows" :key="window.id" :title="windowTitle(window)" :data-low="windowLow(window)">{{ windowText(window) }}</span>
+                    <span v-if="credential.usage.estimate">{{ usageEstimateText(credential.usage.estimate) }}</span>
+                    <span v-if="credential.usage.error">{{ credential.usage.error }}</span>
+                  </template>
+                  <button type="button" class="model-auth-subtle" data-part="query-usage" :disabled="busy" @click="queryUsage(credential)">{{ credential.usage ? text.refreshUsage : text.queryUsage }}</button>
+                </div>
+                <div v-if="method === 'oauth' && needsReconnect(credential)" class="model-auth-credential-actions">
+                  <button type="button" class="model-auth-primary" data-part="reconnect" :disabled="busy || !canUseMethod" @click="authorize(credential.id)">{{ text.reconnect }}</button>
                 </div>
                 <details class="model-auth-credential-settings" data-part="credential-settings">
                   <summary>{{ text.credentialSettings }}</summary>
@@ -592,32 +609,36 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                     <textarea :value="extendText(credential)" :disabled="busy" :aria-label="text.extend" spellcheck="false" @change="updateExtend(credential, ($event.target as HTMLTextAreaElement).value)" />
                     <small>{{ text.extendHint }}</small>
                   </details>
+                  <div class="model-auth-credential-actions">
+                    <button v-if="method === 'oauth' && selectedProvider.logoutEnabled" type="button" class="model-auth-secondary" data-part="logout" :disabled="busy" @click="emit('logout', selectedProvider!.id, credential.id)">{{ text.logout }}</button>
+                    <button type="button" class="model-auth-danger" :disabled="busy" :data-confirmed="pendingRemoval === credential.id" @click="removeCredential(credential)">{{ pendingRemoval === credential.id ? text.confirmRemove : text.remove }}</button>
+                  </div>
                 </details>
-                <div v-if="credential.usage" class="model-auth-usage" data-part="credential-usage">
-                  <span v-if="credential.usage.plan">{{ credential.usage.plan }}</span>
-                  <span v-if="credential.usage.balance">{{ credential.usage.balance.amount }} {{ credential.usage.balance.unit }}</span>
-                  <span v-for="window in credential.usage.windows" :key="window.id" :title="windowTitle(window)">{{ windowText(window) }}</span>
-                  <span v-if="credential.usage.estimate">{{ usageEstimateText(credential.usage.estimate) }}</span>
-                  <span v-if="credential.usage.error">{{ credential.usage.error }}</span>
-                </div>
               </slot>
             </article>
-            <p v-if="!credentials.length" class="model-auth-empty">{{ connectionMode ? text.noConnections : text.noCredentials }}</p>
+            <div v-if="!credentials.length" class="model-auth-empty">
+              <p>{{ connectionMode ? text.noConnections : text.noCredentials }}</p>
+              <button v-if="method === 'oauth' && !connectionMode" type="button" class="model-auth-primary" data-part="authorize" :disabled="busy || !canUseMethod" @click="authorize()">{{ selectedProvider.authorizeLabel || text.authorize }}</button>
+            </div>
           </section>
 
         </div>
         <div v-else-if="step === 'confirmation' && selectedProvider" key="confirmation" :class="['model-auth-detail', transitionName]" data-part="confirmation-step">
-          <strong class="model-auth-selected-provider">{{ selectedProvider.name }}</strong>
-          <section data-part="authorization-result" role="status">
-            <p>{{ text.authorizationComplete }}</p>
-            <p>{{ methodLabel(method) }} · {{ text.verified }}</p>
+          <div class="model-auth-connection-title">
+            <ProviderMark :provider="selectedProvider" />
+            <div><h3>{{ selectedProvider.name }}</h3><span class="model-auth-connection-meta">{{ methodLabel(method) }}</span></div>
+          </div>
+          <section class="model-auth-success" data-part="authorization-result" role="status">
+            <ModelAuthIcon name="check" />
+            <p class="model-auth-success-title">{{ text.authorizationComplete }}</p>
+            <small>{{ text.verified }}</small>
           </section>
         </div>
         <footer v-if="!connectionMode && step === 'detail' && authReady" class="model-auth-actions">
           <button type="button" class="model-auth-primary" data-part="continue-confirmation" :disabled="busy" @click="advanceToConfirmation">{{ text.continue }}</button>
         </footer>
         <footer v-if="!connectionMode && step === 'confirmation' && authReady" class="model-auth-confirmation" part="confirmation" data-part="confirmation">
-          <button type="button" class="model-auth-primary" data-part="confirm" :disabled="busy || !!error" @click="confirmConnection">{{ text.confirm }}</button>
+          <button type="button" class="model-auth-primary" data-part="confirm" :disabled="busy || !!error" @click="confirmConnection">{{ text.done }}</button>
         </footer>
         <slot name="footer" :step="step" :close="close"></slot>
       </section>
