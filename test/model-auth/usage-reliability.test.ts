@@ -1,4 +1,9 @@
 // @vitest-environment node
+
+vi.mock("../../model-auth/packages/providers/src/client-versions.js", async importOriginal => {
+  const actual = await importOriginal<typeof import("../../model-auth/packages/providers/src/client-versions.js")>();
+  return { ...actual, latestClientVersion: async (client: keyof typeof actual.CLIENT_VERSION_FLOORS) => actual.CLIENT_VERSION_FLOORS[client] };
+});
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearAnthropicProfileCache, parseAnthropicUsage, parseCodexUsage, queryAnthropicUsage, queryCodexUsage, usageErrorSnapshot, usageSnapshot,

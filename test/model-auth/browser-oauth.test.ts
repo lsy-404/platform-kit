@@ -1,7 +1,12 @@
 // @vitest-environment node
+
+vi.mock("../../model-auth/packages/providers/src/client-versions.js", async importOriginal => {
+  const actual = await importOriginal<typeof import("../../model-auth/packages/providers/src/client-versions.js")>();
+  return { ...actual, latestClientVersion: async (client: keyof typeof actual.CLIENT_VERSION_FLOORS) => actual.CLIENT_VERSION_FLOORS[client] };
+});
 import { createServer } from "node:http";
 import { request } from "node:http";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { authorizeAnthropic, refreshAnthropic } from "../../model-auth/packages/providers/src/anthropic.js";
 import { authorizeOpenAI, refreshOpenAI } from "../../model-auth/packages/providers/src/openai.js";
 

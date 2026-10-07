@@ -1,18 +1,19 @@
-export type ClientVersionTarget = "codex" | "grok" | "trae-app" | "trae-build";
+export type ClientVersionTarget = "claude" | "codex" | "grok" | "trae-app" | "trae-build";
 export interface ClientVersionOptions { readonly fetchImpl?: typeof fetch; readonly signal?: AbortSignal; readonly timeoutMs?: number; }
 
 /** Oldest versions known to be accepted; lookups never resolve below these. */
-export const CLIENT_VERSION_FLOORS: Readonly<Record<ClientVersionTarget, string>> = Object.freeze({ codex: "0.160.0", grok: "1.0.46", "trae-app": "3.5.104", "trae-build": "2.3.88407" });
+export const CLIENT_VERSION_FLOORS: Readonly<Record<ClientVersionTarget, string>> = Object.freeze({ claude: "2.1.290", codex: "0.160.0", grok: "1.0.46", "trae-app": "3.5.104", "trae-build": "2.3.88407" });
 
-type Feed = "codex" | "grok" | "trae";
+type Feed = "claude" | "codex" | "grok" | "trae";
 type Versions = Partial<Record<ClientVersionTarget, string>>;
 const FEEDS: Readonly<Record<Feed, { urls: readonly string[]; parse: (body: string) => Versions }>> = {
+  claude: { urls: ["https://registry.npmjs.org/@anthropic-ai/claude-code/latest"], parse: body => single("claude", version(record(json(body))?.version)) },
   codex: { urls: ["https://registry.npmjs.org/@openai/codex/latest"], parse: body => single("codex", version(record(json(body))?.version)) },
   grok: { urls: ["https://x.ai/cli/stable", "https://storage.googleapis.com/grok-build-public-artifacts/cli/stable"], parse: body => single("grok", version(body.split(/\r?\n/, 1)[0])) },
   trae: { urls: ["https://api.trae.ai/icube/api/v1/native/version/trae/latest"], parse: parseTrae },
 };
-const FEED_OF: Readonly<Record<ClientVersionTarget, Feed>> = { codex: "codex", grok: "grok", "trae-app": "trae", "trae-build": "trae" };
-const LEAD_OF: Readonly<Record<Feed, ClientVersionTarget>> = { codex: "codex", grok: "grok", trae: "trae-app" };
+const FEED_OF: Readonly<Record<ClientVersionTarget, Feed>> = { claude: "claude", codex: "codex", grok: "grok", "trae-app": "trae", "trae-build": "trae" };
+const LEAD_OF: Readonly<Record<Feed, ClientVersionTarget>> = { claude: "claude", codex: "codex", grok: "grok", trae: "trae-app" };
 const TTL_MS = 6 * 60 * 60 * 1000, RETRY_MS = 5 * 60 * 1000, DEFAULT_TIMEOUT_MS = 5_000, MAX_BODY_CHARS = 2_000_000;
 const cache = new Map<Feed, { at: number; ttl: number; versions?: Versions }>();
 const inflight = new Map<Feed, Promise<Versions | undefined>>();

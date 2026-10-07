@@ -1,3 +1,4 @@
+import { anthropicClientHeaders } from "./anthropic.js";
 import { normalizeCodexPlan, planMultiplierFromTier } from "@model-auth/core";
 import type {
   ProviderUsageBalance, ProviderUsageErrorCode, ProviderUsageEstimate, ProviderUsageEstimateSource, ProviderUsageEstimateUnit,
@@ -377,7 +378,7 @@ async function errorMessage(response: Response): Promise<string> {
 /** GET JSON with transient retries, one renewal after a rejection, and no redirect following. */
 async function usageGet(
   url: string,
-  headersFor: (access: string) => Record<string, string>,
+  headersFor: (access: string) => Record<string, string> | Promise<Record<string, string>>,
   state: UsageHttpState,
   options: ProviderUsageRequestOptions,
 ): Promise<unknown> {
@@ -389,7 +390,7 @@ async function usageGet(
     const usedAccess = state.access;
     let response: Response;
     try {
-      response = await fetchImpl(url, { headers: headersFor(usedAccess), redirect: "manual", ...(options.signal ? { signal: options.signal } : {}) });
+      response = await fetchImpl(url, { headers: await headersFor(usedAccess), redirect: "manual", ...(options.signal ? { signal: options.signal } : {}) });
     } catch (error) {
       if (options.signal?.aborted) throw abortError();
       if (attempt >= 2) throw new UsageRequestError("unreachable", error instanceof Error ? error.message : "Usage request failed.");
@@ -449,7 +450,7 @@ export async function queryAnthropicUsage(credential: ProviderUsageCredential, o
   const state: UsageHttpState = { access: credential.access };
   const cacheKey = options.credentialId ?? credential.accountId;
   const [payload, profile] = await Promise.all([
-    usageGet("https://api.anthropic.com/api/oauth/usage", anthropicHeaders, state, options),
+    usageGet("https://api.anthropic.com/api/oauth/usage", access => anthropicHeaders(access, options), state, options),
     queryAnthropicOAuthMetadata(credential, cacheKey, state, options),
   ]);
   const usage = parseAnthropicUsage(payload);
@@ -478,13 +479,13 @@ export async function queryAnthropicOAuthMetadata(
 async function fetchAnthropicProfile(state: UsageHttpState, options: ProviderUsageRequestOptions): Promise<AnthropicProfileResult> {
   let metadata: AnthropicOAuthMetadata;
   try {
-    metadata = parseAnthropicOAuthProfile(await usageGet("https://api.anthropic.com/api/oauth/profile", anthropicHeaders, state, options));
+    metadata = parseAnthropicOAuthProfile(await usageGet("https://api.anthropic.com/api/oauth/profile", access => anthropicHeaders(access, options), state, options));
   } catch (error) {
     return { metadata: {}, error: error instanceof Error ? error.message : "Anthropic profile metadata is unavailable.", billingUnavailable: false };
   }
   if (!metadata.organizationId) return { metadata, error: "Anthropic OAuth profile did not return an organization id.", billingUnavailable: true };
   try {
-    const details = await usageGet(`https://api.anthropic.com/api/organizations/${encodeURIComponent(metadata.organizationId)}/subscription_details`, anthropicHeaders, state, options);
+    const details = await usageGet(`https://api.anthropic.com/api/organizations/${encodeURIComponent(metadata.organizationId)}/subscription_details`, access => anthropicHeaders(access, options), state, options);
     return { metadata: { ...metadata, ...parseAnthropicSubscriptionDetails(details) }, error: null, billingUnavailable: false };
   } catch (error) {
     const status = error instanceof UsageRequestError ? error.httpStatus : undefined;
@@ -553,8 +554,8 @@ export function mergeAnthropicUsageMetadata(
   };
 }
 
-function anthropicHeaders(access: string): Record<string, string> {
-  return { accept: "application/json", authorization: `Bearer ${access}`, "anthropic-beta": "oauth-2025-04-20" };
+async function anthropicHeaders(access: string, options: ProviderUsageRequestOptions): Promise<Record<string, string>> {
+  return { ...await anthropicClientHeaders(options), accept: "application/json", authorization: `Bearer ${access}`, "anthropic-beta": "oauth-2025-04-20" };
 }
 
 function booleanValue(value: unknown): boolean | undefined {

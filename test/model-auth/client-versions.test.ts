@@ -12,6 +12,25 @@ beforeEach(() => { vi.resetModules(); });
 afterEach(() => { vi.useRealTimers(); });
 
 describe("latest client versions", () => {
+  it("tracks Claude Code latest independently and shares its refresh across callers", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const { latestClientVersion } = await load();
+    const requests: string[] = [];
+    let release = "2.1.293";
+    const fetchImpl: typeof fetch = async url => {
+      requests.push(String(url));
+      return new Response(JSON.stringify({ version: release }));
+    };
+    expect(await Promise.all([latestClientVersion("claude", { fetchImpl }), latestClientVersion("claude", { fetchImpl })])).toEqual([release, release]);
+    expect(requests).toEqual(["https://registry.npmjs.org/@anthropic-ai/claude-code/latest"]);
+    release = "2.1.294";
+    expect(await latestClientVersion("claude", { fetchImpl })).toBe("2.1.293");
+    vi.setSystemTime(Date.now() + 6 * 60 * 60 * 1000 + 1);
+    expect(await latestClientVersion("claude", { fetchImpl })).toBe(release);
+    vi.setSystemTime(Date.now() + 6 * 60 * 60 * 1000 + 1);
+    expect(await latestClientVersion("claude", { fetchImpl: async () => { throw new Error("offline"); } })).toBe(release);
+  });
+
   it("returns a newer published version and never goes below the floor", async () => {
     const { latestClientVersion, CLIENT_VERSION_FLOORS } = await load();
     expect(await latestClientVersion("codex", { fetchImpl: async () => npm("0.160.0") })).toBe("0.160.0");

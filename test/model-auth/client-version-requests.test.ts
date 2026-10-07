@@ -1,4 +1,6 @@
 // @vitest-environment node
+import { anthropicClientHeaders, refreshAnthropic } from "../../model-auth/packages/providers/src/anthropic.js";
+import { queryAnthropicUsage } from "../../model-auth/packages/providers/src/usage.js";
 import { request } from "node:http";
 import { describe, expect, it } from "vitest";
 import { queryGrokUsage, type GrokOAuthCredential } from "../../model-auth/packages/providers/src/grok.js";
@@ -11,6 +13,38 @@ const manifest = () => new Response(JSON.stringify({ data: { manifest: { darwin:
 
 // Each test file gets a fresh module graph, so the in-process cache starts empty and the first lookups below hit the injected fetch.
 describe("default client versions", () => {
+  it("keeps Claude token, usage, profile and inference headers on the same latest release", async () => {
+    const seen: Array<{ url: string; headers: Headers }> = [];
+    const fetchImpl: typeof fetch = async (url, init) => {
+      if (String(url).startsWith("https://registry.npmjs.org/")) return new Response(JSON.stringify({ version: "2.1.293" }));
+      seen.push({ url: String(url), headers: new Headers(init?.headers) });
+      if (String(url).endsWith("/token")) return new Response(JSON.stringify({ access_token: "renewed", refresh_token: "renewed-refresh", expires_in: 3600 }));
+      if (String(url).endsWith("/profile")) return new Response(JSON.stringify({ organization_id: "org", organization_type: "anthropic_max" }));
+      return new Response(JSON.stringify({ five_hour: { utilization: 10 }, billing_interval: "month" }));
+    };
+    const credential = await refreshAnthropic({ type: "oauth", access: "old", refresh: "refresh", expires: 0 }, { fetchImpl });
+    await queryAnthropicUsage(credential, { fetchImpl });
+    const headers = await anthropicClientHeaders({ fetchImpl });
+    expect(headers).toEqual({ "user-agent": "claude-cli/2.1.293", "x-app": "cli" });
+    expect(seen.map(item => item.url)).toEqual([
+      "https://platform.claude.com/v1/oauth/token", "https://api.anthropic.com/api/oauth/usage",
+      "https://api.anthropic.com/api/oauth/profile", "https://api.anthropic.com/api/organizations/org/subscription_details",
+    ]);
+    expect(seen.every(item => item.headers.get("user-agent") === headers["user-agent"] && item.headers.get("x-app") === "cli")).toBe(true);
+    expect(seen[0]!.headers.get("content-type")).toBe("application/json");
+    expect(seen[1]!.headers.get("authorization")).toBe("Bearer renewed");
+  });
+
+  it("does not begin Claude token requests after cancellation", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    let requests = 0;
+    await expect(refreshAnthropic({ type: "oauth", access: "old", refresh: "refresh", expires: 0 }, {
+      signal: controller.signal, fetchImpl: async () => { requests++; return new Response(); },
+    })).rejects.toMatchObject({ code: "aborted" });
+    expect(requests).toBe(0);
+  });
+
   it("sends the latest Codex version to the account catalog", async () => {
     const requests: string[] = [];
     await listOpenAICodexModels({ access: "token" }, { fetchImpl: async url => {
