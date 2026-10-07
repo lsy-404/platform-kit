@@ -30,7 +30,8 @@ export async function refreshAnthropic(credential: AnthropicOAuthCredential, opt
 
 async function withClientHeaders<T extends BrowserOAuthRefreshOptions>(options: T): Promise<T> {
   if (options.signal?.aborted) throw new BrowserOAuthError("aborted", "Browser authorization was cancelled.");
-  const clientHeaders = await anthropicClientHeaders(options), fetchImpl = options.fetchImpl ?? fetch;
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const clientHeaders = await anthropicClientHeaders({ fetchImpl, ...(options.signal ? { signal: options.signal } : {}) });
   if (options.signal?.aborted) throw new BrowserOAuthError("aborted", "Browser authorization was cancelled.");
   return { ...options, fetchImpl: (input, init) => fetchImpl(input, {
     ...init, headers: { ...Object.fromEntries(new Headers(init?.headers)), ...clientHeaders },

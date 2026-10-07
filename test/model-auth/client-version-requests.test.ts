@@ -2,7 +2,7 @@
 import { anthropicClientHeaders, refreshAnthropic } from "../../model-auth/packages/providers/src/anthropic.js";
 import { queryAnthropicUsage } from "../../model-auth/packages/providers/src/usage.js";
 import { request } from "node:http";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { queryGrokUsage, type GrokOAuthCredential } from "../../model-auth/packages/providers/src/grok.js";
 import { authorizeTrae, refreshTrae, traeStatus, createTraeDevice, DEFAULT_TRAE_CLIENT_ID, type TraeCredential } from "../../model-auth/packages/providers/src/trae.js";
 import { listOpenAICodexModels } from "../../model-auth/packages/providers/src/openai.js";
@@ -13,6 +13,21 @@ const manifest = () => new Response(JSON.stringify({ data: { manifest: { darwin:
 
 // Each test file gets a fresh module graph, so the in-process cache starts empty and the first lookups below hit the injected fetch.
 describe("default client versions", () => {
+  it("keeps version discovery bounded separately from the browser authorization budget", async () => {
+    vi.resetModules();
+    const { authorizeAnthropic } = await import("../../model-auth/packages/providers/src/anthropic.js");
+    const timeout = vi.spyOn(AbortSignal, "timeout"), controller = new AbortController();
+    try {
+      await expect(authorizeAnthropic({
+        timeoutMs: 600_000, signal: controller.signal,
+        fetchImpl: async () => { controller.abort(); return new Response(JSON.stringify({ version: "2.1.293" })); },
+        openExternal: () => { throw new Error("unexpected browser"); },
+      })).rejects.toMatchObject({ code: "aborted" });
+      expect(timeout).toHaveBeenCalledWith(5_000);
+      expect(timeout).not.toHaveBeenCalledWith(600_000);
+    } finally { timeout.mockRestore(); }
+  });
+
   it("keeps Claude token, usage, profile and inference headers on the same latest release", async () => {
     const seen: Array<{ url: string; headers: Headers }> = [];
     const fetchImpl: typeof fetch = async (url, init) => {
