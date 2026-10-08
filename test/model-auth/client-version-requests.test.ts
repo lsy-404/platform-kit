@@ -40,7 +40,7 @@ describe("default client versions", () => {
     const credential = await refreshAnthropic({ type: "oauth", access: "old", refresh: "refresh", expires: 0 }, { fetchImpl });
     await queryAnthropicUsage(credential, { fetchImpl });
     const headers = await anthropicClientHeaders({ fetchImpl });
-    expect(headers).toEqual({ "user-agent": "claude-cli/2.1.293", "x-app": "cli" });
+    expect(headers).toEqual({ "user-agent": "claude-cli/2.1.293 (external, sdk-cli)", "x-app": "cli" });
     expect(seen.map(item => item.url)).toEqual([
       "https://platform.claude.com/v1/oauth/token", "https://api.anthropic.com/api/oauth/usage",
       "https://api.anthropic.com/api/oauth/profile", "https://api.anthropic.com/api/organizations/org/subscription_details",

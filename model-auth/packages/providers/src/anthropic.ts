@@ -17,7 +17,7 @@ export type AnthropicOAuthCredential = BrowserOAuthCredential;
 export type AnthropicAuthorizationOptions = BrowserOAuthAuthorizationOptions;
 export type AnthropicRefreshOptions = BrowserOAuthRefreshOptions;
 export async function anthropicClientHeaders(options: ClientVersionOptions = {}): Promise<Record<string, string>> {
-  return { "user-agent": `claude-cli/${await latestClientVersion("claude", options)}`, "x-app": "cli" };
+  return { "user-agent": `claude-cli/${await latestClientVersion("claude", options)} (external, sdk-cli)`, "x-app": "cli" };
 }
 
 export async function authorizeAnthropic(options: AnthropicAuthorizationOptions): Promise<AnthropicOAuthCredential> {
