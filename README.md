@@ -8,7 +8,7 @@ Apache-2.0 theme and public AI access packages, distributed directly through thi
 | `@platform-kit/ui-tokens` | Lightweight CSS theme variables |
 | `@platform-kit/appearance-check` | Development-time appearance checks with stable IDs, CLI and Vite build warnings; [usage](tooling/appearance-check/README.md) |
 | `@model-auth/core` | Framework-neutral provider access, credential routing, authentication interaction and usage contracts |
-| `@model-auth/providers` | Host-side provider authentication, requests, streams and usage queries for OpenAI, Anthropic, WorkBuddy, Trae, Grok and Ollama |
+| `@model-auth/providers` | Host-side provider authentication, requests, streams and usage queries for OpenAI, Anthropic, WorkBuddy, Trae, Grok, Ollama and OpenCode Go |
 | `model-auth-native` | Rust browser authentication for OpenAI and Anthropic; host-owned credential storage |
 | `@model-auth/vue` | Vue provider connection, dynamic authentication and usage interface/custom element |
 

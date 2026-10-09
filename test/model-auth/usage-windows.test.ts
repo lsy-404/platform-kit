@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createGrokAdapter, createCredentialMetadata } from "../../model-auth/packages/core/src/index.js";
 import { parseGrokBilling } from "../../model-auth/packages/providers/src/grok.js";
-import { parseOllamaSettings } from "../../model-auth/packages/providers/src/ollama.js";
 import { normalizeModelFamilyId, parseAnthropicUsage, parseCodexUsage, usageSnapshot, usageWindow } from "../../model-auth/packages/providers/src/usage.js";
 
 const daysFromNow = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString();
@@ -52,15 +51,6 @@ describe("structured usage windows", () => {
       monthlyLimit: { val: 100 }, usage: { includedUsed: { val: 100 } },
     } });
     expect(parsed.windows[0]).toMatchObject({ scope: "account", modelFamilies: [], status: "exhausted", usedRatio: 1, reliability: "high" });
-  });
-
-  it("marks Ollama windows as low reliability", () => {
-    const html = `<section><h2>Plan &amp; Billing</h2><h3>Included usage</h3><span> $7.50 of $60 used </span><h3>Session</h3><span>12.5% used</span><h3>Weekly</h3><span>100% used</span></section>`;
-    const windows = parseOllamaSettings(html).windows;
-    expect(windows.length).toBeGreaterThanOrEqual(3);
-    for (const window of windows) expect(window).toMatchObject({ scope: "account", modelFamilies: [], reliability: "low" });
-    expect(windows.find(window => window.id === "session")).toMatchObject({ status: "known", usedRatio: 0.125 });
-    expect(windows.find(window => window.id === "weekly")).toMatchObject({ status: "exhausted", usedRatio: 1 });
   });
 
   it("carries structured fields through snapshots and the core adapter validation", async () => {

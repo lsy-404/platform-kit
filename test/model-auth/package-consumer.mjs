@@ -89,7 +89,8 @@ import { latestClientVersion, CLIENT_VERSION_FLOORS, type ClientVersionTarget } 
 import { authorizeAnthropic, refreshAnthropic } from "@model-auth/providers/anthropic";
 import { authorizeTrae, refreshTrae, listTraeModels, streamTrae } from "@model-auth/providers/trae";
 import { authorizeGrok, queryGrokUsage } from "@model-auth/providers/grok";
-import { authorizeOllamaWeb, queryOllamaUsage, queryOllamaKeyUsage, parseOllamaKeyUsage } from "@model-auth/providers/ollama";
+import { authorizeOllamaWeb, queryOllamaUsage, parseOllamaSettings } from "@model-auth/providers/ollama";
+import { queryOpencodeGoKeyUsage, parseOpencodeGoUsage } from "@model-auth/providers/opencode";
 import { queryProviderUsage } from "@model-auth/providers/usage";
 const providers: ModelAuthProvider[] = [];
 const dialogProps: InstanceType<typeof ModelAuthDialog>["$props"] = { separateAuthMethods: false };
@@ -98,7 +99,7 @@ const target: ClientVersionTarget = "codex";
 const pending: Promise<string> = latestClientVersion(target);
 const models: readonly OpenAICodexModel[] = parseOpenAICodexModels({ models: [] });
 const router = new CredentialRouter([createCredentialMetadata({ id: "one", providerId: "sample", authMethod: "api-key", modelIds: ["sample"] })]);
-void [providers, router, ModelAuthDialog, registerModelAuthElement, authorizeWorkBuddy, refreshWorkBuddy, authorizeTrae, refreshTrae, listTraeModels, streamTrae, authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic, authorizeGrok, queryGrokUsage, authorizeOllamaWeb, queryOllamaUsage, queryOllamaKeyUsage, parseOllamaKeyUsage, queryProviderUsage, listOpenAICodexModels, CLIENT_VERSION_FLOORS, pending, models];
+void [providers, router, ModelAuthDialog, registerModelAuthElement, authorizeWorkBuddy, refreshWorkBuddy, authorizeTrae, refreshTrae, listTraeModels, streamTrae, authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic, authorizeGrok, queryGrokUsage, authorizeOllamaWeb, queryOllamaUsage, parseOllamaSettings, queryOpencodeGoKeyUsage, parseOpencodeGoUsage, queryProviderUsage, listOpenAICodexModels, CLIENT_VERSION_FLOORS, pending, models];
 `);
 execFileSync(process.execPath, [join(root, "node_modules/typescript/bin/tsc"), "--noEmit", "--strict", "--skipLibCheck", "--moduleResolution", "bundler", "--module", "esnext", "--target", "es2023", join(consumer, "entry.ts")], { stdio: "pipe", cwd: consumer });
 execFileSync(process.execPath, [join(root, "node_modules/typescript/bin/tsc"), "--noEmit", "--strict", "--skipLibCheck", "--moduleResolution", "node", "--module", "commonjs", "--target", "es2023", join(consumer, "entry.ts")], { stdio: "pipe", cwd: consumer });
@@ -110,11 +111,14 @@ import { latestClientVersion, CLIENT_VERSION_FLOORS } from "@model-auth/provider
 import { latestClientVersion as rootLatestClientVersion } from "@model-auth/providers";
 import { authorizeAnthropic, refreshAnthropic } from "@model-auth/providers/anthropic";
 import { authorizeGrok, queryGrokUsage } from "@model-auth/providers/grok";
-import { authorizeOllamaWeb, queryOllamaUsage, queryOllamaKeyUsage, parseOllamaKeyUsage } from "@model-auth/providers/ollama";
-const ollama = await queryOllamaKeyUsage("consumer-key", { fetchImpl: async () => Response.json({ limits: { monthly: { usage: 0.25 } } }) });
-if (ollama.windows[0]?.remainingPercent !== 75 || parseOllamaKeyUsage({ limits: {} }).windows.length !== 0) throw new Error("Installed Ollama key usage unavailable");
+import { authorizeOllamaWeb, queryOllamaUsage, parseOllamaSettings } from "@model-auth/providers/ollama";
+import { queryOpencodeGoKeyUsage, parseOpencodeGoUsage } from "@model-auth/providers/opencode";
+const ollama = parseOllamaSettings("<span>Cloud Usage</span><span>Pro</span><div>Weekly usage</div><span>25% used</span>");
+if (ollama.plan !== "Pro" || ollama.windows[0]?.remainingPercent !== 75) throw new Error("Installed Ollama settings parser unavailable");
+const opencode = await queryOpencodeGoKeyUsage("consumer-key", { fetchImpl: async () => Response.json({ usage: { rolling: { percent: 10 }, weekly: { percent: 25 } } }) });
+if (opencode.plan !== "Go" || opencode.windows[1]?.remainingPercent !== 75) throw new Error("Installed OpenCode Go usage unavailable");
 if (typeof authorizeWorkBuddy !== "function" || typeof refreshWorkBuddy !== "function") throw new Error("Installed providers unavailable");
-for (const provider of [authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic, authorizeGrok, queryGrokUsage, authorizeOllamaWeb, queryOllamaUsage, queryOllamaKeyUsage, parseOllamaKeyUsage]) {
+for (const provider of [authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic, authorizeGrok, queryGrokUsage, authorizeOllamaWeb, queryOllamaUsage, parseOllamaSettings, queryOpencodeGoKeyUsage, parseOpencodeGoUsage]) {
   if (typeof provider !== "function") throw new Error("Installed browser OAuth unavailable");
 }
 if (latestClientVersion !== rootLatestClientVersion || typeof listOpenAICodexModels !== "function") throw new Error("Installed client version lookup unavailable");

@@ -23,7 +23,7 @@ The package-consumer test installs those archives into a temporary consumer and 
 
 ## Boundaries
 
-The toolkit does not contain credentials or provider binaries. The providers package implements trusted-host authentication and provider access for OpenAI, Anthropic, WorkBuddy, Trae, Grok and Ollama. Hosts own secure credential persistence, browser opening, provider availability and request transport. See `docs/` and package READMEs for API contracts.
+The toolkit does not contain credentials or provider binaries. The providers package implements trusted-host authentication and provider access for OpenAI, Anthropic, WorkBuddy, Trae, Grok, Ollama and OpenCode Go. Hosts own secure credential persistence, browser opening, provider availability and request transport. See `docs/` and package READMEs for API contracts.
 
 ## License
 

@@ -1,6 +1,6 @@
 {
   "name": "@model-auth/providers",
-  "version": "0.14.2",
+  "version": "0.15.0",
   "description": "Host-side AI provider access, authentication, requests and usage queries.",
   "type": "module",
   "main": "./dist/index.js",
@@ -24,6 +24,9 @@
       ],
       "ollama": [
         "dist/ollama.d.ts"
+      ],
+      "opencode": [
+        "dist/opencode.d.ts"
       ],
       "usage": [
         "dist/usage.d.ts"
@@ -75,6 +78,10 @@
     "./ollama": {
       "types": "./dist/ollama.d.ts",
       "import": "./dist/ollama.js"
+    },
+    "./opencode": {
+      "types": "./dist/opencode.d.ts",
+      "import": "./dist/opencode.js"
     },
     "./usage": {
       "types": "./dist/usage.d.ts",

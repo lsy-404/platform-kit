@@ -9,7 +9,7 @@ Move provider discovery and credential selection into the shared flow:
 3. Convert stored entries to `CredentialMetadata` with opaque IDs and no secrets.
 4. Use `setEnabled`, `setOrder`, and `setExtend` independently when restoring preferences. `extend` is for non-sensitive per-credential context only.
 5. Route requests through `CredentialRouter` and the host request/stream callbacks, then report classified success or errors.
-6. Query non-secret provider usage through `queryGrokUsage`, `queryOllamaUsage`, `queryProviderUsage`, or a host adapter's `queryUsage` callback.
+6. Query non-secret provider usage through `queryGrokUsage`, `queryOllamaUsage`, `queryOpencodeGoKeyUsage`, `queryProviderUsage`, or a host adapter's `queryUsage` callback.
 
 `createOpenAIAdapter`, `createAnthropicAdapter`, `createWorkBuddyAdapter` and `createTraeAdapter` remain metadata-only validation boundaries. Keep secret storage in the host and verify its adapter before release.
 

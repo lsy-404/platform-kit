@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MODEL_AUTH_VERSION } from "../../model-auth/packages/core/src/index.js";
 import * as providers from "../../model-auth/packages/providers/src/index.js";
 import * as ollama from "../../model-auth/packages/providers/src/ollama.js";
+import * as opencode from "../../model-auth/packages/providers/src/opencode.js";
 import { credentialReady, credentialRemaining, fill, lowestRemaining, windowRemaining } from "../../model-auth/packages/vue/src/usage";
 import { defaultMessages } from "../../model-auth/packages/vue/src/messages";
 
@@ -14,6 +15,13 @@ describe("public package surface", () => {
     expect(providers.queryOllamaAccountUsage).toBe(ollama.queryOllamaAccountUsage);
     expect(typeof providers.authorizeOllamaWeb).toBe("function");
     expect(typeof providers.queryOllamaUsage).toBe("function");
+  });
+
+  it("exports the OpenCode Go usage API from the root and subpath, and no longer the Ollama key endpoint", () => {
+    expect(providers.queryOpencodeGoKeyUsage).toBe(opencode.queryOpencodeGoKeyUsage);
+    expect(providers.parseOpencodeGoUsage).toBe(opencode.parseOpencodeGoUsage);
+    expect(providers.OPENCODE_GO_USAGE_URL).toBe("https://opencode.ai/zen/go/v1/usage");
+    for (const removed of ["queryOllamaKeyUsage", "parseOllamaKeyUsage", "OLLAMA_USAGE_URL"]) expect(providers).not.toHaveProperty(removed);
   });
 
   it("derives remaining percentages and readiness", () => {

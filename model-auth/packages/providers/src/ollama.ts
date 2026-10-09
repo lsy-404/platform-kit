@@ -1,5 +1,5 @@
 import { classifyUsageHttp } from "@model-auth/core";
-import { quotaWindow, usageSnapshot, type ProviderUsageData, type ProviderUsageRequestOptions, type ProviderUsageSnapshot, type ProviderUsageWindow } from "./usage.js";
+import { UsageRequestError, quotaWindow, usageSnapshot, type ProviderUsageData, type ProviderUsageRequestOptions, type ProviderUsageSnapshot, type ProviderUsageWindow } from "./usage.js";
 
 export const OLLAMA_WEB_ENDPOINTS = Object.freeze({
   signIn: "https://ollama.com/signin",
@@ -54,50 +54,6 @@ export async function authorizeOllamaWeb(options: OllamaWebAuthorizationOptions)
   }
 }
 
-export const OLLAMA_USAGE_URL = "https://ollama.com/api/usage";
-
-export function parseOllamaKeyUsage(payload: unknown): ProviderUsageData {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("Ollama usage response is unreadable.");
-  const limits = (payload as Record<string, unknown>).limits;
-  if (!limits || typeof limits !== "object" || Array.isArray(limits)) throw new Error("Ollama usage response has no limits object.");
-  const windows: ProviderUsageWindow[] = [];
-  for (const [id, label, kind] of [["session", "Session", "session"], ["weekly", "Weekly", "weekly"], ["monthly", "Monthly", "monthly"]] as const) {
-    const row = (limits as Record<string, unknown>)[id];
-    if (!row || typeof row !== "object" || Array.isArray(row)) continue;
-    const ratio = (row as Record<string, unknown>).usage;
-    if (typeof ratio !== "number" || !Number.isFinite(ratio) || ratio < 0) continue;
-    const usedPercent = Math.min(100, ratio * 100);
-    windows.push({ ...quotaWindow({ id, label, usedPercent, remainingPercent: 100 - usedPercent, resetAt: null }), kind });
-  }
-  return { plan: null, windows, balance: null };
-}
-
-export async function queryOllamaKeyUsage(apiKey: string, options: ProviderUsageRequestOptions = {}): Promise<ProviderUsageSnapshot> {
-  options.signal?.throwIfAborted();
-  const credentialId = options.credentialId ?? "ollama-key";
-  const failure = (error: string, errorCode: NonNullable<ProviderUsageSnapshot["errorCode"]>) => usageSnapshot("ollama-cloud", credentialId, {
-    status: "error", plan: null, windows: [], balance: null, error, errorCode,
-  });
-  if (typeof apiKey !== "string" || !apiKey.trim()) return failure("An Ollama API key is required.", "signed-out");
-  const signal = options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000);
-  try {
-    const response = await (options.fetchImpl ?? fetch)(OLLAMA_USAGE_URL, {
-      headers: { accept: "application/json", authorization: `Bearer ${apiKey.trim()}` }, redirect: "manual", signal,
-    });
-    signal.throwIfAborted();
-    const code = classifyUsageHttp(response.status);
-    if (code !== "ok" || response.redirected || response.type === "opaqueredirect") return failure(`Ollama usage request failed (${response.status}).`, code === "ok" ? "unreadable" : code);
-    let data: ProviderUsageData;
-    try { data = parseOllamaKeyUsage(await response.json()); }
-    catch { signal.throwIfAborted(); return failure("Ollama usage response is unreadable.", "unreadable"); }
-    signal.throwIfAborted();
-    return usageSnapshot("ollama-cloud", credentialId, data);
-  } catch {
-    options.signal?.throwIfAborted();
-    return failure("Ollama usage request failed.", "unreachable");
-  }
-}
-
 export interface OllamaAccountLogin {
   readonly username: string;
   readonly password: string;
@@ -135,112 +91,146 @@ export async function queryOllamaAccountUsage(options: OllamaAccountUsageOptions
   return second;
 }
 
+const BROWSER_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36";
+const SETTINGS_TIMEOUT_MS = 12_000;
+const MAX_REDIRECTS = 4;
+
 export async function queryOllamaUsage(options: OllamaUsageRequestOptions = {}): Promise<ProviderUsageSnapshot> {
   const credentialId = options.credentialId ?? "ollama-web";
-  if (!options.cookie?.trim()) {
-    return usageSnapshot("ollama-cloud", credentialId, {
-      status: "error", plan: null, windows: [], balance: null,
-      error: SESSION_MISSING,
-    });
-  }
+  const failure = (error: string, errorCode: NonNullable<ProviderUsageSnapshot["errorCode"]>) => usageSnapshot("ollama-cloud", credentialId, {
+    status: "error", plan: null, windows: [], balance: null, error, errorCode,
+  });
+  const cookie = options.cookie?.trim();
+  if (!cookie) return failure(SESSION_MISSING, "signed-out");
+  const timeout = AbortSignal.timeout(SETTINGS_TIMEOUT_MS);
+  const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
   try {
-    const response = await (options.fetchImpl ?? fetch)(OLLAMA_WEB_ENDPOINTS.settings, {
-      headers: { accept: "text/html,application/xhtml+xml", cookie: options.cookie.trim() },
-      redirect: "manual",
-      ...(options.signal ? { signal: options.signal } : {}),
-    });
-    if (response.status === 0 || response.type === "opaqueredirect" || response.status >= 300 && response.status < 400 || response.redirected || !response.ok) {
-      throw new Error(response.status === 401 || response.status === 403 || response.status === 0 || response.type === "opaqueredirect" || response.status >= 300 && response.status < 400
-        ? SESSION_EXPIRED
-        : `Ollama settings request failed (${response.status}).`);
-    }
+    const response = await requestSettings(cookie, signal, options.fetchImpl ?? fetch);
+    if (response.status === 0 || response.type === "opaqueredirect") return failure("Ollama settings request failed (redirect).", "server-error");
+    if (response.status === 401 || response.status === 403) return failure(SESSION_EXPIRED, "signed-out");
+    const code = classifyUsageHttp(response.status);
+    if (code !== "ok") return failure(`Ollama settings request failed (${response.status}).`, code === "signed-out" ? "server-error" : code);
+    const finalUrl = parseUrl(response.url);
+    if (finalUrl && isOllamaAuthUrl(finalUrl)) return failure(SESSION_EXPIRED, "signed-out");
     const html = await response.text();
-    if (/\/signin(?:[/?#]|$)/i.test(response.url)) throw new Error(SESSION_EXPIRED);
-    return usageSnapshot("ollama-cloud", credentialId, parseOllamaSettings(html));
+    const data = parseOllamaSettings(html);
+    if (!data.windows.length) {
+      if (looksSignedOut(html)) return failure(SESSION_EXPIRED, "signed-out");
+      // A header email proves the session is valid even when the page carries no meters.
+      if (data.identity) return usageSnapshot("ollama-cloud", credentialId, { ...data, errorCode: "no-limits" });
+      return failure("Ollama settings page has no usage meters.", "unreadable");
+    }
+    return usageSnapshot("ollama-cloud", credentialId, data);
   } catch (error) {
-    return usageSnapshot("ollama-cloud", credentialId, {
-      status: "error", plan: null, windows: [], balance: null,
-      error: error instanceof Error ? error.message : "Ollama usage request failed.",
-    });
+    if (error instanceof UsageRequestError) return failure(error.message, error.code);
+    return failure("Ollama usage request failed.", "unreachable");
   }
 }
 
-/** Best-effort parser for the authenticated Ollama Plan & Billing page. */
+/** Fetch the settings page, following only HTTPS redirects inside ollama.com so the cookie never leaves it. */
+async function requestSettings(cookie: string, signal: AbortSignal, fetchImpl: typeof fetch): Promise<Response> {
+  let url = new URL(OLLAMA_WEB_ENDPOINTS.settings);
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+    const response = await fetchImpl(url.href, {
+      headers: {
+        accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "accept-language": "en-US,en;q=0.9",
+        // Cloudflare challenges script-like agents on the settings page.
+        "user-agent": BROWSER_USER_AGENT,
+        cookie,
+      },
+      redirect: "manual",
+      signal,
+    });
+    if (response.status < 300 || response.status >= 400) return response;
+    const next = parseUrl(response.headers.get("location"), url);
+    if (!next) return response;
+    if (isOllamaAuthUrl(next)) throw new UsageRequestError("signed-out", SESSION_EXPIRED);
+    if (!isOllamaOrigin(next)) return response;
+    url = next;
+  }
+  throw new UsageRequestError("server-error", "Ollama returned too many redirects.");
+}
+
+function parseUrl(value: string | null | undefined, base?: URL): URL | null {
+  if (!value) return null;
+  try { return new URL(value, base); } catch { return null; }
+}
+
+function isOllamaOrigin(url: URL): boolean {
+  return url.protocol === "https:" && (url.hostname === "ollama.com" || url.hostname === "www.ollama.com");
+}
+
+function isOllamaAuthUrl(url: URL): boolean {
+  const host = url.hostname.toLowerCase();
+  const path = url.pathname.toLowerCase();
+  if ((host === "ollama.com" || host === "www.ollama.com") && path === "/signin") return true;
+  if (host === "signin.ollama.com") return true;
+  return host.endsWith(".workos.com") && path.startsWith("/user_management/authorize");
+}
+
+function looksSignedOut(html: string): boolean {
+  const lower = html.toLowerCase();
+  if (!lower.includes("<form")) return false;
+  const authRoute = /(?:action|href)=["']\/(?:signin|login)["']/.test(lower) || lower.includes("/api/auth/signin") || lower.includes("/auth/signin");
+  const email = /(?:type|name)=["']email["']/.test(lower);
+  const password = /(?:type|name)=["']password["']/.test(lower);
+  return authRoute || lower.includes("sign in to ollama") || (email && password);
+}
+
+const USAGE_LABEL = /(Session usage|Hourly usage|Weekly usage)/gi;
+const MAX_BLOCK_CHARS = 4_000;
+const WINDOW_SPECS = {
+  session: { id: "session", label: "Session", windowSeconds: 18_000, kind: "session" },
+  hourly: { id: "hourly", label: "Hourly", windowSeconds: 3_600, kind: "session" },
+  weekly: { id: "weekly", label: "Weekly", windowSeconds: 604_800, kind: "weekly" },
+} as const;
+
+/** Reads the Cloud Usage section of the authenticated Ollama settings page. */
 export function parseOllamaSettings(html: string): ProviderUsageData {
   const source = typeof html === "string" ? html : "";
-  const text = decodeHtml(source.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "").replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " "));
-  const cloudStart = source.search(/cloud usage|included usage|plan & billing/i);
-  const cloudHtml = cloudStart >= 0 ? source.slice(cloudStart, cloudStart + 12_000) : source;
-  const cloudText = decodeHtml(cloudHtml.replace(/<[^>]+>/g, " "));
-  const plan = firstMatch(cloudText, /\b(?:plan|included usage|cloud usage)[^\n]{0,120}?\b(free|pro|max)\b/i, /\b(free|pro|max)\b/i);
+  const labels = [...source.matchAll(USAGE_LABEL)].map(match => ({
+    index: match.index,
+    spec: WINDOW_SPECS[match[1]!.split(" ")[0]!.toLowerCase() as keyof typeof WINDOW_SPECS],
+  }));
   const windows: ProviderUsageWindow[] = [];
-  const included = sectionAround(text, /included usage|monthly included|included credits/i, 3_000);
-  const money = included.match(/\$\s*([\d,.]+)\s*(?:of|\/)\s*\$?\s*([\d,.]+)/i);
-  if (money) {
-    const used = parseMoney(money[1]);
-    const limit = parseMoney(money[2]);
-    if (used !== null && limit !== null && limit > 0) {
-      const usedPercent = ratioPercent(used, limit);
-      windows.push(quotaWindow({ reliability: "low", id: "included", label: "Monthly included", usedPercent, remainingPercent: 100 - usedPercent, resetAt: resetAtNear(source, source.search(/included usage|monthly included|included credits/i)), used, limit, remaining: Math.max(0, limit - used), unit: "USD" }));
-    }
-  }
-  for (const [id, label, pattern] of [
-    ["session", "Session", /session(?: usage)?/i],
-    ["hourly", "Hourly", /hourly(?: usage)?/i],
-    ["weekly", "Weekly", /weekly(?: usage)?/i],
-  ] as const) {
-    const index = text.search(pattern);
-    if (index < 0) continue;
-    const segment = text.slice(index, index + 900);
-    const match = segment.match(/(\d+(?:\.\d+)?)\s*%/);
-    const usedPercent = match ? Math.max(0, Math.min(100, Number(match[1]))) : null;
-    if (usedPercent === null) continue;
-    windows.push(quotaWindow({ reliability: "low", id, label, usedPercent, resetAt: resetAtNear(source, source.toLowerCase().indexOf(label.toLowerCase())) }));
-  }
+  const seen = new Set<string>();
+  labels.forEach((current, position) => {
+    const { kind } = current.spec;
+    if (seen.has(kind)) return;
+    const nextOther = labels.slice(position + 1).find(candidate => candidate.spec.kind !== kind);
+    const block = source.slice(current.index, Math.min(nextOther?.index ?? source.length, current.index + MAX_BLOCK_CHARS));
+    const percentText = /([0-9]+(?:\.[0-9]+)?)\s*%\s*used/i.exec(block)?.[1] ?? /width\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*%/i.exec(block)?.[1];
+    if (percentText === undefined) return;
+    const usedPercent = Math.max(0, Math.min(100, Number(percentText)));
+    seen.add(kind);
+    windows.push({
+      ...quotaWindow({
+        id: current.spec.id, label: current.spec.label, usedPercent, remainingPercent: 100 - usedPercent,
+        resetAt: resetAtIn(block), windowSeconds: current.spec.windowSeconds,
+      }),
+      kind,
+    });
+  });
+  windows.sort((a, b) => Number(a.kind === "weekly") - Number(b.kind === "weekly"));
+  const plan = /Cloud Usage\s*<\/span\s*>\s*<span[^>]*>([^<]+)<\/span\s*>/i.exec(source)?.[1]?.trim();
+  const email = /id=["']header-email["'][^>]*>([^<]+)</i.exec(source)?.[1]?.trim();
   return {
-    plan: plan ? plan.toLowerCase().replace(/^./, (value) => value.toUpperCase()) : null,
+    plan: plan || null,
     windows,
     balance: null,
-    ...(windows.length ? { status: "ok" as const } : { status: "unknown" as const }),
+    status: windows.length ? "ok" : "unknown",
+    ...(email?.includes("@") ? { identity: email.toLowerCase() } : {}),
   };
 }
 
-function sectionAround(value: string, pattern: RegExp, length: number): string {
-  const index = value.search(pattern);
-  return index < 0 ? "" : value.slice(index, index + length);
-}
-
-function resetAtNear(source: string, index: number): number | null {
-  if (index < 0) return null;
-  const nearby = source.slice(index, index + 2_000);
-  const match = nearby.match(/data-time\s*=\s*["']([^"']+)["']/i);
-  if (!match) return null;
-  const numeric = Number(match[1]);
+function resetAtIn(block: string): number | null {
+  const raw = /data-time\s*=\s*["']([^"']+)["']/i.exec(block)?.[1];
+  if (!raw) return null;
+  const numeric = Number(raw);
   if (Number.isFinite(numeric)) return numeric < 10_000_000_000 ? numeric * 1000 : numeric;
-  const parsed = Date.parse(match[1]!);
+  const parsed = Date.parse(raw);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function parseMoney(value: string | undefined): number | null {
-  if (!value) return null;
-  const parsed = Number(value.replace(/,/g, ""));
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function ratioPercent(used: number, limit: number): number {
-  return Math.max(0, Math.min(100, (used / limit) * 100));
-}
-
-function firstMatch(value: string, ...patterns: RegExp[]): string | null {
-  for (const pattern of patterns) {
-    const match = pattern.exec(value);
-    if (match?.[1]) return match[1];
-  }
-  return null;
-}
-
-function decodeHtml(value: string): string {
-  return value.replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&#36;/g, "$");
 }
 
 function authorizationTimeout(value: number | undefined): number {

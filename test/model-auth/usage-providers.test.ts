@@ -9,7 +9,7 @@ import {
   queryGrokUsage,
   type GrokOAuthCredential,
 } from "../../model-auth/packages/providers/src/grok.js";
-import { authorizeOllamaWeb, parseOllamaSettings, queryOllamaAccountUsage, queryOllamaUsage, type OllamaAccountLogin } from "../../model-auth/packages/providers/src/ollama.js";
+import { authorizeOllamaWeb, queryOllamaAccountUsage, queryOllamaUsage, type OllamaAccountLogin } from "../../model-auth/packages/providers/src/ollama.js";
 import { parseAnthropicUsage, parseCodexUsage, queryAnthropicUsage, queryCodexUsage, queryProviderUsage, usageWindow } from "../../model-auth/packages/providers/src/usage.js";
 
 vi.mock("../../model-auth/packages/providers/src/client-versions.js", async importOriginal => {
@@ -155,18 +155,6 @@ describe("provider usage adapters", () => {
     expect(GROK_OAUTH_CLIENT_ID).toMatch(/^[0-9a-f-]{36}$/);
   });
 
-  it("parses Ollama monthly and legacy web limit fields", () => {
-    const html = `<section><h2>Plan &amp; Billing</h2><h3>Included usage</h3><span> $7.50 of $60 used </span><span data-time="2030-10-01T00:00:00Z">Resets in 20 days</span><h3>Session</h3><span>12.5% used</span><h3>Weekly</h3><span>40% used</span><span data-time="2030-09-14T00:00:00Z">Resets</span><strong>Pro</strong></section>`;
-    const parsed = parseOllamaSettings(html);
-    expect(parsed).toMatchObject({ plan: "Pro", status: "ok" });
-    expect(parsed.windows).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: "included", usedPercent: 12.5, remainingPercent: 87.5, limit: 60, remaining: 52.5, unit: "USD" }),
-      expect.objectContaining({ id: "session", usedPercent: 12.5 }),
-      expect.objectContaining({ id: "weekly", usedPercent: 40 }),
-    ]));
-    expect(parseOllamaSettings("<h2>Cloud Usage</h2><p>Plan: Pro</p>").status).toBe("unknown");
-  });
-
   it("uses a host browser session callback for Ollama login without exposing the cookie in usage", async () => {
     let reads = 0;
     const result = await authorizeOllamaWeb({
@@ -175,7 +163,7 @@ describe("provider usage adapters", () => {
       pollMs: 250,
       fetchImpl: async (_url, init) => {
         expect(new Headers(init?.headers).get("cookie")).toBe("wos-session=opaque");
-        return new Response("<h2>Cloud Usage</h2><h3>Weekly</h3><span>20% used</span>");
+        return new Response("<span>Cloud Usage</span><span>Pro</span><div>Weekly usage</div><span>20% used</span>");
       },
     });
     expect(result.session.cookie).toBe("wos-session=opaque");
@@ -191,7 +179,7 @@ describe("provider usage adapters", () => {
 
 describe("Ollama account usage", () => {
   const login: OllamaAccountLogin = { username: "person@example.test", password: "fixture-password" };
-  const okPage = () => new Response("<h2>Cloud Usage</h2><h3>Weekly</h3><span>20% used</span>");
+  const okPage = () => new Response("<span>Cloud Usage</span><span>Pro</span><div>Weekly usage</div><span>20% used</span>");
   const expiredPage = () => new Response(null, { status: 302, headers: { location: "/signin" } });
   function harness(options: { cookies: Array<string | null>; pages: Array<() => Response>; signIn?: () => Promise<void> }) {
     const state = { signIns: 0, reads: 0, fetches: 0 };

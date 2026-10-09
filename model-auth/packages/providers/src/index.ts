@@ -5,6 +5,7 @@ export * from "./anthropic.js";
 export * from "./grok.js";
 export * from "./client-versions.js";
 export * from "./ollama.js";
+export * from "./opencode.js";
 export * from "./usage.js";
 export * from "./capabilities.js";
 export * from "./pi.js";

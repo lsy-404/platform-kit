@@ -67,21 +67,21 @@ Model discovery returns the account's actual service metadata. `streamTrae` and 
 
 ## Structured usage windows
 
-Every `ProviderUsageWindow` carries `scope` (`account`, `model-family` or `model`), normalized `modelFamilies`, `status` (`known`, `unknown` or `exhausted`), `usedRatio` (0..1, null when unknown), `reliability` (`high`, or `low` for scraped sources such as Ollama) and `resetAt`. Providers fill these fields themselves, so consumers never infer scope from labels. `kind` (`session`, `daily`, `weekly`, `monthly` or null) is derived from the window duration. A window is `exhausted` only when the service reports it (limit flags, lock reasons or severity), never from a percentage alone. A window the provider lists without usage data is reported with status `unknown` rather than omitted. Use `usageWindow` to build windows and `normalizeModelFamilyId` to normalize ids.
+Every `ProviderUsageWindow` carries `scope` (`account`, `model-family` or `model`), normalized `modelFamilies`, `status` (`known`, `unknown` or `exhausted`), `usedRatio` (0..1, null when unknown), `reliability` (`high`, or `low` for estimated sources) and `resetAt`. Providers fill these fields themselves, so consumers never infer scope from labels. `kind` (`session`, `daily`, `weekly`, `monthly` or null) is derived from the window duration. A window is `exhausted` only when the service reports it (limit flags, lock reasons or severity), never from a percentage alone. A window the provider lists without usage data is reported with status `unknown` rather than omitted. Use `usageWindow` to build windows and `normalizeModelFamilyId` to normalize ids.
 
 ## Usage requests and errors
 
-Usage queries retry transient network failures twice, never retry 429, call the host-supplied `refresh` once after a 401 or 403, honor `signal`, and never follow redirects. Failures carry `errorCode` (`signed-out`, `rate-limited`, `server-error`, `unreadable`, `unreachable`, `no-limits`); `usageErrorSnapshot` builds an error snapshot that hosts can merge with `mergeUsageReading` from core. Anthropic profile metadata is cached for six hours per credential, failures included.
+Usage queries retry transient network failures twice, never retry 429, call the host-supplied `refresh` once after a 401 or 403, honor `signal`, and never follow redirects (the cookie-based Ollama settings query is the one exception, described below). Failures carry `errorCode` (`signed-out`, `rate-limited`, `server-error`, `unreadable`, `unreachable`, `no-limits`); `usageErrorSnapshot` builds an error snapshot that hosts can merge with `mergeUsageReading` from core. Anthropic profile metadata is cached for six hours per credential, failures included.
 
 `authorizeOpenAI` switches to the device code flow when the loopback port is taken and `notify` is supplied, reporting the code through a `device_code` notice.
 
-## Ollama API key usage
+## OpenCode Go usage
 
-`queryOllamaKeyUsage(apiKey, options)` reads account quota from `https://ollama.com/api/usage` with a Bearer API key. `parseOllamaKeyUsage` reads the reported session, weekly or monthly ratios. Missing plan, balance, reset date and duration stay unknown. This endpoint is not documented by Ollama.
+`queryOpencodeGoKeyUsage(apiKey, options)` reads the Go subscription quota from `https://opencode.ai/zen/go/v1/usage` with a Bearer API key. `parseOpencodeGoUsage` maps the `rolling`, `weekly` and `monthly` windows to session, weekly and monthly usage with their reset times, and the plan is reported as `Go`. A payload without both the session and weekly windows is unreadable. A 403 carrying the `EntitlementError` body means the key has no Go subscription and yields an `unknown` snapshot with `no-limits`; any other 403 is a `server-error`. Window lengths are the documented 5 hours, 7 days and 30 days; dollar limits are not reported by the endpoint and stay unknown.
 
 ## Ollama web session and usage
 
-`authorizeOllamaWeb` opens `ollama.com/signin`, waits for the host to observe the authenticated browser cookie, and verifies the session by reading the first-party settings page. `queryOllamaUsage` and `parseOllamaSettings` expose plan and usage information without returning the cookie. The cookie callback and persistence remain host-owned.
+`authorizeOllamaWeb` opens `ollama.com/signin`, waits for the host to observe the authenticated browser cookie, and verifies the session by reading the first-party settings page. `queryOllamaUsage` and `parseOllamaSettings` read the Cloud Usage section of that page without returning the cookie: the plan name exactly as shown, the account email as `identity`, and the session (5 hours) and weekly (7 days) windows with their percentages and reset times. Only one short window is reported: the first of Session or Hourly (1 hour) on the page. `queryOllamaUsage` follows up to four HTTPS redirects within `ollama.com` and sends the cookie nowhere else; redirects to the sign-in pages report `signed-out`, as do 401 and 403 responses and signed-out settings pages, and any other redirect target is a `server-error`. A signed-in page that shows the account email but no meters yields an `unknown` snapshot with `no-limits`. The cookie callback and persistence remain host-owned.
 
 ## Dynamic authentication and generic requests
 
