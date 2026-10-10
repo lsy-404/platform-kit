@@ -22,7 +22,7 @@ afterEach(() => { for (const app of mounted) app.unmount(); mounted = []; docume
 
 async function mount(extra: Record<string, unknown> = {}, slots?: Record<string, (...args: any[]) => any>) {
   const host = document.createElement("div"); document.body.append(host);
-  const state = reactive({ open: true, providers: fixtures(), busy: false, error: null as string | null, ...extra });
+  const state = reactive({ open: true, providers: fixtures(), busy: false, error: null as string | null, catalogStatus: { state: "ready", source: "models.dev", checkedAt: "2000-01-01T00:00:00.000Z" }, ...extra });
   const events: { name: string; payload: unknown }[] = [];
   const on = (name: string) => (...payload: unknown[]) => events.push({ name, payload: payload.length === 1 ? payload[0] : payload });
   const app = createApp(() => h(ModelAuthDialog, {
@@ -32,7 +32,6 @@ async function mount(extra: Record<string, unknown> = {}, slots?: Record<string,
     onRemoveApiKey: on("remove"),
     onQueryUsage: on("usage"), onRespondAuth: on("respond-auth"), onCancelAuth: on("cancel-auth"), onOpenAuthUrl: on("open-auth-url"),
     onReconnectOauth: (...payload: unknown[]) => { state.busy = true; on("reconnect-oauth")(...payload); },
-    catalogStatus: { state: "ready", source: "models.dev", checkedAt: "2000-01-01T00:00:00.000Z" },
   }, slots));
   mounted.push(app); app.mount(host); await nextTick(); await nextTick();
   return { state, events, host };
@@ -621,6 +620,14 @@ describe("provider picker groups", () => {
     await fill('[data-part="search"]', "no-such-provider");
     expect(rows("oauth")).toEqual([]);
     await click('[data-part="refresh-catalog"]');
+    expect(events.at(-1)?.name).toBe("refresh");
+  });
+
+  it("offers catalog refresh in the error status line while providers are listed", async () => {
+    const { events } = await mount({ catalogStatus: { state: "error", error: "catalog failed" } });
+    expect(rows("oauth").length).toBeGreaterThan(0);
+    expect(get('[data-part="catalog-status"]').textContent).toContain("catalog failed");
+    await click('[data-part="catalog-status"] [data-part="refresh-catalog"]');
     expect(events.at(-1)?.name).toBe("refresh");
   });
 

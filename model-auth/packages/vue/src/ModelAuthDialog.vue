@@ -515,7 +515,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
             <ModelAuthIcon name="search" class="model-auth-search-icon" />
             <input ref="searchInput" v-model="search" class="model-auth-search" part="search" data-part="search" type="search" :placeholder="text.search" :aria-label="text.search" autocomplete="off" @keydown="handleProviderKeydown" />
           </div>
-          <p v-if="catalogStatus.error || catalogStatus.state === 'error'" class="model-auth-error" part="catalog-status" data-part="catalog-status" role="status">{{ catalogStatus.error || text.catalogUnavailable }}</p>
+          <p v-if="catalogStatus.error || catalogStatus.state === 'error'" class="model-auth-error" part="catalog-status" data-part="catalog-status" role="status">{{ catalogStatus.error || text.catalogUnavailable }} <button v-if="providerGroups.length" type="button" class="model-auth-subtle" data-part="refresh-catalog" @click="emit('refresh-catalog')">{{ text.refreshCatalog }}</button></p>
           <div class="model-auth-provider-list" part="provider-list">
             <section v-for="group in providerGroups" :key="group.key" class="model-auth-provider-group" :data-part="group.key + '-group'" :aria-label="group.label">
               <h3 class="model-auth-group-label">{{ group.label }}</h3>
