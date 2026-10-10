@@ -531,7 +531,7 @@ it("separated authentication does not add a choice page to an existing connectio
 });
 
 describe("provider picker groups", () => {
-  const english = { signIn: "Sign in", apiKey: "API key", unavailable: "Unavailable", showAll: "Show all ({count})", noProviders: "No matching providers" };
+  const english = { signIn: "Sign in", apiKey: "API key", unavailable: "Unavailable", showAll: "Show all ({count})", showLess: "Show less", noProviders: "No matching providers" };
   const entry = (id: string, authMethods: ModelAuthProvider["authMethods"], extra: Partial<ModelAuthProvider> = {}): ModelAuthProvider =>
     ({ id, name: id, description: "", authMethods, available: true, models: [], ...extra });
   const rows = (group: string) => [...document.querySelectorAll<HTMLElement>('[data-part="' + group + '-group"] .model-auth-provider-row')].map(row => row.dataset.providerId);
@@ -559,11 +559,34 @@ describe("provider picker groups", () => {
 
   it("shows eight entries per group and reveals the rest on request", async () => {
     await mount({ messages: english, providers: keyProviders(12) });
-    expect(rows("api-key")).toHaveLength(8);
+    expect(rows("api-key")).toEqual(Array.from({ length: 8 }, (_, index) => "key-" + (index + 1)));
     const toggle = get('[data-part="group-toggle"][data-group="api-key"]');
     expect(toggle.textContent).toBe("Show all (12)");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
     await click('[data-part="group-toggle"][data-group="api-key"]');
     expect(rows("api-key")).toHaveLength(12);
+    expect(get('[data-part="group-toggle"][data-group="api-key"]').textContent).toBe("Show less");
+    expect(get('[data-part="group-toggle"][data-group="api-key"]').getAttribute("aria-expanded")).toBe("true");
+    await click('[data-part="group-toggle"][data-group="api-key"]');
+    expect(rows("api-key")).toHaveLength(8);
+  });
+
+  it("drops the keyboard highlight when expanding a group moves the entries under it", async () => {
+    const oauthProviders = Array.from({ length: 10 }, (_, index) => entry("sign-" + (index + 1), ["oauth"]));
+    await mount({ providers: [...oauthProviders, entry("key-a", ["api-key"]), entry("key-b", ["api-key"])] });
+    keydown("End"); await nextTick();
+    expect(get(".model-auth-provider-row.focused").dataset.providerId).toBe("key-b");
+    await click('[data-part="group-toggle"][data-group="oauth"]');
+    expect(document.querySelector(".model-auth-provider-row.focused")).toBeNull();
+  });
+
+  it("drops the keyboard highlight when the provider list shrinks under it", async () => {
+    const { state } = await mount({ providers: keyProviders(8) });
+    keydown("End"); await nextTick();
+    expect(get(".model-auth-provider-row.focused").dataset.providerId).toBe("key-8");
+    state.providers = keyProviders(3); await nextTick();
+    state.providers = keyProviders(8); await nextTick();
+    expect(document.querySelector(".model-auth-provider-row.focused")).toBeNull();
   });
 
   it("does not truncate while searching and offers no toggle", async () => {

@@ -118,7 +118,7 @@ const providerGroups = computed(() => {
   });
 });
 const orderedProviders = computed(() => providerGroups.value.flatMap(group => group.providers));
-function toggleGroup(key: string) { expandedGroups[key] = !expandedGroups[key]; }
+function toggleGroup(key: string) { expandedGroups[key] = !expandedGroups[key]; focusedProviderIndex.value = -1; }
 const credentials = computed<ProviderCredential[]>(() => {
   const provider = selectedProvider.value;
   return (method.value === "oauth" ? provider?.oauthCredentials : provider?.apiKeyCredentials) ?? [];

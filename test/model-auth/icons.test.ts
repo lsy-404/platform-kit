@@ -36,6 +36,11 @@ describe("model auth control icons", () => {
     expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([181, 256]);
   });
 
+  it("embeds a raster image only for the Ollama providers", () => {
+    const ids = ["ollama", "ollama-cloud", "opencode", "opencode-go", "openai", "anthropic", "github-copilot", "google", "mistral", "deepseek"];
+    expect(ids.filter(id => builtinProviderIcon(id)?.includes("data:image"))).toEqual(["ollama", "ollama-cloud"]);
+  });
+
   it("styles icons with fill instead of strokes", () => {
     const css = readFileSync(resolve(src, "style.css"), "utf8");
     expect(css).not.toMatch(/\.model-auth-icon\s*\{[^}]*stroke/);
