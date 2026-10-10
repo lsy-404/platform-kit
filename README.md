@@ -5,6 +5,7 @@ Apache-2.0 theme and public AI access packages, distributed directly through thi
 | Package | Contents |
 | --- | --- |
 | `@platform-kit/fluent` | Native Fluent themes, Vue controls, navigation and overlays |
+| `@platform-kit/visual-center` | Background-aware pixel/SVG centroid estimates; [usage](tooling/visual-center/README.md) |
 | `@platform-kit/ui-tokens` | Lightweight CSS theme variables |
 | `@platform-kit/appearance-check` | Development-time appearance checks with stable IDs, CLI and Vite build warnings; [usage](tooling/appearance-check/README.md) |
 | `@model-auth/core` | Framework-neutral provider access, credential routing, authentication interaction and usage contracts |

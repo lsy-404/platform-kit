@@ -41,3 +41,19 @@ test("local gradients and clipped paths work while external or active content is
   }
   await assert.rejects(()=>measure(svg('<rect/>'),{color:'red;fill:url(https://example.invalid/image.svg)'}));
 });
+
+test("scales intrinsic SVG coordinates consistently and preserves authored color", async () => {
+  const withoutViewBox = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" color="white"><rect x="4" y="4" width="8" height="8" fill="currentColor"/></svg>';
+  const result = await measure(withoutViewBox,{background:"black"});
+  assert.deepEqual(result.bounds,{x:8,y:8,width:16,height:16});
+  assert.equal(result.status,"estimated");
+  const white = await measure(withoutViewBox,{background:"white"});
+  assert.equal(white.status,"no-contrast");
+  await assert.rejects(()=>measure('<svg xmlns="http://www.w3.org/2000/svg"><path/></svg>'), /viewBox|intrinsic/);
+});
+
+test("accepts inline SVG markup without an explicit namespace and keeps the same measured geometry", async () => {
+  const result = await measure('<svg viewBox="0 0 32 32"><rect x="4" y="8" width="16" height="8"/></svg>');
+  assert.deepEqual(result.bounds,{x:4,y:8,width:16,height:8});
+  assert(result.svg.includes('xmlns="http://www.w3.org/2000/svg"'));
+});

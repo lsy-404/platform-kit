@@ -6,6 +6,7 @@ on:
       - 'fluent-v*'
       - 'ui-tokens-v*'
       - 'appearance-check-v*'
+      - 'visual-center-v*'
       - 'model-auth-core-v*'
       - 'model-auth-providers-v*'
       - 'model-auth-vue-v*'
@@ -38,6 +39,7 @@ jobs:
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm run test:appearance
+      - run: pnpm run test:visual-center
       - run: node test/fluent-selection.browser.mjs
       - run: node test/fluent-catalog.browser.mjs
       - run: node test/fluent-dark.browser.mjs
@@ -45,6 +47,7 @@ jobs:
       - run: pnpm run pack:release
       - run: node test/release-consumer.mjs
       - run: node --test test/appearance-consumer.mjs
+      - run: node --test test/visual-center-consumer.mjs
       - run: docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1 git /repo --redact=100 --no-banner
       - uses: actions/upload-artifact@v4
         with:
@@ -72,6 +75,7 @@ jobs:
         run: |
           case "$RELEASE_TAG" in
             fluent-v*) PACKAGE_DIR="platform-kit-fluent"; PACKAGE_LABEL="@platform-kit/fluent" ;;
+            visual-center-v*) PACKAGE_DIR="platform-kit-visual-center"; PACKAGE_LABEL="@platform-kit/visual-center" ;;
             appearance-check-v*) PACKAGE_DIR="platform-kit-appearance-check"; PACKAGE_LABEL="@platform-kit/appearance-check" ;;
             ui-tokens-v*) PACKAGE_DIR="platform-kit-ui-tokens"; PACKAGE_LABEL="@platform-kit/ui-tokens" ;;
             model-auth-core-v*) PACKAGE_DIR="model-auth-core"; PACKAGE_LABEL="@model-auth/core" ;;

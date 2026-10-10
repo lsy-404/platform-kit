@@ -14,7 +14,12 @@ export interface SvgMeasurement extends CenterMeasurement {
 
 export function prepareSvg(source: string, options: Pick<SvgOptions, "width" | "height" | "color"> = {}): string {
   if (source.length > 1_048_576 || /<!DOCTYPE|<!ENTITY/i.test(source)) throw new Error("Expected a standalone SVG smaller than 1 MB without document entities");
-  const document = new DOMParser().parseFromString(source, "image/svg+xml");
+  const parser = new DOMParser();
+  let document = parser.parseFromString(source, "image/svg+xml");
+  if (document.documentElement.localName === "svg" && !document.documentElement.namespaceURI) {
+    document.documentElement.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    document = parser.parseFromString(new XMLSerializer().serializeToString(document), "image/svg+xml");
+  }
   const root = document.documentElement;
   if (document.querySelector("parsererror") || root.localName !== "svg" || root.namespaceURI !== "http://www.w3.org/2000/svg") throw new Error("Invalid SVG document");
   for (const element of [root, ...root.querySelectorAll("*")]) {
@@ -27,11 +32,21 @@ export function prepareSvg(source: string, options: Pick<SvgOptions, "width" | "
     if (element.localName === "style") checkCss(element.textContent ?? "");
   }
   if (options.color !== undefined && (!CSS.supports("color", options.color) || /var\(|currentcolor|inherit|initial|unset|revert/i.test(options.color))) throw new Error("SVG color must be a resolved CSS color");
+  if (!root.hasAttribute("viewBox")) {
+    const lengths = [root.getAttribute("width"), root.getAttribute("height")].map(value => value && /^\d+(?:\.\d+)?(?:px)?$/.test(value.trim()) ? parseFloat(value) : NaN);
+    if (!lengths.every(value => Number.isFinite(value) && value > 0)) throw new Error("SVG requires a viewBox or absolute intrinsic width and height");
+    root.setAttribute("viewBox", "0 0 " + lengths.join(" "));
+  }
+  const viewBox = root.getAttribute("viewBox")!.trim().split(/[\s,]+/).map(Number);
+  if (viewBox.length !== 4 || !viewBox.every(Number.isFinite) || viewBox[2]! <= 0 || viewBox[3]! <= 0) throw new Error("Invalid SVG viewBox");
   const width = options.width ?? 32, height = options.height ?? 32;
   if (![width,height].every(value => Number.isFinite(value) && value > 0 && value <= 2048)) throw new Error("SVG viewport must be between 0 and 2048 pixels");
   root.setAttribute("width", String(width));
   root.setAttribute("height", String(height));
-  root.setAttribute("style", (root.getAttribute("style") ?? "") + ";width:" + width + "px;height:" + height + "px;color:" + (options.color ?? "black"));
+  const style = (root as unknown as SVGSVGElement).style;
+  style.setProperty("width", width + "px", "important");
+  style.setProperty("height", height + "px", "important");
+  if (options.color !== undefined) style.setProperty("color", options.color, "important");
   return new XMLSerializer().serializeToString(document);
 }
 

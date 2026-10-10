@@ -35,7 +35,7 @@ describe("visual center measurement", () => {
     expect(analyzePixels(image(1,1,[ink]),{background:"black"})).toMatchObject({status:"no-contrast",bounds:{x:0,y:0,width:1,height:1},center:null,offset:null});
   });
 
-  it("preserves reflection symmetry across many asymmetric alpha masks", () => {
+  it("preserves reflection and translation across many asymmetric alpha masks", () => {
     fc.assert(fc.property(fc.array(fc.integer({min:1,max:255}),{minLength:1,maxLength:30}), values => {
       const pixels = values.map(alpha => [10,40,90,alpha] as [number,number,number,number]);
       const a = analyzePixels(image(values.length,1,pixels),{background:"white"});
@@ -43,6 +43,8 @@ describe("visual center measurement", () => {
       expect(a.center!.x + b.center!.x).toBeCloseTo(values.length, 8);
       expect(a.center!.y).toBeCloseTo(0.5, 8);
       expect(a.offset!.x + b.offset!.x).toBeCloseTo(0, 8);
+      const shifted = analyzePixels(image(values.length + 3,1,[clear,clear,clear,...pixels]),{background:"white"});
+      expect(shifted.center!.x).toBeCloseTo(a.center!.x + 3, 8);
     }),{numRuns:100});
   });
 

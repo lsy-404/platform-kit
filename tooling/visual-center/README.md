@@ -19,7 +19,7 @@ const measurement = await measureSvg(svgSource, {
 
 `status` is `estimated`, `empty` or `no-contrast`. Empty and zero-contrast images have no proposed center or offset. `paintTouchesViewport` flags paint at the sampling edge; content already clipped by the source viewport cannot be recovered. `sampleScale` defaults to 4 and accepts 1–8. Sampling is limited to four megapixels.
 
-The SVG entry accepts self-contained, static SVGs with local definitions and embedded raster images. External resources, active content and animations are rejected. `color` must be resolved; pass the actual foreground and background for each theme. SVG measurements return the sized `svg` that was rendered, for consistent display. Arbitrary CSS from a host document and external fonts are not captured. Native image/canvas decoding can supply RGBA for PNG or other formats.
+The SVG entry requires a valid `viewBox` or absolute pixel width and height. It accepts self-contained, static SVGs with local definitions and embedded raster images. External resources, active content and animations are rejected. `color` must be resolved; pass the actual foreground and background for each theme. SVG measurements return the sized `svg` that was rendered, for consistent display. Arbitrary CSS from a host document and external fonts are not captured. Native image/canvas decoding can supply RGBA for PNG or other formats.
 
 ## Model and limits
 

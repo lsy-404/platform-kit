@@ -9,6 +9,7 @@ const targets = [
   "styles/fluent",
   "styles/ui-tokens",
   "tooling/appearance-check",
+  "tooling/visual-center",
   "model-auth/packages/core",
   "model-auth/packages/providers",
   "model-auth/packages/vue",
