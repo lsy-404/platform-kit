@@ -1,4 +1,4 @@
-import { classifyUsageHttp } from "@model-auth/core";
+import { classifyUsageHttp, parseRetryAfter } from "@model-auth/core";
 import { UsageRequestError, quotaWindow, usageSnapshot, type ProviderUsageData, type ProviderUsageRequestOptions, type ProviderUsageSnapshot, type ProviderUsageWindow } from "./usage.js";
 
 export const OLLAMA_WEB_ENDPOINTS = Object.freeze({
@@ -97,8 +97,9 @@ const MAX_REDIRECTS = 4;
 
 export async function queryOllamaUsage(options: OllamaUsageRequestOptions = {}): Promise<ProviderUsageSnapshot> {
   const credentialId = options.credentialId ?? "ollama-web";
-  const failure = (error: string, errorCode: NonNullable<ProviderUsageSnapshot["errorCode"]>) => usageSnapshot("ollama-cloud", credentialId, {
+  const failure = (error: string, errorCode: NonNullable<ProviderUsageSnapshot["errorCode"]>, retryAfterMs?: number | null) => usageSnapshot("ollama-cloud", credentialId, {
     status: "error", plan: null, windows: [], balance: null, error, errorCode,
+    ...(retryAfterMs != null ? { retryAfterMs } : {}),
   });
   const cookie = options.cookie?.trim();
   if (!cookie) return failure(SESSION_MISSING, "signed-out");
@@ -109,7 +110,9 @@ export async function queryOllamaUsage(options: OllamaUsageRequestOptions = {}):
     if (response.status === 0 || response.type === "opaqueredirect") return failure("Ollama settings request failed (redirect).", "server-error");
     if (response.status === 401 || response.status === 403) return failure(SESSION_EXPIRED, "signed-out");
     const code = classifyUsageHttp(response.status);
-    if (code !== "ok") return failure(`Ollama settings request failed (${response.status}).`, code === "signed-out" ? "server-error" : code);
+    if (code !== "ok") {
+      return failure(`Ollama settings request failed (${response.status}).`, code === "signed-out" ? "server-error" : code, parseRetryAfter(response.headers.get("retry-after")));
+    }
     const finalUrl = parseUrl(response.url);
     if (finalUrl && isOllamaAuthUrl(finalUrl)) return failure(SESSION_EXPIRED, "signed-out");
     const html = await response.text();

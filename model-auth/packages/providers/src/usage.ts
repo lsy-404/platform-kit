@@ -79,6 +79,7 @@ export interface ProviderUsageData {
   readonly identity?: string | null;
   readonly error?: string | null;
   readonly errorCode?: ProviderUsageErrorCode | null;
+  readonly retryAfterMs?: number;
 }
 
 export interface ProviderUsageRequestOptions {
@@ -135,6 +136,7 @@ export function usageSnapshot(providerId: string, credentialId: string, data: Pr
     fetchedAtUtc: new Date().toISOString(),
     error: data.error ?? null,
     errorCode: data.errorCode ?? (status === "unknown" ? "no-limits" : null),
+    ...(data.retryAfterMs !== undefined ? { retryAfterMs: data.retryAfterMs } : {}),
   };
 }
 
@@ -152,11 +154,18 @@ export class UsageRequestError extends Error {
   }
 }
 
-/** Error snapshot for a failed query; hosts merge it with the last good reading. */
-export function usageErrorSnapshot(providerId: string, credentialId: string, error: unknown): ProviderUsageSnapshot {
+/**
+ * Error snapshot for a failed query; hosts merge it with the last good reading.
+ * Pass the identity of the credential's last reading so that merge never crosses accounts.
+ */
+export function usageErrorSnapshot(providerId: string, credentialId: string, error: unknown, identity?: string | null): ProviderUsageSnapshot {
   const code: ProviderUsageErrorCode = error instanceof UsageRequestError ? error.code : "unreachable";
   const message = error instanceof Error ? error.message : "Usage request failed.";
-  return usageSnapshot(providerId, credentialId, { status: "error", plan: null, windows: [], balance: null, error: message, errorCode: code });
+  return usageSnapshot(providerId, credentialId, {
+    status: "error", plan: null, windows: [], balance: null, error: message, errorCode: code,
+    ...(error instanceof UsageRequestError && error.retryAfterMs !== undefined ? { retryAfterMs: error.retryAfterMs } : {}),
+    ...(identity ? { identity } : {}),
+  });
 }
 
 type Json = Record<string, unknown>;
@@ -684,7 +693,10 @@ export async function queryClaudePrepaidCredits(options: ClaudePrepaidRequestOpt
       throw new UsageRequestError("unreachable", signal.aborted ? "Claude prepaid request was cancelled." : "Claude prepaid request failed.");
     }
     const code = classifyUsageHttp(response.status);
-    if (code !== "ok") throw new UsageRequestError(code, `Claude prepaid request failed (${response.status}).`, response.status);
+    if (code !== "ok") {
+      const retryAfter = parseRetryAfter(response.headers.get("retry-after"));
+      throw new UsageRequestError(code, `Claude prepaid request failed (${response.status}).`, response.status, retryAfter ?? undefined);
+    }
     try { return await response.json(); } catch { throw new UsageRequestError("unreadable", "Claude prepaid response is not valid JSON.", response.status); }
   };
   try {
@@ -702,7 +714,7 @@ export async function queryClaudePrepaidCredits(options: ClaudePrepaidRequestOpt
     return usageSnapshot("anthropic", credentialId, { status: "ok", plan: null, windows: [], balance: { amount: minor / 100, unit, funded } });
   } catch (error) {
     if (error instanceof UsageRequestError) {
-      return usageSnapshot("anthropic", credentialId, { status: "error", plan: null, windows: [], balance: null, error: error.message, errorCode: error.code });
+      return usageErrorSnapshot("anthropic", credentialId, error);
     }
     return usageSnapshot("anthropic", credentialId, { status: "error", plan: null, windows: [], balance: null, error: "Claude prepaid request failed.", errorCode: "unreachable" });
   }

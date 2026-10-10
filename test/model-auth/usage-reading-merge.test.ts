@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { usageErrorSnapshot, UsageRequestError } from "../../model-auth/packages/providers/src/usage.js";
 import { mergeUsageReading, type ProviderUsageSnapshot, type ProviderUsageWindow } from "../../model-auth/packages/core/src/index.js";
 
 const NOW = Date.parse("2030-01-10T12:00:00Z");
@@ -74,5 +75,17 @@ describe("mergeUsageReading keeps the last valid reading", () => {
   it("returns a successful reading as is", () => {
     const next = reading({ fetchedAtUtc: new Date(NOW).toISOString() });
     expect(mergeUsageReading(reading(), next, NOW)).toBe(next);
+  });
+});
+
+describe("mergeUsageReading with failures built by the providers package", () => {
+  it("carries Retry-After from the failure onto the merged reading", () => {
+    const failed = usageErrorSnapshot("anthropic", "c1", new UsageRequestError("rate-limited", "429", 429, 600_000));
+    expect(mergeUsageReading(reading(), failed, NOW)).toMatchObject({ stale: true, retryAfterMs: 600_000 });
+  });
+
+  it("does not merge across identities when the failure is given the expected one", () => {
+    expect(mergeUsageReading(reading(), usageErrorSnapshot("anthropic", "c1", new UsageRequestError("rate-limited", "429"), "org-2"), NOW).stale).toBeUndefined();
+    expect(mergeUsageReading(reading(), usageErrorSnapshot("anthropic", "c1", new UsageRequestError("rate-limited", "429"), "org-1"), NOW).stale).toBe(true);
   });
 });

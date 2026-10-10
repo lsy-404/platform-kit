@@ -12,6 +12,8 @@ describe("normalizeCodexPlan multipliers", () => {
     ["pro_5x", "pro", 5],
     ["pro_10x", "pro", 10],
     ["pro-25x", "pro", 25],
+    ["pro_10x_usage_based", "pro", 10],
+    ["Pro-25x-Usage-Based", "pro", 25],
     ["go", "go", null],
     ["plus", "plus", null],
     ["team", "business", null],
@@ -26,6 +28,8 @@ describe("normalizeCodexPlan multipliers", () => {
   it("leaves a nonsensical multiplier as an unknown plan name", () => {
     expect(normalizeCodexPlan("pro_0x")).toMatchObject({ plan: "pro_0x", multiplier: null });
     expect(normalizeCodexPlan("pro_101x")).toMatchObject({ plan: "pro_101x", multiplier: null });
+    expect(normalizeCodexPlan("pro_0x_usage_based")).toMatchObject({ plan: "pro_0x_usage_based", multiplier: null });
+    expect(normalizeCodexPlan("professional_10x")).toMatchObject({ plan: "professional_10x", multiplier: null });
   });
 
   it("still drops an email", () => {

@@ -1,3 +1,4 @@
+import { parseRetryAfter } from "@model-auth/core";
 import { quotaWindow, usageSnapshot, type ProviderUsageData, type ProviderUsageRequestOptions, type ProviderUsageSnapshot, type ProviderUsageWindow } from "./usage.js";
 
 export const OPENCODE_GO_USAGE_URL = "https://opencode.ai/zen/go/v1/usage";
@@ -36,8 +37,9 @@ export function parseOpencodeGoUsage(payload: unknown): ProviderUsageData {
 export async function queryOpencodeGoKeyUsage(apiKey: string, options: ProviderUsageRequestOptions = {}): Promise<ProviderUsageSnapshot> {
   options.signal?.throwIfAborted();
   const credentialId = options.credentialId ?? "opencode-go-key";
-  const failure = (error: string, errorCode: NonNullable<ProviderUsageSnapshot["errorCode"]>) => usageSnapshot("opencode-go", credentialId, {
+  const failure = (error: string, errorCode: NonNullable<ProviderUsageSnapshot["errorCode"]>, retryAfterMs?: number | null) => usageSnapshot("opencode-go", credentialId, {
     status: "error", plan: null, windows: [], balance: null, error, errorCode,
+    ...(retryAfterMs != null ? { retryAfterMs } : {}),
   });
   if (typeof apiKey !== "string" || !apiKey.trim()) return failure("An OpenCode Go API key is required.", "signed-out");
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
@@ -57,8 +59,9 @@ export async function queryOpencodeGoKeyUsage(apiKey: string, options: ProviderU
       return failure("OpenCode Go usage request failed (403).", "server-error");
     }
     if (response.status === 401) return failure("OpenCode Go usage request was rejected (401).", "signed-out");
-    if (response.status === 429) return failure("OpenCode Go usage request was rate limited (429).", "rate-limited");
-    if (response.status !== 200) return failure(`OpenCode Go usage request failed (${response.status}).`, "server-error");
+    const retryAfter = parseRetryAfter(response.headers.get("retry-after"));
+    if (response.status === 429) return failure("OpenCode Go usage request was rate limited (429).", "rate-limited", retryAfter);
+    if (response.status !== 200) return failure(`OpenCode Go usage request failed (${response.status}).`, "server-error", retryAfter);
     let data: ProviderUsageData;
     try { data = parseOpencodeGoUsage(await response.json()); }
     catch { signal.throwIfAborted(); return failure("OpenCode Go usage response is unreadable.", "unreadable"); }

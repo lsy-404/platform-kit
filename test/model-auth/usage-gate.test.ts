@@ -43,6 +43,27 @@ describe("parseRetryAfter (RFC 9110 section 10.2.3)", () => {
   it("rejects anything else", () => {
     for (const value of ["abc", "", "   ", "-5", "1.5", "5s", "1e3", null, undefined]) expect(parseRetryAfter(value, now), String(value)).toBeNull();
   });
+
+  it("rejects weekday-prefixed text that is not one of the three HTTP-date formats", () => {
+    for (const value of [
+      "Mon, 1", "Monday 5", "Sun foo 2030", "Sun, 06 Nov 1994 08:51:07", "Sun, 6 Nov 1994 08:51:07 GMT",
+      "Sat, 31 Feb 2026 00:00:00 GMT", "Sun, 06 Nov 1994 25:00:00 GMT", "Sun, 06 Nov 1994 08:51:07 PST",
+      "Sunday, 06 Nov 1994 08:51:07 GMT", "Sun, 06-Nov-94 08:51:07 GMT",
+    ]) expect(parseRetryAfter(value, now), value).toBeNull();
+  });
+
+  it("reads the obsolete rfc850 and asctime dates as UTC", () => {
+    expect(parseRetryAfter("Sunday, 06-Nov-94 08:51:07 GMT", now)).toBe(90_000);
+    expect(parseRetryAfter("Sun Nov  6 08:51:07 1994", now)).toBe(90_000);
+    expect(parseRetryAfter("Sun Nov 06 08:51:07 1994", now)).toBe(90_000);
+    expect(parseRetryAfter("Sun Nov  6 08:00:00 1994", now)).toBe(0);
+  });
+
+  it("reads a two-digit rfc850 year as the nearest year within fifty years ahead", () => {
+    const later = Date.parse("2026-10-10T00:00:00Z");
+    expect(parseRetryAfter("Saturday, 10-Oct-26 00:01:30 GMT", later)).toBe(90_000);
+    expect(parseRetryAfter("Sunday, 06-Nov-94 08:51:07 GMT", later)).toBe(0);
+  });
 });
 
 describe("createUsageGate", () => {
@@ -115,6 +136,40 @@ describe("createUsageGate", () => {
     expect(result.retryAt).toBeGreaterThanOrEqual(START + 300_000);
     expect(result.retryAt).toBeLessThanOrEqual(START + 305_000);
     expect((await gate.run("b", { providerId: "p", reason: "credential-changed" }, async () => 1)).ran).toBe(false);
+  });
+
+  it("counts one burst of concurrent failures as a single step of the backoff", async () => {
+    const { gate } = setup();
+    await Promise.allSettled([1, 2, 3, 4].map((id) => gate.run(`c${id}`, { providerId: "p", reason: "timer" }, () => fail(rateLimited()))));
+    const blocked = await gate.run("d", { providerId: "p", reason: "manual" }, async () => 1);
+    expect(blocked.retryAt).toBeGreaterThanOrEqual(START + 60_000);
+    expect(blocked.retryAt).toBeLessThanOrEqual(START + 65_000);
+  });
+
+  it("does not let a failure that carried Retry-After raise the next backoff", async () => {
+    const { gate, time } = setup();
+    await expect(gate.run("a", { providerId: "p", reason: "credential-changed" }, () => fail(rateLimited(30_000)))).rejects.toThrow();
+    time.advance(35_001);
+    const before = time.now();
+    await expect(gate.run("a", { providerId: "p", reason: "credential-changed" }, () => fail(rateLimited()))).rejects.toThrow();
+    const blocked = await gate.run("b", { providerId: "p", reason: "manual" }, async () => 1);
+    expect(blocked.retryAt! - before).toBeGreaterThanOrEqual(60_000);
+    expect(blocked.retryAt! - before).toBeLessThanOrEqual(65_000);
+  });
+
+  it("runs a credential-changed task after a read of that credential that was already queued", async () => {
+    const { gate } = setup({ lane: () => ({ concurrency: 1, minSpacingMs: 0 }) });
+    const order: string[] = [];
+    let release!: () => void;
+    const holder = gate.run("other", { providerId: "p", reason: "timer" }, () => new Promise<void>((resolve) => { release = resolve; }));
+    const queued = gate.run("a", { providerId: "p", reason: "timer" }, async () => { order.push("old credential"); return "old"; });
+    await Promise.resolve();
+    const changed = gate.run("a", { providerId: "p", reason: "credential-changed" }, async () => { order.push("new credential"); return "new"; });
+    release();
+    await holder;
+    expect(await queued).toMatchObject({ ran: true, value: "old" });
+    expect(await changed).toMatchObject({ ran: true, value: "new" });
+    expect(order).toEqual(["old credential", "new credential"]);
   });
 
   it("caps a long Retry-After at one hour plus jitter", async () => {

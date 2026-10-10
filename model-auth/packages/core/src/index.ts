@@ -805,6 +805,8 @@ export interface ProviderUsageSnapshot {
   readonly fetchedAtUtc: string;
   readonly error: string | null;
   readonly errorCode?: ProviderUsageErrorCode | null;
+  /** Server-provided Retry-After in milliseconds on a rate-limit or server failure; the usage gate backs the provider off for it. */
+  readonly retryAfterMs?: number;
   /** True when the windows come from an earlier successful reading. */
   readonly stale?: boolean;
   /** "accurate" when every window is carried as read; "estimated" when any window was rolled past its reset. */
@@ -879,7 +881,42 @@ export function mergeUsageReading(
     observedAtUtc,
     error: next.error,
     errorCode: next.errorCode ?? null,
+    ...(next.retryAfterMs !== undefined ? { retryAfterMs: next.retryAfterMs } : {}),
   };
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const SHORT_DAYS = "Mon|Tue|Wed|Thu|Fri|Sat|Sun";
+const LONG_DAYS = "Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday";
+const MONTH_NAMES = MONTHS.join("|");
+const IMF_FIXDATE = new RegExp(`^(?:${SHORT_DAYS}), (\\d{2}) (${MONTH_NAMES}) (\\d{4}) (\\d{2}):(\\d{2}):(\\d{2}) GMT$`);
+const RFC850_DATE = new RegExp(`^(?:${LONG_DAYS}), (\\d{2})-(${MONTH_NAMES})-(\\d{2}) (\\d{2}):(\\d{2}):(\\d{2}) GMT$`);
+const ASCTIME_DATE = new RegExp(`^(?:${SHORT_DAYS}) (${MONTH_NAMES}) ([ \\d]\\d) (\\d{2}):(\\d{2}):(\\d{2}) (\\d{4})$`);
+
+/** UTC time for the given fields, or null when they do not name a real date and time. */
+function utcFields(year: number, month: string, day: number, hour: number, minute: number, second: number): number | null {
+  const monthIndex = MONTHS.indexOf(month);
+  const time = Date.UTC(year, monthIndex, day, hour, minute, second);
+  const check = new Date(time);
+  return check.getUTCFullYear() === year && check.getUTCMonth() === monthIndex
+    && check.getUTCHours() === hour && check.getUTCMinutes() === minute && check.getUTCSeconds() === second ? time : null;
+}
+
+/** Parses the three HTTP-date formats of RFC 9110 section 5.6.7, all in UTC; null for anything else. */
+function parseHttpDate(text: string, now: number): number | null {
+  let match = IMF_FIXDATE.exec(text);
+  if (match) return utcFields(Number(match[3]), match[2]!, Number(match[1]), Number(match[4]), Number(match[5]), Number(match[6]));
+  match = RFC850_DATE.exec(text);
+  if (match) {
+    // A two-digit year more than 50 years ahead means the most recent past year with those digits.
+    const currentYear = new Date(now).getUTCFullYear();
+    let year = currentYear - (currentYear % 100) + Number(match[3]);
+    if (year > currentYear + 50) year -= 100;
+    return utcFields(year, match[2]!, Number(match[1]), Number(match[4]), Number(match[5]), Number(match[6]));
+  }
+  match = ASCTIME_DATE.exec(text);
+  if (match) return utcFields(Number(match[6]), match[1]!, Number(match[2]!.trim()), Number(match[3]), Number(match[4]), Number(match[5]));
+  return null;
 }
 
 /** Delay in milliseconds from a Retry-After header (RFC 9110 section 10.2.3): delay-seconds or an HTTP-date; null when unusable. */
@@ -890,9 +927,8 @@ export function parseRetryAfter(value: string | null | undefined, now: number = 
     const seconds = Number(text);
     return Number.isFinite(seconds) ? seconds * 1000 : null;
   }
-  if (!/^(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s/i.test(text)) return null;
-  const date = Date.parse(text);
-  return Number.isFinite(date) ? Math.max(0, date - now) : null;
+  const date = parseHttpDate(text, now);
+  return date === null ? null : Math.max(0, date - now);
 }
 
 export interface OAuthRenewalSlot {
@@ -1006,7 +1042,7 @@ export function createUsageGate(policy: UsageGatePolicy): UsageGate {
   const sleep = policy.sleep ?? ((ms: number) => new Promise<void>((resolve) => { setTimeout(resolve, ms); }));
   const random = policy.random ?? Math.random;
   const maxConcurrent = policy.maxConcurrent ?? Infinity;
-  const refreshGate = createRefreshGate();
+  const inflight = new Map<string, Promise<unknown>>();
   const lanes = new Map<string, UsageLane>();
   const lastStart = new Map<string, number>();
   let running = 0;
@@ -1026,12 +1062,13 @@ export function createUsageGate(policy: UsageGatePolicy): UsageGate {
     for (const resume of pending) resume();
   };
   const backingOffUntil = (lane: UsageLane): number | null => lane.retryNotBefore > now() ? lane.retryNotBefore : null;
-  const recordFailure = (lane: UsageLane, signal: UsageFailureSignal) => {
-    lane.failures += 1;
+  const recordFailure = (lane: UsageLane, signal: UsageFailureSignal, startedAt: number) => {
+    // Reads that were already in flight together count as one incident; a server-given delay does not feed the exponent.
+    if (signal.retryAfterMs === null && startedAt > lane.lastFailureAt) lane.failures += 1;
     lane.lastFailureAt = now();
     const delay = signal.retryAfterMs !== null
       ? Math.min(signal.retryAfterMs, RETRY_AFTER_CAP_MS)
-      : Math.min(BACKOFF_BASE_MS * 2 ** Math.min(lane.failures - 1, 16), BACKOFF_CAP_MS);
+      : Math.min(BACKOFF_BASE_MS * 2 ** Math.min(Math.max(lane.failures - 1, 0), 16), BACKOFF_CAP_MS);
     lane.retryNotBefore = Math.max(lane.retryNotBefore, now() + delay + random() * BACKOFF_JITTER_MS);
   };
 
@@ -1054,12 +1091,12 @@ export function createUsageGate(policy: UsageGatePolicy): UsageGate {
         value = await task();
       } catch (error) {
         const signal = usageFailureSignal(error);
-        if (signal) recordFailure(lane, signal);
+        if (signal) recordFailure(lane, signal, startedAt);
         throw error;
       }
       const signal = usageFailureSignal(value);
       if (signal) {
-        recordFailure(lane, signal);
+        recordFailure(lane, signal, startedAt);
         return { ran: true, value, retryAt: backingOffUntil(lane) };
       }
       if (startedAt > lane.lastFailureAt) {
@@ -1079,14 +1116,20 @@ export function createUsageGate(policy: UsageGatePolicy): UsageGate {
       const lane = laneOf(request.providerId);
       const blocked = backingOffUntil(lane);
       if (blocked !== null) return { ran: false, retryAt: blocked };
-      return refreshGate.run(credentialId, async () => {
+      const current = inflight.get(credentialId);
+      // A credential change must not take the result of a read that was set up with the old credential.
+      if (current && request.reason !== "credential-changed") return current as Promise<UsageGateResult<T>>;
+      const promise: Promise<UsageGateResult<T>> = (async () => {
+        if (current) await current.catch(() => undefined);
         const previous = lastStart.get(credentialId);
         if (previous !== undefined) {
           const next = previous + policy.minIntervalMs(request.providerId, request.reason);
           if (next > now()) return { ran: false, retryAt: next } as UsageGateResult<T>;
         }
         return start(credentialId, request, task);
-      });
+      })().finally(() => { if (inflight.get(credentialId) === promise) inflight.delete(credentialId); });
+      inflight.set(credentialId, promise);
+      return promise;
     },
   };
 }
@@ -1120,10 +1163,11 @@ const CODEX_PLAN_ALIASES: Readonly<Record<string, { plan: string; multiplier: nu
 export function normalizeCodexPlan(value: unknown): { plan: string | null; multiplier: number | null; tier: string | null } {
   if (typeof value !== "string" || !value.trim() || value.includes("@")) return { plan: null, multiplier: null, tier: null };
   const raw = value.trim();
-  const sized = /^pro[\s_-]*(\d{1,3})x$/i.exec(raw);
-  const sizedMultiplier = sized ? Number(sized[1]) : null;
-  if (sizedMultiplier !== null && sizedMultiplier >= 1 && sizedMultiplier <= 100) return { plan: "pro", multiplier: sizedMultiplier, tier: "pro" };
   const alias = CODEX_PLAN_ALIASES[raw.toLowerCase()];
+  if (!alias && /^pro(?![a-z0-9])/i.test(raw)) {
+    const sized = planMultiplierFromTier(raw);
+    if (sized !== null && sized >= 1 && sized <= 100) return { plan: "pro", multiplier: sized, tier: "pro" };
+  }
   const plan = alias?.plan ?? raw;
   return { plan, multiplier: alias?.multiplier ?? null, tier: plan };
 }
