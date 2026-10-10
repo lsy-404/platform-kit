@@ -1,6 +1,6 @@
 {
   "name": "@model-auth/providers",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "Host-side AI provider access, authentication, requests and usage queries.",
   "type": "module",
   "main": "./dist/index.js",
@@ -104,7 +104,7 @@
     "tough-cookie": "6.0.2"
   },
   "peerDependencies": {
-    "@model-auth/core": "^0.10.0"
+    "@model-auth/core": "^0.11.0"
   },
   "devDependencies": {
     "@model-auth/core": "workspace:*"

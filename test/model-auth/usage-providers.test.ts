@@ -252,3 +252,31 @@ describe("Ollama account usage", () => {
     expect(h.state.signIns).toBe(0);
   });
 });
+
+describe("ChatGPT plan multipliers", () => {
+  const multiplier = (payload: Record<string, unknown>) => parseCodexUsage(payload).planMultiplier;
+
+  it("accepts any integer multiplier from 1 to 100, and an explicit field wins over the plan alias", () => {
+    expect(multiplier({ plan_type: "pro", plan_multiplier: 25 })).toBe(25);
+    expect(multiplier({ plan_type: "pro", plan_multiplier: 10 })).toBe(10);
+    expect(multiplier({ plan_type: "pro", plan_multiplier: 1 })).toBe(1);
+    expect(multiplier({ plan_type: "pro", plan_multiplier: 100 })).toBe(100);
+    expect(multiplier({ plan_type: "prolite", plan_multiplier: 10 })).toBe(10);
+    expect(multiplier({ plan_type: "pro", subscription: { usage_multiplier: 25 } })).toBe(25);
+  });
+
+  it("ignores values outside 1 to 100 or that are not whole numbers, and falls back to the plan", () => {
+    for (const value of [0, -5, 101, 2.5]) {
+      expect(multiplier({ plan_type: "prolite", plan_multiplier: value }), String(value)).toBe(5);
+      expect(multiplier({ plan_type: "pro", plan_multiplier: value }), String(value)).toBeNull();
+    }
+  });
+
+  it("reports no multiplier for a bare pro, and the size encoded in the plan name otherwise", () => {
+    expect(multiplier({ plan_type: "pro" })).toBeNull();
+    expect(multiplier({ plan_type: "pro_10x" })).toBe(10);
+    expect(multiplier({ plan_type: "prolite" })).toBe(5);
+    expect(multiplier({ plan_type: "go" })).toBeNull();
+    expect(multiplier({ plan_type: "plus" })).toBeNull();
+  });
+});

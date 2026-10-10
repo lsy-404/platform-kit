@@ -108,6 +108,7 @@ describe("plan multipliers", () => {
 
   it("lets an explicit multiplier win and never surfaces an email as a plan", () => {
     expect(parseCodexUsage({ plan_type: "pro", plan_multiplier: 5 })).toMatchObject({ plan: "pro", planMultiplier: 5 });
+    expect(parseCodexUsage({ plan_type: "pro", plan_multiplier: 25 })).toMatchObject({ plan: "pro", planMultiplier: 25 });
     expect(parseCodexUsage({ plan_type: "owner@example.test" })).toMatchObject({ plan: null, planTier: null, planMultiplier: null });
     expect(parseCodexUsage({}, { plan: "prolite" })).toMatchObject({ plan: "pro", planMultiplier: 5 });
   });

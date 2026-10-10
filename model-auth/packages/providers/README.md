@@ -71,7 +71,7 @@ Every `ProviderUsageWindow` carries `scope` (`account`, `model-family` or `model
 
 ## Usage requests and errors
 
-Usage queries retry transient network failures twice, never retry 429, call the host-supplied `refresh` once after a 401 or 403, honor `signal`, and never follow redirects (the cookie-based Ollama settings query is the one exception, described below; the Claude prepaid query is a second one, which does not retry and does not call `refresh`). Failures carry `errorCode` (`signed-out`, `rate-limited`, `server-error`, `unreadable`, `unreachable`, `no-limits`); `usageErrorSnapshot` builds an error snapshot that hosts can merge with `mergeUsageReading` from core. Anthropic profile metadata is cached for six hours per credential, failures included.
+Usage queries retry transient network failures twice, never retry 429 (a `Retry-After` header on any failed response, in seconds or as an HTTP date, becomes `UsageRequestError.retryAfterMs`), call the host-supplied `refresh` once after a 401 or 403, honor `signal`, and never follow redirects (the cookie-based Ollama settings query is the one exception, described below; the Claude prepaid query is a second one, which does not retry and does not call `refresh`). Failures carry `errorCode` (`signed-out`, `rate-limited`, `server-error`, `unreadable`, `unreachable`, `no-limits`); `usageErrorSnapshot` builds an error snapshot that hosts can merge with `mergeUsageReading` from core. Anthropic profile metadata is cached for six hours per credential, failures included.
 
 `authorizeOpenAI` switches to the device code flow when the loopback port is taken and `notify` is supplied, reporting the code through a `device_code` notice.
 
@@ -83,7 +83,7 @@ Usage queries retry transient network failures twice, never retry 429, call the 
 
 ## Codex plans and tiers
 
-`normalizeCodexPlan` maps the reported plan name to `{ plan, multiplier, tier }`: `prolite` variants are `pro` at 5x, `pro` is `pro` at 20x, `team`, `teams`, `business` and `self_serve_business_usage_based` are `business`, `enterprise` and `enterprise_cbp_usage_based` are `enterprise`, and `free`, `go`, `plus` and `edu` are kept. Other names pass through unchanged, and a value containing `@` is dropped. `tier` equals the canonical plan, and an explicit `plan_multiplier` in the response wins over the table.
+`normalizeCodexPlan` maps the reported plan name to `{ plan, multiplier, tier }`: `prolite` variants are `pro` at 5x, `pro_10x`-style names are `pro` at the encoded size (1 to 100), a bare `pro` is `pro` with no multiplier, `team`, `teams`, `business` and `self_serve_business_usage_based` are `business`, `enterprise` and `enterprise_cbp_usage_based` are `enterprise`, and `free`, `go`, `plus` and `edu` are kept. Other names pass through unchanged, and a value containing `@` is dropped. `tier` equals the canonical plan, and an explicit multiplier field in the response (a whole number from 1 to 100) wins over the table.
 
 ## OpenCode Go usage
 

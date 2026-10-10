@@ -5,7 +5,7 @@ import type {
   ProviderUsageExtraUsage, ProviderUsageSnapshot, ProviderUsageStatus, ProviderUsageWindow, ProviderUsageWindowKind,
   ProviderUsageWindowReliability, ProviderUsageWindowScope, ProviderUsageWindowStatus,
 } from "@model-auth/core";
-import { classifyUsageHttp } from "@model-auth/core";
+import { classifyUsageHttp, parseRetryAfter } from "@model-auth/core";
 
 export type {
   ProviderUsageBalance, ProviderUsageErrorCode, ProviderUsageEstimate, ProviderUsageEstimateSource, ProviderUsageEstimateUnit,
@@ -140,7 +140,13 @@ export function usageSnapshot(providerId: string, credentialId: string, data: Pr
 
 /** Failure code and message carried by usage HTTP errors. */
 export class UsageRequestError extends Error {
-  constructor(public readonly code: ProviderUsageErrorCode, message: string, public readonly httpStatus?: number) {
+  constructor(
+    public readonly code: ProviderUsageErrorCode,
+    message: string,
+    public readonly httpStatus?: number,
+    /** Server-provided Retry-After in milliseconds; absent when the response gave none. */
+    public readonly retryAfterMs?: number,
+  ) {
     super(message);
     this.name = "UsageRequestError";
   }
@@ -261,14 +267,19 @@ function codexRateWindows(prefix: string, labelPrefix: string, rate: Json, targe
   });
 }
 
+/** First reported multiplier that is a whole number from 1 to 100. */
 function planMultiplier(payload: Json): number | null {
   const plan = record(payload.plan);
   const subscription = record(payload.subscription ?? payload.subscription_details);
-  const value = numberValue(payload.plan_multiplier, payload.planMultiplier, payload.usage_multiplier, payload.usageMultiplier,
+  const candidates = [payload.plan_multiplier, payload.planMultiplier, payload.usage_multiplier, payload.usageMultiplier,
     payload.codex_usage_multiplier, payload.codexUsageMultiplier, plan.multiplier, plan.usage_multiplier,
     plan.usageMultiplier, subscription.plan_multiplier, subscription.planMultiplier, subscription.usage_multiplier,
-    subscription.usageMultiplier);
-  return value === 5 || value === 20 ? value : null;
+    subscription.usageMultiplier];
+  for (const candidate of candidates) {
+    const value = typeof candidate === "number" ? candidate : typeof candidate === "string" && candidate.trim() ? Number(candidate) : NaN;
+    if (Number.isInteger(value) && value >= 1 && value <= 100) return value;
+  }
+  return null;
 }
 
 /** Parser for the Codex usage response used by the IRIS provider-usage view. */
@@ -453,7 +464,13 @@ async function usageGet(
       if (access) state.access = access;
       if (state.access !== usedAccess) continue;
     }
-    throw new UsageRequestError(outcome, response.status >= 300 && response.status < 400 ? `${response.status} Redirect refused` : await errorMessage(response), response.status);
+    const retryAfter = parseRetryAfter(response.headers.get("retry-after"));
+    throw new UsageRequestError(
+      outcome,
+      response.status >= 300 && response.status < 400 ? `${response.status} Redirect refused` : await errorMessage(response),
+      response.status,
+      retryAfter ?? undefined,
+    );
   }
 }
 
