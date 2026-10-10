@@ -67,6 +67,15 @@ describe("Claude extra usage", () => {
     await expect(adapter({ ...snapshot, providerId: "grok" }).host.queryUsage?.("credential")).resolves.toMatchObject({ extraUsage: snapshot.extraUsage });
     await expect(adapter({ ...snapshot, providerId: "grok", extraUsage: { ...snapshot.extraUsage, used: "2.35" } }).host.queryUsage?.("credential"))
       .rejects.toThrow("invalid extra usage");
+    for (const bad of [{ usedPercent: 150 }, { usedPercent: -5 }, { used: -1 }, { limit: -20 }]) {
+      await expect(adapter({ ...snapshot, providerId: "grok", extraUsage: { ...snapshot.extraUsage, ...bad } }).host.queryUsage?.("credential"))
+        .rejects.toThrow("invalid extra usage");
+    }
+  });
+
+  it("clamps an overspent cap to 100 percent so the snapshot stays valid", () => {
+    const over = parseAnthropicUsage({ extra_usage: { is_enabled: true, monthly_limit: 2000, used_credits: 2500, currency: "USD", decimal_places: 2 } });
+    expect(over.extraUsage).toMatchObject({ used: 25, limit: 20, usedPercent: 100 });
   });
 });
 
@@ -85,10 +94,11 @@ const UNFUNDED = { amount: 0, currency: "USD", tranches: [], promo_tranches: [] 
 const FREE_ORG = { uuid: "organization-free", name: "Personal", capabilities: ["chat"] };
 const TEAM_ORG = { uuid: "organization-team", name: "Team Workspace", capabilities: ["chat", "raven"], raven_type: "team" };
 
-function sessionFetch(routes: Record<string, unknown | { status: number; body?: unknown }>, seen: string[] = []): typeof fetch {
-  return (async (input: string | URL | Request) => {
+function sessionFetch(routes: Record<string, unknown | { status: number; body?: unknown }>, seen: string[] = [], inits: RequestInit[] = []): typeof fetch {
+  return (async (input: string | URL | Request, init?: RequestInit) => {
     const path = new URL(String(input)).pathname;
     seen.push(path);
+    inits.push(init ?? {});
     const route = routes[path];
     if (route === undefined) throw new Error(`unexpected endpoint: ${path}`);
     if (route && typeof route === "object" && "status" in route) return new Response(JSON.stringify((route as { body?: unknown }).body ?? {}), { status: (route as { status: number }).status });
@@ -106,11 +116,45 @@ describe("Claude prepaid credits through a web session", () => {
     expect(seen).toEqual(["/api/organizations", "/api/organizations/org-1/prepaid/credits"]);
   });
 
-  it("keeps a genuine zero balance", async () => {
-    const snapshot = await queryClaudePrepaidCredits({
-      fetchImpl: sessionFetch({ "/api/organizations": [{ uuid: "org-1" }], "/api/organizations/org-1/prepaid/credits": UNFUNDED }),
+  it("marks a funded pool and a never-funded pool apart, keeping a drained funded pool at zero", async () => {
+    const read = async (credits: unknown) => (await queryClaudePrepaidCredits({
+      fetchImpl: sessionFetch({ "/api/organizations": [{ uuid: "org-1" }], "/api/organizations/org-1/prepaid/credits": credits }),
+    })).balance;
+    expect(await read(PREPAID_CREDITS)).toEqual({ amount: 113.44, unit: "USD", funded: true });
+    expect(await read(UNFUNDED)).toEqual({ amount: 0, unit: "USD", funded: false });
+    expect(await read({ ...UNFUNDED, tranches: [{ remaining_amount_minor_units: 0, granted_amount_minor_units: 500, currency: "USD", expires_at: "2026-08-09T00:00:00Z" }] }))
+      .toEqual({ amount: 0, unit: "USD", funded: true });
+  });
+
+  it("sends neither cookies nor credentials of its own and never follows a redirect", async () => {
+    const inits: RequestInit[] = [];
+    await queryClaudePrepaidCredits({
+      fetchImpl: sessionFetch({ "/api/organizations": [{ uuid: "org-1" }], "/api/organizations/org-1/prepaid/credits": PREPAID_CREDITS }, [], inits),
     });
-    expect(snapshot.balance).toEqual({ amount: 0, unit: "USD" });
+    expect(inits).toHaveLength(2);
+    for (const init of inits) {
+      expect(init.redirect).toBe("manual");
+      const names = Object.keys((init.headers ?? {}) as Record<string, string>).map(name => name.toLowerCase());
+      expect(names).not.toContain("cookie");
+      expect(names).not.toContain("authorization");
+      expect(init.credentials).toBeUndefined();
+    }
+  });
+
+  it("reports a login redirect as signed out", async () => {
+    const snapshot = await queryClaudePrepaidCredits({ fetchImpl: sessionFetch({ "/api/organizations": { status: 302 } }) });
+    expect(snapshot).toMatchObject({ status: "error", errorCode: "signed-out", balance: null });
+  });
+
+  it("reports a cancelled request as unreachable without a balance", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const fetchImpl = (async (_input: string | URL | Request, init?: RequestInit) => {
+      if (init?.signal?.aborted) throw new DOMException("aborted", "AbortError");
+      return new Response("[]");
+    }) as typeof fetch;
+    const snapshot = await queryClaudePrepaidCredits({ fetchImpl, signal: controller.signal });
+    expect(snapshot).toMatchObject({ status: "error", errorCode: "unreachable", balance: null });
   });
 
   it("reads the selected organization regardless of list order", async () => {
@@ -120,7 +164,7 @@ describe("Claude prepaid credits through a web session", () => {
         organizationId: TEAM_ORG.uuid,
         fetchImpl: sessionFetch({ "/api/organizations": organizations, "/api/organizations/organization-team/prepaid/credits": { amount: 1234, currency: "USD" } }, seen),
       });
-      expect(snapshot.balance).toEqual({ amount: 12.34, unit: "USD" });
+      expect(snapshot.balance).toMatchObject({ amount: 12.34, unit: "USD" });
       expect(seen).toEqual(["/api/organizations", "/api/organizations/organization-team/prepaid/credits"]);
     }
   });

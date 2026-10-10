@@ -71,9 +71,19 @@ Every `ProviderUsageWindow` carries `scope` (`account`, `model-family` or `model
 
 ## Usage requests and errors
 
-Usage queries retry transient network failures twice, never retry 429, call the host-supplied `refresh` once after a 401 or 403, honor `signal`, and never follow redirects (the cookie-based Ollama settings query is the one exception, described below). Failures carry `errorCode` (`signed-out`, `rate-limited`, `server-error`, `unreadable`, `unreachable`, `no-limits`); `usageErrorSnapshot` builds an error snapshot that hosts can merge with `mergeUsageReading` from core. Anthropic profile metadata is cached for six hours per credential, failures included.
+Usage queries retry transient network failures twice, never retry 429, call the host-supplied `refresh` once after a 401 or 403, honor `signal`, and never follow redirects (the cookie-based Ollama settings query is the one exception, described below; the Claude prepaid query is a second one, which does not retry and does not call `refresh`). Failures carry `errorCode` (`signed-out`, `rate-limited`, `server-error`, `unreadable`, `unreachable`, `no-limits`); `usageErrorSnapshot` builds an error snapshot that hosts can merge with `mergeUsageReading` from core. Anthropic profile metadata is cached for six hours per credential, failures included.
 
 `authorizeOpenAI` switches to the device code flow when the loopback port is taken and `notify` is supplied, reporting the code through a `device_code` notice.
+
+## Claude extra usage and prepaid credits
+
+`parseAnthropicUsage` reports pay-as-you-go spend as `snapshot.extraUsage` (`enabled`, `used`, `limit`, `usedPercent`, `currency`), in major units; the field is `null` when the response carries neither block. The `spend` block outranks the legacy `extra_usage` block (amounts are `amount_minor / 10^exponent`, legacy amounts `/ 10^decimal_places`). `usedPercent` is `extra_usage.utilization` when present, otherwise `used / limit * 100` when a limit exists, clamped to 0..100; the `spend.percent` field is never used. Core validation rejects an `extraUsage` whose percentage is outside 0..100 or whose amounts are negative.
+
+`queryClaudePrepaidCredits({ fetchImpl, signal, organizationId })` reads the prepaid credit pool, which the OAuth token cannot see. `fetchImpl` must be a fetch bound to a signed-in claude.ai web session; the module never handles cookies or authorization headers, does not retry, and does not follow redirects (a redirect, 401 or 403 reports `signed-out`). It lists `/api/organizations`, keeps chat-capable organizations (or, failing that, anything that is not API-only) and reads `/api/organizations/{id}/prepaid/credits`. A session with several eligible organizations and no `organizationId` yields an `unreadable` snapshot asking to choose one. The balance is `amount / 100` in the reported currency. `balance.funded` is `false` only for a pool with a zero amount and no tranches, so a host can hide a never-funded pool while keeping a drained one at zero.
+
+## Codex plans and tiers
+
+`normalizeCodexPlan` maps the reported plan name to `{ plan, multiplier, tier }`: `prolite` variants are `pro` at 5x, `pro` is `pro` at 20x, `team`, `teams`, `business` and `self_serve_business_usage_based` are `business`, `enterprise` and `enterprise_cbp_usage_based` are `enterprise`, and `free`, `go`, `plus` and `edu` are kept. Other names pass through unchanged, and a value containing `@` is dropped. `tier` equals the canonical plan, and an explicit `plan_multiplier` in the response wins over the table.
 
 ## OpenCode Go usage
 

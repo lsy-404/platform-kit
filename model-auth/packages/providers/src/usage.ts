@@ -681,7 +681,8 @@ export async function queryClaudePrepaidCredits(options: ClaudePrepaidRequestOpt
     const minor = finiteNumber(payload.amount);
     if (minor === null || minor < 0) throw new UsageRequestError("unreadable", "Claude prepaid credits response has no balance.");
     const unit = (stringValue(payload.currency) ?? "USD").toUpperCase();
-    return usageSnapshot("anthropic", credentialId, { status: "ok", plan: null, windows: [], balance: { amount: minor / 100, unit } });
+    const funded = minor > 0 || [payload.tranches, payload.promo_tranches].some(list => Array.isArray(list) && list.length > 0);
+    return usageSnapshot("anthropic", credentialId, { status: "ok", plan: null, windows: [], balance: { amount: minor / 100, unit, funded } });
   } catch (error) {
     if (error instanceof UsageRequestError) {
       return usageSnapshot("anthropic", credentialId, { status: "error", plan: null, windows: [], balance: null, error: error.message, errorCode: error.code });

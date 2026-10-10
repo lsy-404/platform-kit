@@ -739,6 +739,8 @@ export interface ProviderUsageWindow {
 export interface ProviderUsageBalance {
   readonly amount: number;
   readonly unit: string;
+  /** False for a pool that was never funded; absent when the provider cannot tell. */
+  readonly funded?: boolean;
 }
 
 export type ProviderUsageEstimateSource = "configured" | "learned" | "unknown";
@@ -1154,9 +1156,9 @@ const USAGE_WINDOW_KINDS: readonly string[] = ["session", "daily", "weekly", "mo
 const USAGE_ERROR_CODES: readonly string[] = ["signed-out", "rate-limited", "server-error", "unreadable", "unreachable", "no-limits"];
 
 function validateExtraUsage(extra: ProviderUsageExtraUsage): ProviderUsageExtraUsage {
-  const amount = (value: unknown): boolean => value === null || (typeof value === "number" && Number.isFinite(value));
+  const amount = (value: unknown, max = Infinity): boolean => value === null || (typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= max);
   if (!extra || typeof extra !== "object" || typeof extra.enabled !== "boolean"
-    || !amount(extra.used) || !amount(extra.limit) || !amount(extra.usedPercent)
+    || !amount(extra.used) || !amount(extra.limit) || !amount(extra.usedPercent, 100)
     || (extra.currency !== null && (typeof extra.currency !== "string" || !extra.currency.trim()))) {
     throw new Error("adapter returned an invalid extra usage");
   }
@@ -1227,7 +1229,8 @@ function validateUsageSnapshot(capability: ProviderCapabilityDescriptor, credent
   const balance = snapshot.balance === null ? null : snapshot.balance && typeof snapshot.balance === "object"
     && typeof snapshot.balance.amount === "number" && Number.isFinite(snapshot.balance.amount)
     && typeof snapshot.balance.unit === "string" && snapshot.balance.unit.trim()
-    ? { amount: snapshot.balance.amount, unit: snapshot.balance.unit.trim() }
+    && (snapshot.balance.funded === undefined || typeof snapshot.balance.funded === "boolean")
+    ? { amount: snapshot.balance.amount, unit: snapshot.balance.unit.trim(), ...(snapshot.balance.funded !== undefined ? { funded: snapshot.balance.funded } : {}) }
     : undefined;
   if (snapshot.balance !== null && !balance) throw new Error("adapter returned an invalid usage balance");
   const estimate = snapshot.estimate === undefined ? undefined : snapshot.estimate === null ? null : validateUsageEstimate(snapshot.estimate);
