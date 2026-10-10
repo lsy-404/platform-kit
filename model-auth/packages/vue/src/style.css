@@ -5,6 +5,7 @@
 .model-auth-root { font: inherit; }
 .model-auth-root *, .model-auth-root *::before, .model-auth-root *::after { box-sizing: border-box; }
 .model-auth-dialog { width: 100%; max-height: calc(100dvh - 48px); display: flex; flex-direction: column; overflow: hidden; }
+.model-auth-dialog-fixed { height: min(640px, calc(100dvh - 48px)); }
 .model-auth-header { display: grid; grid-template-columns: minmax(80px,1fr) minmax(0,4fr) minmax(80px,1fr); align-items: center; gap: 8px; padding: 20px 24px; flex: none; }
 .model-auth-title { grid-column: 2; grid-row: 1; min-width: 0; text-align: center; overflow-wrap: anywhere; }
 .model-auth-back { grid-column: 1; grid-row: 1; justify-self: start; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
@@ -21,12 +22,15 @@
 .model-auth-method-card strong, .model-auth-method-card small, .model-auth-section-heading strong, .model-auth-section-heading small, .model-auth-row-main strong, .model-auth-row-main small, .model-auth-api-form strong, .model-auth-api-form small { display: block; }
 .model-auth-provider-step, .model-auth-detail { min-height: 0; padding: 0 24px 24px; display: grid; gap: 16px; align-content: start; }
 .model-auth-detail { overflow: auto; }
-.model-auth-provider-step { grid-template-rows: auto auto minmax(0, 1fr); overflow: hidden; padding-top: 4px; }
+.model-auth-provider-step { display: flex; flex-direction: column; flex: 1 1 0; overflow: hidden; padding-top: 4px; }
 .model-auth-provider-list, .model-auth-provider-group, .model-auth-credentials, .model-auth-credential-section { display: grid; gap: 8px; min-width: 0; }
-.model-auth-provider-list { min-height: 0; overflow: auto; padding: 2px; margin: -2px; }
+.model-auth-provider-list { flex: 1 1 0; min-height: 0; overflow: auto; align-content: start; padding: 2px; margin: -2px; }
 .model-auth-section-heading > button { margin-left: auto; }
 .model-auth-section-heading { display: flex; justify-content: space-between; align-items: center; gap: 14px; }
-.model-auth-provider-search { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; }
+.model-auth-provider-search { position: relative; flex: none; }
+.model-auth-search { width: 100%; padding-left: 34px; }
+.model-auth-search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+.model-auth-group-toggle { justify-self: start; }
 .model-auth-group-label { margin: 8px 0 2px; }
 .model-auth-provider-row { width: 100%; display: grid; grid-template-columns: auto minmax(0,1fr) auto auto; gap: 12px; align-items: center; text-align: left; }
 .model-auth-provider-mark, .model-auth-method-icon { display: grid; place-items: center; flex-shrink: 0; width: 36px; height: 36px; }

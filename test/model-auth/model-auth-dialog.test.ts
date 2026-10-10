@@ -103,7 +103,7 @@ describe("authentication dialog", () => {
     const mark = get('[data-provider-id="ollama"] .model-auth-provider-mark');
     expect(mark.querySelector("svg")).toBeTruthy();
     expect(mark.querySelector("img")).toBeNull();
-    expect(mark.innerHTML).not.toMatch(/favicon|href=|src=/);
+    expect(mark.innerHTML).not.toMatch(/favicon|src=|href="(?!data:image\/png;base64,)/);
   });
 
   it("renders the letter mark for unknown provider ids", async () => {
@@ -215,16 +215,13 @@ describe("authentication dialog", () => {
   });
 
   it("opens searchable mixed provider entries and follows visible keyboard order", async () => {
-    const { events } = await mount();
+    await mount();
     expect(document.querySelector('[data-part="method-list"]')).toBeNull();
     expect([...document.querySelectorAll('.model-auth-row-main strong')].map(node => node.textContent)).toContain('Provider A');
     expect(document.querySelector('[data-part="method-list"]')).toBeNull();
     get('[data-part="search"]').focus();
     expect(document.activeElement).toBe(get('[data-part="search"]'));
-    await click('[data-part="refresh-catalog"]');
-    expect(events.at(-1)?.name).toBe("refresh");
     const search = get('[data-part="search"]');
-    search.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
     search.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
     search.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
     search.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
@@ -244,8 +241,8 @@ describe("authentication dialog", () => {
     const search = get<HTMLInputElement>('[data-part="search"]');
     const list = get<HTMLElement>('[part="provider-list"]');
   const stylesheet = readFileSync(resolve(import.meta.dirname, "../../model-auth/packages/vue/src/style.css"), "utf8");
-    expect(stylesheet).toContain(".model-auth-provider-step { grid-template-rows: auto auto minmax(0, 1fr); overflow: hidden; padding-top: 4px; }");
-    expect(stylesheet).toContain(".model-auth-provider-list { min-height: 0; overflow: auto; padding: 2px; margin: -2px; }");
+    expect(stylesheet).toMatch(/\.model-auth-provider-step \{[^}]*overflow: hidden/);
+    expect(stylesheet).toMatch(/\.model-auth-provider-list \{[^}]*overflow: auto/);
     expect(stylesheet).not.toContain(".model-auth-select-menu { position: fixed;");
     expect(step.contains(search)).toBe(true);
     expect(list).toBeTruthy();
@@ -271,7 +268,7 @@ describe("authentication dialog", () => {
     expect(events.filter(event => event.name === "remove")).toHaveLength(0);
     await click('[data-part="api-key-credential"] .model-auth-danger');
     expect(events.at(-1)).toEqual({ name: "remove", payload: ["provider-a", "key-1"] });
-    await click('[data-part="back"]'); await details('api-key', 'unavailable');
+    await click('[data-part="back"]'); await fill('[data-part="search"]', "Unavailable"); await details('api-key', 'unavailable');
     expect(get<HTMLInputElement>('input[type="password"]').disabled).toBe(true);
   });
 
@@ -371,7 +368,7 @@ describe("authentication dialog", () => {
   it("traps focus, closes once on Escape and restores the trigger", async () => {
     const trigger = document.createElement("button"); document.body.append(trigger); trigger.focus();
     const { events } = await mount();
-    const first = get('[data-part="close"]'), last = [...document.querySelectorAll<HTMLElement>('[data-provider-id]')].at(-1)!;
+    const first = get('[data-part="close"]'), last = [...document.querySelectorAll<HTMLElement>(".model-auth-provider-list button")].at(-1)!;
     last.focus(); last.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }));
     expect(document.activeElement).toBe(first);
     first.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true }));
@@ -460,7 +457,7 @@ describe("authentication dialog", () => {
     expect(shadow.querySelector("style")?.textContent).toContain(".model-auth-styled");
     expect(shadow.querySelector('[part="dialog"]')).toBeTruthy();
     expect(shadow.querySelector<HTMLDialogElement>('[part="dialog"]')?.open).toBe(true);
-    const last = [...shadow.querySelectorAll<HTMLElement>('[data-provider-id]')].at(-1)!;
+    const last = [...shadow.querySelectorAll<HTMLElement>(".model-auth-provider-list button")].at(-1)!;
     last.focus(); last.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }));
     expect(shadow.activeElement).toBe(shadow.querySelector('[data-part="close"]'));
     let selected = "";
@@ -531,4 +528,108 @@ it("separated authentication does not add a choice page to an existing connectio
   expect(document.querySelector('[data-part="method-list"]')).toBeNull();
   expect(document.querySelector('[part="progress"]')).toBeNull();
   expect(document.querySelector('[data-part="back"]')).toBeNull();
+});
+
+describe("provider picker groups", () => {
+  const english = { signIn: "Sign in", apiKey: "API key", unavailable: "Unavailable", showAll: "Show all ({count})", showLess: "Show less", noProviders: "No matching providers" };
+  const entry = (id: string, authMethods: ModelAuthProvider["authMethods"], extra: Partial<ModelAuthProvider> = {}): ModelAuthProvider =>
+    ({ id, name: id, description: "", authMethods, available: true, models: [], ...extra });
+  const rows = (group: string) => [...document.querySelectorAll<HTMLElement>('[data-part="' + group + '-group"] .model-auth-provider-row')].map(row => row.dataset.providerId);
+  const groupOrder = () => [...document.querySelectorAll<HTMLElement>(".model-auth-provider-group")].map(node => node.dataset.part);
+  const keydown = (key: string) => get('[data-part="search"]').dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+  const keyProviders = (count: number) => Array.from({ length: count }, (_, index) => entry("key-" + (index + 1), ["api-key"]));
+
+  it("lists sign-in entries before API key entries before unavailable ones", async () => {
+    await mount({ messages: english, providers: [
+      entry("A", ["api-key"]), entry("B", ["oauth"]), entry("C", ["api-key"]), entry("D", ["oauth"]), entry("E", ["oauth"], { available: false }),
+    ] });
+    expect(groupOrder()).toEqual(["oauth-group", "api-key-group", "unavailable-group"]);
+    expect([...document.querySelectorAll(".model-auth-group-label")].map(node => node.textContent)).toEqual(["Sign in", "API key", "Unavailable"]);
+    expect([rows("oauth"), rows("api-key")]).toEqual([["B", "D"], ["A", "C"]]);
+    expect(rows("unavailable")).toEqual([]);
+    await click('[data-part="group-toggle"][data-group="unavailable"]');
+    expect(rows("unavailable")).toEqual(["E"]);
+  });
+
+  it("puts providers with saved credentials first and keeps host order otherwise", async () => {
+    const saved = [{ id: "c1", label: "Saved", enabled: true, healthy: true }];
+    await mount({ providers: [entry("first", ["oauth"]), entry("second", ["oauth"], { oauthCredentials: saved }), entry("third", ["oauth"])] });
+    expect(rows("oauth")).toEqual(["second", "first", "third"]);
+  });
+
+  it("shows eight entries per group and reveals the rest on request", async () => {
+    await mount({ messages: english, providers: keyProviders(12) });
+    expect(rows("api-key")).toEqual(Array.from({ length: 8 }, (_, index) => "key-" + (index + 1)));
+    const toggle = get('[data-part="group-toggle"][data-group="api-key"]');
+    expect(toggle.textContent).toBe("Show all (12)");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    await click('[data-part="group-toggle"][data-group="api-key"]');
+    expect(rows("api-key")).toHaveLength(12);
+    expect(get('[data-part="group-toggle"][data-group="api-key"]').textContent).toBe("Show less");
+    expect(get('[data-part="group-toggle"][data-group="api-key"]').getAttribute("aria-expanded")).toBe("true");
+    await click('[data-part="group-toggle"][data-group="api-key"]');
+    expect(rows("api-key")).toHaveLength(8);
+  });
+
+  it("drops the keyboard highlight when expanding a group moves the entries under it", async () => {
+    const oauthProviders = Array.from({ length: 10 }, (_, index) => entry("sign-" + (index + 1), ["oauth"]));
+    await mount({ providers: [...oauthProviders, entry("key-a", ["api-key"]), entry("key-b", ["api-key"])] });
+    keydown("End"); await nextTick();
+    expect(get(".model-auth-provider-row.focused").dataset.providerId).toBe("key-b");
+    await click('[data-part="group-toggle"][data-group="oauth"]');
+    expect(document.querySelector(".model-auth-provider-row.focused")).toBeNull();
+  });
+
+  it("drops the keyboard highlight when the provider list shrinks under it", async () => {
+    const { state } = await mount({ providers: keyProviders(8) });
+    keydown("End"); await nextTick();
+    expect(get(".model-auth-provider-row.focused").dataset.providerId).toBe("key-8");
+    state.providers = keyProviders(3); await nextTick();
+    state.providers = keyProviders(8); await nextTick();
+    expect(document.querySelector(".model-auth-provider-row.focused")).toBeNull();
+  });
+
+  it("does not truncate while searching and offers no toggle", async () => {
+    const providers = [...Array.from({ length: 10 }, (_, index) => entry("match-" + index, ["api-key"])), entry("other-1", ["api-key"]), entry("other-2", ["api-key"])];
+    await mount({ messages: english, providers });
+    expect(rows("api-key")).toHaveLength(8);
+    await fill('[data-part="search"]', "match");
+    expect(rows("api-key")).toHaveLength(10);
+    expect(document.querySelector('[data-part="group-toggle"]')).toBeNull();
+  });
+
+  it("includes unavailable matches when a search is active", async () => {
+    await mount({ providers: [entry("alive", ["oauth"]), entry("gone", ["oauth"], { available: false })] });
+    expect(rows("unavailable")).toEqual([]);
+    await fill('[data-part="search"]', "gone");
+    expect(rows("unavailable")).toEqual(["gone"]);
+  });
+
+  it("moves keyboard focus only over visible entries", async () => {
+    await mount({ providers: [...keyProviders(12), entry("hidden-unavailable", ["oauth"], { available: false })] });
+    keydown("End"); await nextTick();
+    expect(get(".model-auth-provider-row.focused").dataset.providerId).toBe("key-8");
+    keydown("ArrowDown"); await nextTick();
+    expect(get(".model-auth-provider-row.focused").dataset.providerId).toBe("key-1");
+    keydown("ArrowUp"); keydown("Enter"); await nextTick();
+    expect(get('[data-part="detail"] h3').textContent).toBe("key-8");
+  });
+
+  it("offers catalog refresh only when no provider matches", async () => {
+    const { events } = await mount();
+    expect(document.querySelector('[data-part="refresh-catalog"]')).toBeNull();
+    await fill('[data-part="search"]', "no-such-provider");
+    expect(rows("oauth")).toEqual([]);
+    await click('[data-part="refresh-catalog"]');
+    expect(events.at(-1)?.name).toBe("refresh");
+  });
+
+  it("keeps the provider dialog at a fixed height that detail pages do not use", async () => {
+    await mount({ providers: keyProviders(3) });
+    expect(get(".model-auth-dialog").classList.contains("model-auth-dialog-fixed")).toBe(true);
+    const stylesheet = readFileSync(resolve(import.meta.dirname, "../../model-auth/packages/vue/src/style.css"), "utf8");
+    expect(stylesheet).toMatch(/\.model-auth-dialog-fixed \{(?:[^}]*[\s;])?height: min\(640px, calc\(100dvh - 48px\)\)/);
+    await details("api-key", "key-1");
+    expect(get(".model-auth-dialog").classList.contains("model-auth-dialog-fixed")).toBe(false);
+  });
 });

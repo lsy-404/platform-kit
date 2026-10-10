@@ -11,6 +11,7 @@ const files = import.meta.glob(
     "../node_modules/@fluentui/svg-icons/icons/eye_off_16_regular.svg",
     "../node_modules/@fluentui/svg-icons/icons/key_16_regular.svg",
     "../node_modules/@fluentui/svg-icons/icons/person_key_16_regular.svg",
+    "../node_modules/@fluentui/svg-icons/icons/search_16_regular.svg",
   ],
   { query: "?raw", import: "default", eager: true },
 ) as Record<string, string>;
@@ -27,6 +28,7 @@ const ICON_FILES = {
   "eye-off": "eye_off",
   "key": "key",
   "oauth": "person_key",
+  "search": "search",
 } as const;
 
 export type ModelAuthIconName = keyof typeof ICON_FILES;

@@ -1,3 +1,5 @@
+import ollamaMark from "./assets/ollama.svg?raw";
+
 const files = import.meta.glob(
   [
     "../node_modules/@lobehub/icons-static-svg/icons/alibaba-color.svg",
@@ -22,7 +24,6 @@ const files = import.meta.glob(
     "../node_modules/@lobehub/icons-static-svg/icons/mistral-color.svg",
     "../node_modules/@lobehub/icons-static-svg/icons/moonshot.svg",
     "../node_modules/@lobehub/icons-static-svg/icons/nvidia-color.svg",
-    "../node_modules/@lobehub/icons-static-svg/icons/ollama.svg",
     "../node_modules/@lobehub/icons-static-svg/icons/openai.svg",
     "../node_modules/@lobehub/icons-static-svg/icons/opencode.svg",
     "../node_modules/@lobehub/icons-static-svg/icons/openrouter-color.svg",
@@ -54,8 +55,6 @@ const ICON_FILES: Record<string, string> = {
   "kimi-coding": "kimi-color",
   "kimi-for-coding": "kimi-color",
   "moonshotai": "moonshot",
-  "ollama": "ollama",
-  "ollama-cloud": "ollama",
   "opencode": "opencode",
   "opencode-go": "opencode",
   "openrouter": "openrouter-color",
@@ -85,7 +84,11 @@ const ICON_FILES: Record<string, string> = {
   "siliconflow": "siliconcloud-color",
 };
 
+const LOCAL_ICONS: Record<string, string> = { "ollama": ollamaMark, "ollama-cloud": ollamaMark };
+
 export function builtinProviderIcon(id: string): string | null {
-  const file = ICON_FILES[id.trim().toLowerCase()];
+  const key = id.trim().toLowerCase();
+  if (Object.hasOwn(LOCAL_ICONS, key)) return LOCAL_ICONS[key]!;
+  const file = ICON_FILES[key];
   return file ? files[`../node_modules/@lobehub/icons-static-svg/icons/${file}.svg`] ?? null : null;
 }
