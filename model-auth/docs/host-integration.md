@@ -106,7 +106,11 @@ try {
 }
 ```
 
-Use `setEnabled` for an independent on/off control and `setOrder(credentialIds)` to set priority; credentials are ordered by registration unless reordered. `401`/`403` permanently isolate a credential; `429`, server errors, and transport errors use bounded cooling. `failover` always tries eligible credentials in that order, while `round-robin` rotates over them starting from that order.
+Use `setEnabled` for an independent on/off control and `setOrder(credentialIds)` to set priority; credentials are ordered by registration unless reordered. `401`/`403` permanently isolate a credential; `429`, server errors, and transport errors use bounded cooling; pass the response's `Retry-After` as `retryAfterMs` on a 429 `RouteError` to cool down for that long, and read `router.health(id).cooldownReason` to tell a rate limit from a transient failure. `failover` always tries eligible credentials in that order, while `round-robin` rotates over them starting from that order.
+
+## 5. Pace usage reads
+
+Route every usage read through one `createUsageGate` so timers, view refreshes, manual retries and re-authentication cannot stack up against a provider that rate-limits usage endpoints. Give it per-reason minimum intervals and a lane (concurrency and start spacing) for providers that need one, and let tasks surface `UsageRequestError` (which carries `retryAfterMs` from `Retry-After`) so a 429 backs the whole provider off. A call that does not run returns `retryAt`, which a host can show next to the last reading instead of an error.
 
 ## Presentation contract
 

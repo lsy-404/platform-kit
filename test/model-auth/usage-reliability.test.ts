@@ -96,7 +96,7 @@ describe("plan multipliers", () => {
   it("maps every ChatGPT plan alias to its tier", () => {
     const table: Array<[string, string, number | null]> = [
       ["prolite", "pro", 5], ["pro_lite", "pro", 5], ["pro-lite", "pro", 5], ["Pro Lite", "pro", 5],
-      ["pro", "pro", 20],
+      ["pro", "pro", null], ["pro_10x", "pro", 10],
       ["team", "business", null], ["teams", "business", null], ["business", "business", null], ["self_serve_business_usage_based", "business", null],
       ["enterprise", "enterprise", null], ["enterprise_cbp_usage_based", "enterprise", null],
       ["free", "free", null], ["go", "go", null], ["plus", "plus", null], ["edu", "edu", null],

@@ -120,9 +120,11 @@ describe("describeOAuthCredential", () => {
     for (const secret of [access, "refresh-secret-value", "signature-value", "ignored"]) expect(text).not.toContain(secret);
   });
 
-  it("reads a plain pro claim as Pro 20x and drops a plan that holds an email", () => {
+  it("reads a plain pro claim without a multiplier and drops a plan that holds an email", () => {
     const withPlan = (plan: string) => describeOAuthCredential("openai-codex", { type: "oauth", access: "opaque", refresh: "r", expires: NOW + 3600_000, plan }, NOW);
-    expect(withPlan("pro")).toMatchObject({ plan: "pro", planMultiplier: 20 });
+    expect(withPlan("pro")).toMatchObject({ plan: "pro" });
+    expect(withPlan("pro")).not.toHaveProperty("planMultiplier");
+    expect(withPlan("pro_10x")).toMatchObject({ plan: "pro", planMultiplier: 10 });
     expect(withPlan("teams")).toMatchObject({ plan: "business" });
     expect(withPlan("person@example.test")).not.toHaveProperty("plan");
   });

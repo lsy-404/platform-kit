@@ -505,12 +505,16 @@ export interface RouteRequest {
 }
 
 export type RouteError =
-  | { readonly kind: "http"; readonly status: number }
+  | { readonly kind: "http"; readonly status: number; /** Server-provided Retry-After in milliseconds; used for 429 only. */ readonly retryAfterMs?: number }
   | { readonly kind: "transport" };
+
+export type CredentialCooldownReason = "rate-limited" | "transient";
 
 export interface CredentialHealthSummary {
   readonly health: CredentialHealth;
   readonly cooldownUntilUtc: string | null;
+  /** Present only while the credential is cooling down. */
+  readonly cooldownReason?: CredentialCooldownReason;
 }
 
 export interface CredentialRouterOptions {
@@ -524,6 +528,7 @@ export class CredentialRouter {
   private readonly credentials = new Map<string, CredentialMetadata>();
   private readonly order: string[] = [];
   private readonly failures = new Map<string, number>();
+  private readonly cooldownReasons = new Map<string, CredentialCooldownReason>();
   private readonly cursor = new Map<string, number>();
   private readonly now: () => number;
   private strategy: RouteStrategy;
@@ -629,7 +634,11 @@ export class CredentialRouter {
     this.failures.set(credentialId, failureCount);
     const base = rateLimited ? this.rateLimitCooldownMs : this.transientCooldownMs;
     const maximum = rateLimited ? this.rateLimitCooldownMs * 8 : this.transientCooldownMs * 8;
-    const until = new Date(this.now() + Math.min(maximum, base * (2 ** Math.min(failureCount - 1, 3)))).toISOString();
+    const retryAfterMs = rateLimited && error.kind === "http" && typeof error.retryAfterMs === "number" && Number.isFinite(error.retryAfterMs) && error.retryAfterMs > 0
+      ? error.retryAfterMs
+      : null;
+    const until = new Date(this.now() + Math.min(maximum, retryAfterMs ?? base * (2 ** Math.min(failureCount - 1, 3)))).toISOString();
+    this.cooldownReasons.set(credentialId, rateLimited ? "rate-limited" : "transient");
     this.credentials.set(credentialId, { ...current, health: "cooling-down", cooldownUntilUtc: until });
   }
 
@@ -637,11 +646,13 @@ export class CredentialRouter {
     this.pruneExpired();
     const current = this.credentials.get(credentialId);
     if (!current) return null;
-    return { health: current.health, cooldownUntilUtc: current.cooldownUntilUtc };
+    const reason = current.health === "cooling-down" ? this.cooldownReasons.get(credentialId) : undefined;
+    return { health: current.health, cooldownUntilUtc: current.cooldownUntilUtc, ...(reason ? { cooldownReason: reason } : {}) };
   }
 
   public remove(credentialId: string): void {
     this.credentials.delete(credentialId);
+    this.cooldownReasons.delete(credentialId);
     const index = this.order.indexOf(credentialId);
     if (index >= 0) this.order.splice(index, 1);
     this.failures.delete(credentialId);
@@ -796,7 +807,13 @@ export interface ProviderUsageSnapshot {
   readonly errorCode?: ProviderUsageErrorCode | null;
   /** True when the windows come from an earlier successful reading. */
   readonly stale?: boolean;
+  /** "accurate" when every window is carried as read; "estimated" when any window was rolled past its reset. */
+  readonly basis?: ProviderUsageBasis;
+  /** When the carried reading was actually observed; absent on a fresh reading, where fetchedAtUtc is the observation. */
+  readonly observedAtUtc?: string;
 }
+
+export type ProviderUsageBasis = "accurate" | "estimated";
 
 export type UsageHttpClass = "ok" | "signed-out" | "rate-limited" | "server-error";
 
@@ -818,6 +835,23 @@ export function usageRemedy(code: ProviderUsageErrorCode | null | undefined): Us
 
 const NO_RESET_WINDOW_TTL_MS = 24 * 3600 * 1000;
 
+/** Moves a window whose reset has passed into the current cycle as a low-reliability lower bound. */
+function rollWindow(window: ProviderUsageWindow, now: number): ProviderUsageWindow {
+  const span = (window.windowSeconds as number) * 1000;
+  const cycles = Math.floor((now - (window.resetAt as number)) / span) + 1;
+  return {
+    ...window,
+    status: "unknown",
+    usedRatio: null,
+    usedPercent: 0,
+    remainingPercent: null,
+    used: null,
+    remaining: null,
+    reliability: "low",
+    resetAt: (window.resetAt as number) + cycles * span,
+  };
+}
+
 /** Keep the last good reading, marked stale, when the new reading failed. */
 export function mergeUsageReading(
   previous: ProviderUsageSnapshot | null | undefined,
@@ -827,11 +861,38 @@ export function mergeUsageReading(
   if (next.status !== "error") return next;
   if (!previous || previous.status === "error" || previous.providerId !== next.providerId || previous.credentialId !== next.credentialId) return next;
   if (previous.identity && next.identity && previous.identity !== next.identity) return next;
-  const fetchedAt = Date.parse(previous.fetchedAtUtc);
-  const windows = previous.windows.filter((window) => window.resetAt !== null
-    ? window.resetAt > now
-    : Number.isFinite(fetchedAt) && now - fetchedAt <= NO_RESET_WINDOW_TTL_MS);
-  return { ...previous, windows, stale: true, error: next.error, errorCode: next.errorCode ?? null };
+  const observedAtUtc = previous.observedAtUtc ?? previous.fetchedAtUtc;
+  const observedAt = Date.parse(observedAtUtc);
+  let rolled = previous.basis === "estimated";
+  const windows = previous.windows.flatMap((window): ProviderUsageWindow[] => {
+    if (window.resetAt === null) return Number.isFinite(observedAt) && now - observedAt <= NO_RESET_WINDOW_TTL_MS ? [window] : [];
+    if (window.resetAt > now) return [window];
+    if (typeof window.windowSeconds !== "number" || !Number.isFinite(window.windowSeconds) || window.windowSeconds <= 0) return [];
+    rolled = true;
+    return [rollWindow(window, now)];
+  });
+  return {
+    ...previous,
+    windows,
+    stale: true,
+    basis: rolled ? "estimated" : "accurate",
+    observedAtUtc,
+    error: next.error,
+    errorCode: next.errorCode ?? null,
+  };
+}
+
+/** Delay in milliseconds from a Retry-After header (RFC 9110 section 10.2.3): delay-seconds or an HTTP-date; null when unusable. */
+export function parseRetryAfter(value: string | null | undefined, now: number = Date.now()): number | null {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  if (/^\d+$/.test(text)) {
+    const seconds = Number(text);
+    return Number.isFinite(seconds) ? seconds * 1000 : null;
+  }
+  if (!/^(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s/i.test(text)) return null;
+  const date = Date.parse(text);
+  return Number.isFinite(date) ? Math.max(0, date - now) : null;
 }
 
 export interface OAuthRenewalSlot {
@@ -873,6 +934,163 @@ export function createRefreshGate(): RefreshGate {
   };
 }
 
+export type UsageReadReason = "timer" | "view" | "manual" | "credential-changed";
+
+export interface UsageGateLanePolicy {
+  /** Reads of this provider that may run at the same time. */
+  readonly concurrency: number;
+  /** Minimum time between two read starts of this provider. */
+  readonly minSpacingMs: number;
+}
+
+export interface UsageGatePolicy {
+  /** Minimum time since the last read of the same credential started, for the given reason. */
+  minIntervalMs(providerId: string, reason: UsageReadReason): number;
+  lane?(providerId: string): UsageGateLanePolicy;
+  /** Reads that may run at the same time across all providers. */
+  readonly maxConcurrent?: number;
+  readonly now?: () => number;
+  readonly sleep?: (ms: number) => Promise<void>;
+  /** Random source in [0, 1) for backoff jitter. */
+  readonly random?: () => number;
+}
+
+export interface UsageGateRequest {
+  readonly providerId: string;
+  readonly reason: UsageReadReason;
+}
+
+export type UsageGateResult<T> =
+  | { readonly ran: true; readonly value: T; /** Set when this read left its provider backing off. */ readonly retryAt: number | null }
+  | { readonly ran: false; readonly retryAt: number | null };
+
+export interface UsageGate {
+  run<T>(credentialId: string, request: UsageGateRequest, task: () => Promise<T>): Promise<UsageGateResult<T>>;
+}
+
+const BACKOFF_BASE_MS = 60_000;
+const BACKOFF_CAP_MS = 30 * 60_000;
+const RETRY_AFTER_CAP_MS = 60 * 60_000;
+const BACKOFF_JITTER_MS = 5000;
+
+interface UsageLane {
+  running: number;
+  lastStartAt: number;
+  retryNotBefore: number;
+  failures: number;
+  lastFailureAt: number;
+}
+
+interface UsageFailureSignal {
+  readonly retryAfterMs: number | null;
+}
+
+/** A rate-limit or server failure, thrown as an error with a code or returned as a snapshot with an errorCode. */
+function usageFailureSignal(value: unknown): UsageFailureSignal | null {
+  if (!value || typeof value !== "object") return null;
+  const source = value as { code?: unknown; errorCode?: unknown; retryAfterMs?: unknown };
+  const code = source.code ?? source.errorCode;
+  if (code !== "rate-limited" && code !== "server-error") return null;
+  const retryAfterMs = typeof source.retryAfterMs === "number" && Number.isFinite(source.retryAfterMs) && source.retryAfterMs >= 0 ? source.retryAfterMs : null;
+  return { retryAfterMs };
+}
+
+/**
+ * Decides when a usage read may run; it keeps no readings. One read per credential at a time,
+ * a minimum interval per reason, and per-provider lanes with a concurrency cap, start spacing
+ * and a backoff that no reason bypasses. A task reports a rate-limit or server failure by
+ * throwing an error or returning a value whose code or errorCode says so, with an optional retryAfterMs.
+ */
+export function createUsageGate(policy: UsageGatePolicy): UsageGate {
+  const now = policy.now ?? Date.now;
+  const sleep = policy.sleep ?? ((ms: number) => new Promise<void>((resolve) => { setTimeout(resolve, ms); }));
+  const random = policy.random ?? Math.random;
+  const maxConcurrent = policy.maxConcurrent ?? Infinity;
+  const refreshGate = createRefreshGate();
+  const lanes = new Map<string, UsageLane>();
+  const lastStart = new Map<string, number>();
+  let running = 0;
+  let waiters: Array<() => void> = [];
+
+  const laneOf = (providerId: string): UsageLane => {
+    let lane = lanes.get(providerId);
+    if (!lane) {
+      lane = { running: 0, lastStartAt: -Infinity, retryNotBefore: 0, failures: 0, lastFailureAt: -Infinity };
+      lanes.set(providerId, lane);
+    }
+    return lane;
+  };
+  const wake = () => {
+    const pending = waiters;
+    waiters = [];
+    for (const resume of pending) resume();
+  };
+  const backingOffUntil = (lane: UsageLane): number | null => lane.retryNotBefore > now() ? lane.retryNotBefore : null;
+  const recordFailure = (lane: UsageLane, signal: UsageFailureSignal) => {
+    lane.failures += 1;
+    lane.lastFailureAt = now();
+    const delay = signal.retryAfterMs !== null
+      ? Math.min(signal.retryAfterMs, RETRY_AFTER_CAP_MS)
+      : Math.min(BACKOFF_BASE_MS * 2 ** Math.min(lane.failures - 1, 16), BACKOFF_CAP_MS);
+    lane.retryNotBefore = Math.max(lane.retryNotBefore, now() + delay + random() * BACKOFF_JITTER_MS);
+  };
+
+  async function start<T>(credentialId: string, request: UsageGateRequest, task: () => Promise<T>): Promise<UsageGateResult<T>> {
+    const lane = laneOf(request.providerId);
+    const limits = policy.lane?.(request.providerId) ?? { concurrency: Infinity, minSpacingMs: 0 };
+    while (lane.running >= limits.concurrency || running >= maxConcurrent) await new Promise<void>((resolve) => { waiters.push(resolve); });
+    lane.running += 1;
+    running += 1;
+    try {
+      const startAt = Math.max(now(), lane.lastStartAt + limits.minSpacingMs);
+      lane.lastStartAt = startAt;
+      if (startAt > now()) await sleep(startAt - now());
+      const blocked = backingOffUntil(lane);
+      if (blocked !== null) return { ran: false, retryAt: blocked };
+      lastStart.set(credentialId, now());
+      const startedAt = now();
+      let value: T;
+      try {
+        value = await task();
+      } catch (error) {
+        const signal = usageFailureSignal(error);
+        if (signal) recordFailure(lane, signal);
+        throw error;
+      }
+      const signal = usageFailureSignal(value);
+      if (signal) {
+        recordFailure(lane, signal);
+        return { ran: true, value, retryAt: backingOffUntil(lane) };
+      }
+      if (startedAt > lane.lastFailureAt) {
+        lane.failures = 0;
+        lane.retryNotBefore = 0;
+      }
+      return { ran: true, value, retryAt: null };
+    } finally {
+      lane.running -= 1;
+      running -= 1;
+      wake();
+    }
+  }
+
+  return {
+    async run<T>(credentialId: string, request: UsageGateRequest, task: () => Promise<T>): Promise<UsageGateResult<T>> {
+      const lane = laneOf(request.providerId);
+      const blocked = backingOffUntil(lane);
+      if (blocked !== null) return { ran: false, retryAt: blocked };
+      return refreshGate.run(credentialId, async () => {
+        const previous = lastStart.get(credentialId);
+        if (previous !== undefined) {
+          const next = previous + policy.minIntervalMs(request.providerId, request.reason);
+          if (next > now()) return { ran: false, retryAt: next } as UsageGateResult<T>;
+        }
+        return start(credentialId, request, task);
+      });
+    },
+  };
+}
+
 /** Numeric multiplier encoded in a tier name such as "default_claude_max_5x". */
 export function planMultiplierFromTier(tier: unknown): number | null {
   if (typeof tier !== "string") return null;
@@ -885,7 +1103,7 @@ const CODEX_PLAN_ALIASES: Readonly<Record<string, { plan: string; multiplier: nu
   pro_lite: { plan: "pro", multiplier: 5 },
   "pro-lite": { plan: "pro", multiplier: 5 },
   "pro lite": { plan: "pro", multiplier: 5 },
-  pro: { plan: "pro", multiplier: 20 },
+  pro: { plan: "pro", multiplier: null },
   team: { plan: "business", multiplier: null },
   teams: { plan: "business", multiplier: null },
   business: { plan: "business", multiplier: null },
@@ -902,6 +1120,9 @@ const CODEX_PLAN_ALIASES: Readonly<Record<string, { plan: string; multiplier: nu
 export function normalizeCodexPlan(value: unknown): { plan: string | null; multiplier: number | null; tier: string | null } {
   if (typeof value !== "string" || !value.trim() || value.includes("@")) return { plan: null, multiplier: null, tier: null };
   const raw = value.trim();
+  const sized = /^pro[\s_-]*(\d{1,3})x$/i.exec(raw);
+  const sizedMultiplier = sized ? Number(sized[1]) : null;
+  if (sizedMultiplier !== null && sizedMultiplier >= 1 && sizedMultiplier <= 100) return { plan: "pro", multiplier: sizedMultiplier, tier: "pro" };
   const alias = CODEX_PLAN_ALIASES[raw.toLowerCase()];
   const plan = alias?.plan ?? raw;
   return { plan, multiplier: alias?.multiplier ?? null, tier: plan };
