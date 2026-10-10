@@ -9,7 +9,7 @@
 | 编号 | 检查项 | 判定范围 |
 | --- | --- | --- |
 | AP001 | 文本颜色对比度 | axe 对实际前景和背景的对比度检查 |
-| AP002 | hover / focus 可读性 | 自动发现可见控件，检查悬停与键盘 focus 时的文字对比度 |
+| AP002 | hover / focus 可读性 | 自动发现可见控件与复选/单选框的关联标签，检查悬停与键盘 focus 时的文字对比度 |
 | AP003 | 同心圆角 | 可见嵌套表面的实际间距与内外圆角，含椭圆、百分比、胶囊形和透明包装层 |
 | AP004 | 内容重叠 | 独立可见文字之间的交叠 |
 | AP005 | 换行与容器 | 文字裁切、逃出容器、控件标签异常换行；允许显式省略和滚动区域 |
@@ -21,33 +21,34 @@ AP003–AP008 根据渲染证据推断设计意图，报告是警告。AP007 测
 
 ## 安装与参数模式
 
-从本仓库打包的 `platform-kit-appearance-check-0.1.0.tgz` 安装为开发依赖（仓库通过 GitHub Releases 分发包）。需要 Node 24+。
+从本仓库打包的 `platform-kit-appearance-check-0.1.1.tgz` 安装为开发依赖（仓库通过 GitHub Releases 分发包）。需要 Node 24+。
 
 ```sh
-pnpm add -D /path/to/platform-kit-appearance-check-0.1.0.tgz
+pnpm add -D /path/to/platform-kit-appearance-check-0.1.1.tgz
 pnpm dlx playwright@1.63.0 install chromium
 pnpm exec appearance-check --url http://localhost:5173 --viewport 390x844
-pnpm exec appearance-check --url http://localhost:5173/settings --checks AP002,AP003 --json
+pnpm exec appearance-check --url http://localhost:5173/settings --checks AP002,AP003 --color-scheme light --color-scheme dark --json
 pnpm exec appearance-check --config appearance-check.json --output appearance-report.json --json
 pnpm exec appearance-check --list
 ```
 
-默认检查指定页面的桌面 1280×800 和移动 390×844 视口；每个视口最多检查 40 个控件的 hover / focus。使用 `--max-controls` 修改上限，`--ignore-check AP003` 关闭某项检查，`--executable-path` 指定已安装的 Chromium。CLI 退出码：0 无问题；1 输入错误、执行失败或有覆盖缺口；2 发现问题。`--warn-only` 让报告不改变退出码，输入或启动错误仍返回 1。
+默认以浅色主题检查指定页面的桌面 1280×800 和移动 390×844 视口；重复传入 `--color-scheme light --color-scheme dark` 检查两种主题。每个视口最多检查 40 个控件的 hover / focus。使用 `--max-controls` 修改上限，`--ignore-check AP003` 关闭某项检查，`--executable-path` 指定已安装的 Chromium。CLI 退出码：0 无问题；1 输入错误、执行失败或有覆盖缺口；2 发现问题。`--warn-only` 让报告不改变退出码，输入或启动错误仍返回 1。
 
 配置文件使用 Node API 的 JSON 参数：
 
 ```json
 {
   "urls": ["http://localhost:5173/settings"],
+  "colorSchemes": ["light", "dark"],
   "checks": ["AP001", "AP002", "AP003", "AP004", "AP005", "AP006", "AP007", "AP008"],
   "ignores": [
     {"checkId": "AP003", "page": "/settings", "selector": ".brand-card", "reason": "品牌装饰使用独立圆角"},
-    {"checkId": "AP002", "page": "/settings", "selector": "#preview", "state": "hover", "reason": "已登记的预览状态问题"}
+    {"checkId": "AP002", "page": "/settings", "selector": "#preview", "state": "hover", "colorScheme": "dark", "reason": "已登记的深色预览状态问题"}
   ]
 }
 ```
 
-忽略项中的字段同时匹配；未指定的字段不限。`page` 匹配完整 URL、pathname 或 Vue 的 hash 路由，支持 `*`。`selector` 匹配元素及其后代，`state` 为 `default`、`hover`、`focus`。已忽略的问题保留在 JSON 的 `suppressed` 中，包含原因；其他页面和状态仍接受检查。
+忽略项中的字段同时匹配；未指定的字段不限。`page` 匹配完整 URL、pathname 或 Vue 的 hash 路由，支持 `*`。`selector` 匹配元素及其后代，`state` 为 `default`、`hover`、`focus`，`colorScheme` 为 `light` 或 `dark`。已忽略的问题保留在 JSON 的 `suppressed` 中，包含原因；其他页面和状态仍接受检查。
 
 ## Vite 构建警告
 
@@ -61,6 +62,7 @@ export default defineConfig({
   plugins: [appearanceCheck({
     paths: ['', 'settings'],
     checks: ['AP002', 'AP003', 'AP004', 'AP005'],
+    colorSchemes: ['light', 'dark'],
     ignores: [{checkId: 'AP003', page: '*/settings', selector: '.brand-card', reason: '品牌装饰'}]
   })]
 });
@@ -81,6 +83,18 @@ const report = await auditAppearance({
 });
 ```
 
-报告含 `findings`、`suppressed`、`coverage` 和已扫描的 `pages`。每个 finding 都有 `checkId`、页面、视口、状态、CSS selector、判定可信度和具体 `evidence`。不要把空 findings 当作完整覆盖；同时查看 coverage。
+报告含 `findings`、`suppressed`、`coverage` 和已扫描的 `pages`。每个 finding 都有 `checkId`、页面、视口、`colorScheme`、状态、CSS selector、判定可信度和具体 `evidence`；`pages`、`coverage` 和 `suppressed` 同样保留主题。不要把空 findings 当作完整覆盖；同时查看 coverage。`colorSchemes` 不能是空列表。主题参数模拟 `prefers-color-scheme`；固定主题或由账户设置控制的页面需由宿主切换到相应主题。
 
 当前范围是指定页面与视口中的可见内容。不会自动遍历路由、滚动全页、点击打开弹窗或提交表单，也不分析伪元素的独立绘制内容。可见 iframe、Shadow DOM、无法计算的几何、axe 不确定结果、超出控件上限及页面脚本错误或 HTTP 失败会列入 coverage。圆角暂不处理旋转、缩放、遮罩和裁剪路径；布局与光学检查也有各自几何限制。测试包含真实 Vue slot/fragment/Teleport，以及启用插件前后所有构建文件 SHA-256 相同的验证。
+
+## 在仓库中构建
+
+```sh
+pnpm install --frozen-lockfile
+pnpm --filter @platform-kit/appearance-check run typecheck
+pnpm --filter @platform-kit/appearance-check run build
+pnpm exec playwright install chromium
+pnpm run test:appearance
+```
+
+完整公开归档使用仓库根目录的 `pnpm run build`、`pnpm run pack:release`，然后执行 `node --test test/appearance-consumer.mjs` 验证独立安装、CLI、类型声明和 Vite 8 消费。

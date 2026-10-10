@@ -11,7 +11,7 @@ const help = `appearance-check --url http://localhost:5173 [options]
   --checks AP003,AP005   Run selected check IDs
   --ignore-check AP003   Disable a check (repeatable)
   --viewport 390x844     Viewport (repeatable; default desktop + mobile)
-  --color-scheme light|dark  Emulate prefers-color-scheme (repeatable)
+  --color-scheme light|dark  Emulate prefers-color-scheme (repeatable; default light)
   --executable-path FILE Chromium executable; default Playwright Chromium
   --max-controls N      Hover/focus limit per page (default 40)
   --timeout N           Page timeout in milliseconds (default 15000)

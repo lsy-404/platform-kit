@@ -1,4 +1,5 @@
 export type CheckId = "AP001" | "AP002" | "AP003" | "AP004" | "AP005" | "AP006" | "AP007" | "AP008";
+export type ColorScheme = "light" | "dark";
 export type State = "default" | "hover" | "focus";
 export interface RawFinding {
   checkId: CheckId;
@@ -21,6 +22,7 @@ export interface Viewport { width: number; height: number }
 export interface Finding extends RawFinding {
   page: string;
   viewport: Viewport;
+  colorScheme: ColorScheme;
   state: State;
 }
 export interface Ignore {
@@ -28,13 +30,14 @@ export interface Ignore {
   page?: string;
   selector?: string;
   state?: State;
+  colorScheme?: ColorScheme;
   reason: string;
 }
 export interface AuditOptions {
   urls: string[];
   checks?: CheckId[];
   viewports?: Viewport[];
-  colorSchemes?: Array<"light" | "dark">;
+  colorSchemes?: ColorScheme[];
   ignores?: Ignore[];
   executablePath?: string;
   maxControls?: number;
@@ -43,6 +46,6 @@ export interface AuditOptions {
 export interface Report {
   findings: Finding[];
   suppressed: Array<Finding & { reason: string }>;
-  coverage: Array<{ page: string; viewport: Viewport; state: State; target: string; checkId?: CheckId; reason: string }>;
-  pages: Array<{ page: string; viewport: Viewport; controls: number }>;
+  coverage: Array<{ page: string; viewport: Viewport; colorScheme: ColorScheme; state: State; target: string; checkId?: CheckId; reason: string }>;
+  pages: Array<{ page: string; viewport: Viewport; colorScheme: ColorScheme; controls: number }>;
 }
