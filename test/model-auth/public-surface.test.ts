@@ -6,6 +6,7 @@ import * as opencode from "../../model-auth/packages/providers/src/opencode.js";
 import * as usage from "../../model-auth/packages/providers/src/usage.js";
 import { credentialReady, credentialRemaining, fill, lowestRemaining, windowRemaining } from "../../model-auth/packages/vue/src/usage";
 import { defaultMessages } from "../../model-auth/packages/vue/src/messages";
+import type { CredentialUsage, ProviderCredential } from "../../model-auth/packages/vue/src/types";
 
 describe("public package surface", () => {
   it("exposes a semantic package version", () => {
@@ -41,6 +42,20 @@ describe("public package surface", () => {
     expect(credentialReady(base)).toBe(true);
     expect(credentialReady({ ...base, cooldownUntilUtc: "2030-01-01T00:00:00Z" })).toBe(false);
     expect(fill("{a}-{b}-{c}", { a: 1, b: "x" })).toBe("1-x-{c}");
+  });
+
+  it("carries reading provenance, extra usage, funded balance and cooldown on the credential types", () => {
+    const usage = {
+      providerId: "anthropic", credentialId: "c", status: "ok", plan: "max", fetchedAtUtc: "2030-01-01T00:00:00Z", error: null,
+      windows: [{ id: "five_hour", label: "5h", usedPercent: 40, resetAt: null }],
+      balance: { amount: 5, unit: "USD", funded: true },
+      extraUsage: { enabled: true, used: 3, limit: 50, usedPercent: 6, currency: "USD" },
+      basis: "estimated", observedAtUtc: "2029-12-31T00:00:00Z",
+    } satisfies CredentialUsage;
+    const credential = {
+      id: "c", label: "C", healthy: true, enabled: true, usage, cooldown: { until: Date.parse("2030-01-01T00:05:00Z"), reason: "rate-limited" },
+    } satisfies ProviderCredential;
+    expect(credentialRemaining(credential)).toBe(60);
   });
 
   it("ships the new default messages", () => {

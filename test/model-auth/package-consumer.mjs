@@ -80,9 +80,9 @@ assert.ok(element.shadowRoot.querySelector('[data-auth-method="api-key"]'));
 element.remove();
 await browser.happyDOM.close();
 writeFileSync(join(consumer, "entry.ts"), `
-import { ModelAuthDialog, type ModelAuthProvider } from "@model-auth/vue";
+import { ModelAuthDialog, type ModelAuthProvider, type CredentialUsage, type ProviderCredential } from "@model-auth/vue";
 import { registerModelAuthElement } from "@model-auth/vue/custom-element";
-import { CredentialRouter, createCredentialMetadata } from "@model-auth/core";
+import { CredentialRouter, createCredentialMetadata, createUsageGate, parseRetryAfter, type UsageGate } from "@model-auth/core";
 import { authorizeWorkBuddy, refreshWorkBuddy } from "@model-auth/providers/workbuddy";
 import { authorizeOpenAI, refreshOpenAI, listOpenAICodexModels, parseOpenAICodexModels, type OpenAICodexModel } from "@model-auth/providers/openai";
 import { latestClientVersion, CLIENT_VERSION_FLOORS, type ClientVersionTarget } from "@model-auth/providers/client-versions";
@@ -94,6 +94,10 @@ import { queryOpencodeGoKeyUsage, parseOpencodeGoUsage } from "@model-auth/provi
 import { queryProviderUsage, queryClaudePrepaidCredits, parseAnthropicUsage } from "@model-auth/providers/usage";
 import type { ProviderUsageExtraUsage } from "@model-auth/core";
 const extraUsage: ProviderUsageExtraUsage | null | undefined = parseAnthropicUsage({}).extraUsage;
+const gate: UsageGate = createUsageGate({ minIntervalMs: () => 0 });
+const retryAfter: number | null = parseRetryAfter("120");
+const usage = { providerId: "anthropic", credentialId: "one", status: "ok", plan: null, windows: [], balance: { amount: 1, unit: "USD", funded: true }, basis: "estimated", observedAtUtc: "2030-01-01T00:00:00Z", fetchedAtUtc: "2030-01-01T00:00:00Z", error: null } satisfies CredentialUsage;
+const credential = { id: "one", label: "One", healthy: true, enabled: true, usage, cooldown: { until: 1, reason: "rate-limited" } } satisfies ProviderCredential;
 const providers: ModelAuthProvider[] = [];
 const dialogProps: InstanceType<typeof ModelAuthDialog>["$props"] = { separateAuthMethods: false };
 void dialogProps;
@@ -101,12 +105,12 @@ const target: ClientVersionTarget = "codex";
 const pending: Promise<string> = latestClientVersion(target);
 const models: readonly OpenAICodexModel[] = parseOpenAICodexModels({ models: [] });
 const router = new CredentialRouter([createCredentialMetadata({ id: "one", providerId: "sample", authMethod: "api-key", modelIds: ["sample"] })]);
-void [providers, router, ModelAuthDialog, registerModelAuthElement, authorizeWorkBuddy, refreshWorkBuddy, authorizeTrae, refreshTrae, listTraeModels, streamTrae, authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic, authorizeGrok, queryGrokUsage, authorizeOllamaWeb, queryOllamaUsage, parseOllamaSettings, queryOpencodeGoKeyUsage, parseOpencodeGoUsage, queryProviderUsage, queryClaudePrepaidCredits, extraUsage, listOpenAICodexModels, CLIENT_VERSION_FLOORS, pending, models];
+void [gate, retryAfter, credential, providers, router, ModelAuthDialog, registerModelAuthElement, authorizeWorkBuddy, refreshWorkBuddy, authorizeTrae, refreshTrae, listTraeModels, streamTrae, authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic, authorizeGrok, queryGrokUsage, authorizeOllamaWeb, queryOllamaUsage, parseOllamaSettings, queryOpencodeGoKeyUsage, parseOpencodeGoUsage, queryProviderUsage, queryClaudePrepaidCredits, extraUsage, listOpenAICodexModels, CLIENT_VERSION_FLOORS, pending, models];
 `);
 execFileSync(process.execPath, [join(root, "node_modules/typescript/bin/tsc"), "--noEmit", "--strict", "--skipLibCheck", "--moduleResolution", "bundler", "--module", "esnext", "--target", "es2023", join(consumer, "entry.ts")], { stdio: "pipe", cwd: consumer });
 execFileSync(process.execPath, [join(root, "node_modules/typescript/bin/tsc"), "--noEmit", "--strict", "--skipLibCheck", "--moduleResolution", "node", "--module", "commonjs", "--target", "es2023", join(consumer, "entry.ts")], { stdio: "pipe", cwd: consumer });
 execFileSync(process.execPath, ["--input-type=module", "-e", `
-import { CredentialRouter, createCredentialMetadata } from "@model-auth/core";
+import { CredentialRouter, createCredentialMetadata, createUsageGate, parseRetryAfter } from "@model-auth/core";
 import { authorizeWorkBuddy, refreshWorkBuddy } from "@model-auth/providers/workbuddy";
 import { authorizeOpenAI, refreshOpenAI, listOpenAICodexModels, parseOpenAICodexModels } from "@model-auth/providers/openai";
 import { latestClientVersion, CLIENT_VERSION_FLOORS } from "@model-auth/providers/client-versions";
@@ -131,6 +135,9 @@ for (const provider of [authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refr
 if (latestClientVersion !== rootLatestClientVersion || typeof listOpenAICodexModels !== "function") throw new Error("Installed client version lookup unavailable");
 if (parseOpenAICodexModels({ models: [{ slug: "sample" }] })[0]?.id !== "sample") throw new Error("Installed Codex catalog parser unavailable");
 if (await latestClientVersion("grok", { fetchImpl: async () => { throw new Error("offline"); } }) !== CLIENT_VERSION_FLOORS.grok) throw new Error("Installed client version floor unavailable");
+if (parseRetryAfter("120") !== 120000 || parseRetryAfter("soon") !== null) throw new Error("Installed Retry-After parser unavailable");
+const gated = await createUsageGate({ minIntervalMs: () => 0 }).run("one", { providerId: "sample", reason: "manual" }, async () => "read");
+if (!gated.ran || gated.value !== "read") throw new Error("Installed usage gate unavailable");
 const router = new CredentialRouter([createCredentialMetadata({ id: "one", providerId: "sample", authMethod: "api-key", modelIds: ["sample"] })]);
 if (router.candidates({ providerId: "sample", modelId: "sample" })[0]?.id !== "one") throw new Error("Installed core cannot route");
 `], { stdio: "pipe", cwd: consumer });

@@ -38,6 +38,8 @@ export interface ProviderAuthState {
 
 export type CredentialUsageWindowKind = "session" | "daily" | "weekly" | "monthly";
 export type CredentialUsageWindowStatus = "known" | "unknown" | "exhausted";
+export type CredentialUsageBasis = "accurate" | "estimated";
+export type CredentialCooldownReason = "rate-limited" | "transient" | "auth";
 export type CredentialUsageErrorCode = "signed-out" | "rate-limited" | "server-error" | "unreadable" | "unreachable" | "no-limits";
 
 export interface CredentialUsageWindow {
@@ -75,6 +77,15 @@ export interface CredentialUsageEstimate {
   nextResetAt: number | null;
 }
 
+/** Pay-as-you-go spend beyond the plan limits; amounts are in major currency units. */
+export interface CredentialUsageExtraUsage {
+  enabled: boolean;
+  used: number | null;
+  limit: number | null;
+  usedPercent: number | null;
+  currency: string | null;
+}
+
 export interface CredentialUsage {
   providerId: string;
   credentialId: string;
@@ -87,8 +98,13 @@ export interface CredentialUsage {
   subscriptionExpiresAt?: number | null;
   metadataError?: string | null;
   windows: CredentialUsageWindow[];
-  balance: { amount: number; unit: string } | null;
+  balance: { amount: number; unit: string; funded?: boolean } | null;
+  extraUsage?: CredentialUsageExtraUsage | null;
   estimate?: CredentialUsageEstimate | null;
+  /** "estimated" when a window was rolled forward past its reset since the reading was observed. */
+  basis?: CredentialUsageBasis;
+  /** When the carried reading was observed; absent on a fresh reading. */
+  observedAtUtc?: string;
   fetchedAtUtc: string;
   error: string | null;
   errorCode?: CredentialUsageErrorCode | null;
@@ -110,6 +126,8 @@ export interface ProviderCredential {
   account?: string;
   models?: string[];
   cooldownUntilUtc?: string | null;
+  /** Why the credential is held back and until when (epoch milliseconds). */
+  cooldown?: { until: number; reason: CredentialCooldownReason };
   extend?: CredentialExtend;
   secret?: string;
   usage?: CredentialUsage | null;
