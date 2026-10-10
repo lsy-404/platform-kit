@@ -96,11 +96,29 @@ const matchingProviders = computed(() => {
   return props.providers.flatMap(provider => provider.authMethods.filter(value => !props.separateAuthMethods || value === method.value).map(method => ({ provider, method })))
     .filter(entry => [entry.provider.name, entry.provider.description, entry.provider.id, methodLabel(entry.method)].some(value => value.toLocaleLowerCase().includes(query)));
 });
-const providerGroups = computed(() => [
-  { key: "available", label: text.value.available, providers: matchingProviders.value.filter(entry => entry.provider.available) },
-  { key: "unavailable", label: text.value.unavailable, providers: matchingProviders.value.filter(entry => !entry.provider.available) },
-].filter(group => group.providers.length));
+type ProviderEntry = { provider: ModelAuthProvider; method: AuthMethod };
+const GROUP_LIMIT = 8;
+const expandedGroups = reactive<Record<string, boolean>>({});
+const searching = computed(() => search.value.trim() !== "");
+function withCredentialsFirst(entries: ProviderEntry[]): ProviderEntry[] {
+  return [...entries.filter(entry => credentialCount(entry) > 0), ...entries.filter(entry => credentialCount(entry) === 0)];
+}
+const providerGroups = computed(() => {
+  const entries = matchingProviders.value;
+  const groups = [
+    { key: "oauth", label: text.value.signIn, limit: GROUP_LIMIT, all: entries.filter(entry => entry.provider.available && entry.method === "oauth") },
+    { key: "api-key", label: text.value.apiKey, limit: GROUP_LIMIT, all: entries.filter(entry => entry.provider.available && entry.method === "api-key") },
+    { key: "unavailable", label: text.value.unavailable, limit: 0, all: entries.filter(entry => !entry.provider.available) },
+  ];
+  return groups.filter(group => group.all.length).map(group => {
+    const ordered = withCredentialsFirst(group.all);
+    const expanded = searching.value || expandedGroups[group.key] === true;
+    const collapsible = !searching.value && ordered.length > group.limit;
+    return { key: group.key, label: group.label, total: ordered.length, expanded: expanded && collapsible, toggle: collapsible, providers: expanded ? ordered : ordered.slice(0, group.limit) };
+  });
+});
 const orderedProviders = computed(() => providerGroups.value.flatMap(group => group.providers));
+function toggleGroup(key: string) { expandedGroups[key] = !expandedGroups[key]; }
 const credentials = computed<ProviderCredential[]>(() => {
   const provider = selectedProvider.value;
   return (method.value === "oauth" ? provider?.oauthCredentials : provider?.apiKeyCredentials) ?? [];
@@ -134,7 +152,7 @@ function resetState() {
   method.value = props.initialConnection?.method ?? props.initialMethod;
   step.value = props.initialConnection ? "detail" : props.separateAuthMethods ? "method" : "providers";
   selectedProviderId.value = props.initialConnection?.providerId ?? ""; search.value = "";
-  focusedProviderIndex.value = -1; pendingRemoval.value = ""; localError.value = ""; clearSecret();
+  focusedProviderIndex.value = -1; for (const key of Object.keys(expandedGroups)) delete expandedGroups[key]; pendingRemoval.value = ""; localError.value = ""; clearSecret();
 }
 function reducedMotion() { return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches; }
 async function focusHeading() { await nextTick(); if (props.open && modalState.value !== "closing") heading.value?.focus(); }
@@ -439,6 +457,7 @@ watch(() => credentials.value.map(credential => [credential.id, credential.label
   const before = new Map(previous);
   for (const [id, label] of current) if (before.get(id) !== label) delete labelDrafts[id];
 });
+watch(orderedProviders, list => { if (focusedProviderIndex.value >= list.length) focusedProviderIndex.value = -1; });
 watch(selectedProvider, provider => {
   if (!provider && !connectionMode.value && (step.value === "detail" || step.value === "confirmation")) { awaitingVerification = false; step.value = "providers"; }
 });
@@ -448,7 +467,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
 <template>
   <dialog v-if="visible" ref="dialog" class="model-auth-modal" :class="{ 'model-auth-styled': styled }" :data-theme="theme" :data-state="modalState" part="dialog" data-part="dialog" :aria-labelledby="titleId" :aria-busy="busy" @cancel="handleCancel" @click.self="close" @keydown="handleDialogKeydown" @animationend="handleModalAnimationEnd">
     <div class="model-auth-root">
-      <section class="model-auth-dialog" role="document" tabindex="-1">
+      <section class="model-auth-dialog" :class="{ 'model-auth-dialog-fixed': step === 'providers' }" role="document" tabindex="-1">
         <header class="model-auth-header" part="header" data-part="navigation">
           <button v-if="stepIndex > 0 && !connectionMode && step !== 'confirmation'" type="button" class="model-auth-back" part="back" data-part="back" :aria-label="text.back" @click="back"><ModelAuthIcon name="back" /></button>
           <h2 :id="titleId" ref="heading" class="model-auth-title" tabindex="-1">{{ connectionMode ? text.connectionInfo : pageTitles[stepIndex] }}</h2>
@@ -493,8 +512,8 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
         </div>
         <div v-else-if="step === 'providers'" key="providers" :class="['model-auth-provider-step', transitionName]" part="provider-step" data-part="provider-step">
           <div class="model-auth-provider-search">
+            <ModelAuthIcon name="search" class="model-auth-search-icon" />
             <input ref="searchInput" v-model="search" class="model-auth-search" part="search" data-part="search" type="search" :placeholder="text.search" :aria-label="text.search" autocomplete="off" @keydown="handleProviderKeydown" />
-            <button type="button" class="model-auth-secondary" data-part="refresh-catalog" :disabled="catalogStatus.state === 'loading'" @click="emit('refresh-catalog')">{{ catalogStatus.state === 'loading' ? text.refreshingCatalog : text.refreshCatalog }}</button>
           </div>
           <p v-if="catalogStatus.error || catalogStatus.state === 'error'" class="model-auth-error" part="catalog-status" data-part="catalog-status" role="status">{{ catalogStatus.error || text.catalogUnavailable }}</p>
           <div class="model-auth-provider-list" part="provider-list">
@@ -508,8 +527,12 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                   <ModelAuthIcon name="next" class="model-auth-row-chevron" />
                 </slot>
               </button>
+              <button v-if="group.toggle" type="button" class="model-auth-subtle model-auth-group-toggle" data-part="group-toggle" :data-group="group.key" :aria-expanded="group.expanded" @click="toggleGroup(group.key)">{{ group.expanded ? text.showLess : text.showAll.replace('{count}', String(group.total)) }}</button>
             </section>
-            <p v-if="!orderedProviders.length" class="model-auth-empty" role="status">{{ text.noProviders }}</p>
+            <div v-if="!providerGroups.length" class="model-auth-empty" role="status">
+              <span>{{ text.noProviders }}</span>
+              <button type="button" class="model-auth-secondary" data-part="refresh-catalog" :disabled="catalogStatus.state === 'loading'" @click="emit('refresh-catalog')">{{ catalogStatus.state === 'loading' ? text.refreshingCatalog : text.refreshCatalog }}</button>
+            </div>
           </div>
         </div>
 

@@ -28,6 +28,14 @@ describe("model auth control icons", () => {
     expect(builtinProviderIcon("ollama-cloud")).not.toBe(icon);
   });
 
+  it("bundles the official Ollama PNG mark for both Ollama providers", () => {
+    const icon = builtinProviderIcon("ollama")!;
+    expect(builtinProviderIcon("ollama-cloud")).toBe(icon);
+    const png = Buffer.from(icon.match(/href="data:image\/png;base64,([^"]+)"/)![1]!, "base64");
+    expect(png.subarray(1, 4).toString()).toBe("PNG");
+    expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([181, 256]);
+  });
+
   it("styles icons with fill instead of strokes", () => {
     const css = readFileSync(resolve(src, "style.css"), "utf8");
     expect(css).not.toMatch(/\.model-auth-icon\s*\{[^}]*stroke/);
