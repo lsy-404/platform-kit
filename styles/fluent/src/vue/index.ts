@@ -33,3 +33,4 @@ export { FluentSelect, FluentMenu } from "./selection.js";
 export type { FluentMenuItem } from "./selection.js";
 export { fluentIcon } from "./icon.js";
 export type { FluentIconName } from "./icon.js";
+export { FluentSvgIcon, FluentIconText } from "./graphics.js";

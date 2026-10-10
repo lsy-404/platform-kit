@@ -17,6 +17,13 @@ Switches and sliders can omit a visible `label` when an `aria-label` is supplied
 
 `FluentSlider` accepts continuous values by default. Set `snap="integer"` for whole numbers or `snap="available"` with `availableValues` for the nearest listed value. The existing `step` prop remains available for a numeric range interval when `snap` is omitted; `snap="none"` explicitly allows any value. `availableValues` also draws marks at those values; `tickFrequency` sets the small-mark interval and `majorTickFrequency` sets a larger-mark interval, independently of snapping. Set `tickPlacement` to `start`, `end`, or `outside` (both sides), and `orientation` to `horizontal` or `vertical`. Values outside the range and non-finite values are ignored in the available list. `formatValue` controls the visible value text; by default the actual number is shown.
 
+`FluentSvgIcon` and `FluentIconText` accept an SVG string and use rendered paint bounds (including strokes) for optional whitespace trimming. Both keep the full sanitized SVG image and move it inside a fixed slot, so strokes and other painted pixels are preserved. `FluentSvgIcon` is decorative by default; pass `label` for an accessible image name. `FluentIconText` takes its visible label from the default slot and exposes that text once to assistive technology. Its vertical alignment uses browser font metrics for a Latin cap or CJK em glyph; complex mixed-script shaping and multiline baseline alignment remain approximate. A `ready` event carries measurement status and `data-status` reports `pending`, `estimated`, `empty`, `no-contrast`, or `error`; invalid SVG reports an `error` event. Set `foreground` and `background` to explicit colors when inherited CSS colors do not represent the SVG's actual rendering surface.
+
+```vue
+<FluentSvgIcon :svg="searchSvg" label="Search" :size="20" />
+<FluentIconText :svg="saveSvg">Save</FluentIconText>
+```
+
 ```vue
 <FluentSlider v-model="value" :min="0" :max="100"
   :tick-frequency="5" :major-tick-frequency="20"

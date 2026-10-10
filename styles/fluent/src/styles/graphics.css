@@ -1,0 +1,46 @@
+.fluent-svg-icon,
+.fluent-icon-text {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  color: inherit;
+}
+
+.fluent-svg-icon {
+  position: relative;
+  width: var(--fluent-graphic-size, 16px);
+  height: var(--fluent-graphic-size, 16px);
+  flex: 0 0 var(--fluent-graphic-size, 16px);
+  overflow: hidden;
+}
+
+.fluent-svg-icon__paint,
+.fluent-icon-text__paint {
+  position: absolute;
+  inset: 0 auto auto 0;
+  transform-origin: top left;
+}
+
+.fluent-svg-icon__paint img,
+.fluent-icon-text__paint img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.fluent-icon-text {
+  gap: 0.35em;
+  line-height: inherit;
+  align-items: baseline;
+}
+
+.fluent-icon-text__icon {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.fluent-icon-text__label {
+  min-width: 0;
+}
