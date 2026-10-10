@@ -33,6 +33,8 @@
     "vue": "^3.5.0"
   },
   "devDependencies": {
-    "@fluentui/svg-icons": "^1.1.343"
+    "@fluentui/svg-icons": "^1.1.343",
+    "@platform-kit/visual-center": "workspace:*",
+    "esbuild": "0.28.2"
   }
 }
