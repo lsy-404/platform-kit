@@ -761,6 +761,15 @@ export interface ProviderUsageEstimate {
   readonly nextResetAt: number | null;
 }
 
+/** Pay-as-you-go spend beyond the plan limits; amounts are in major currency units. */
+export interface ProviderUsageExtraUsage {
+  readonly enabled: boolean;
+  readonly used: number | null;
+  readonly limit: number | null;
+  readonly usedPercent: number | null;
+  readonly currency: string | null;
+}
+
 export interface ProviderUsageSnapshot {
   readonly providerId: string;
   readonly credentialId: string;
@@ -775,6 +784,8 @@ export interface ProviderUsageSnapshot {
   readonly metadataError?: string | null;
   readonly windows: readonly ProviderUsageWindow[];
   readonly balance: ProviderUsageBalance | null;
+  /** Null when the provider reports no extra-usage block. */
+  readonly extraUsage?: ProviderUsageExtraUsage | null;
   readonly estimate?: ProviderUsageEstimate | null;
   /** Organization or account id used to keep cached readings from crossing accounts. */
   readonly identity?: string | null;
@@ -867,11 +878,31 @@ export function planMultiplierFromTier(tier: unknown): number | null {
   return match ? Number(match[1]) : null;
 }
 
-/** Codex plan names; "prolite" is the 5x Pro tier and other values pass through. */
-export function normalizeCodexPlan(value: unknown): { plan: string | null; multiplier: number | null } {
-  if (typeof value !== "string" || !value.trim()) return { plan: null, multiplier: null };
-  const plan = value.trim();
-  return plan.toLowerCase() === "prolite" ? { plan: "pro", multiplier: 5 } : { plan, multiplier: null };
+const CODEX_PLAN_ALIASES: Readonly<Record<string, { plan: string; multiplier: number | null }>> = {
+  prolite: { plan: "pro", multiplier: 5 },
+  pro_lite: { plan: "pro", multiplier: 5 },
+  "pro-lite": { plan: "pro", multiplier: 5 },
+  "pro lite": { plan: "pro", multiplier: 5 },
+  pro: { plan: "pro", multiplier: 20 },
+  team: { plan: "business", multiplier: null },
+  teams: { plan: "business", multiplier: null },
+  business: { plan: "business", multiplier: null },
+  self_serve_business_usage_based: { plan: "business", multiplier: null },
+  enterprise: { plan: "enterprise", multiplier: null },
+  enterprise_cbp_usage_based: { plan: "enterprise", multiplier: null },
+  free: { plan: "free", multiplier: null },
+  go: { plan: "go", multiplier: null },
+  plus: { plan: "plus", multiplier: null },
+  edu: { plan: "edu", multiplier: null },
+};
+
+/** Canonical Codex plan, its usage multiplier and tier key; unknown names pass through and anything containing "@" is dropped. */
+export function normalizeCodexPlan(value: unknown): { plan: string | null; multiplier: number | null; tier: string | null } {
+  if (typeof value !== "string" || !value.trim() || value.includes("@")) return { plan: null, multiplier: null, tier: null };
+  const raw = value.trim();
+  const alias = CODEX_PLAN_ALIASES[raw.toLowerCase()];
+  const plan = alias?.plan ?? raw;
+  return { plan, multiplier: alias?.multiplier ?? null, tier: plan };
 }
 
 export type OAuthCredentialStatus = "active" | "refresh-needed" | "reauth" | "unknown";
@@ -963,7 +994,7 @@ export function describeOAuthCredential(provider: string, credential: unknown, n
   let planMultiplier: number | undefined;
   if (provider === "openai-codex" && plan) {
     const normalized = normalizeCodexPlan(plan);
-    plan = normalized.plan ?? plan;
+    plan = normalized.plan ?? undefined;
     if (normalized.multiplier !== null) planMultiplier = normalized.multiplier;
   }
   const tier = pick(fields.tier) as string | undefined;
@@ -1122,6 +1153,16 @@ function validateUsageEstimate(estimate: ProviderUsageEstimate): ProviderUsageEs
 const USAGE_WINDOW_KINDS: readonly string[] = ["session", "daily", "weekly", "monthly"];
 const USAGE_ERROR_CODES: readonly string[] = ["signed-out", "rate-limited", "server-error", "unreadable", "unreachable", "no-limits"];
 
+function validateExtraUsage(extra: ProviderUsageExtraUsage): ProviderUsageExtraUsage {
+  const amount = (value: unknown): boolean => value === null || (typeof value === "number" && Number.isFinite(value));
+  if (!extra || typeof extra !== "object" || typeof extra.enabled !== "boolean"
+    || !amount(extra.used) || !amount(extra.limit) || !amount(extra.usedPercent)
+    || (extra.currency !== null && (typeof extra.currency !== "string" || !extra.currency.trim()))) {
+    throw new Error("adapter returned an invalid extra usage");
+  }
+  return { enabled: extra.enabled, used: extra.used, limit: extra.limit, usedPercent: extra.usedPercent, currency: extra.currency === null ? null : extra.currency.trim() };
+}
+
 function validateUsageSnapshot(capability: ProviderCapabilityDescriptor, credentialId: string, snapshot: ProviderUsageSnapshot): ProviderUsageSnapshot {
   if (!snapshot || typeof snapshot !== "object" || snapshot.providerId !== capability.providerId
     || snapshot.credentialId !== credentialId || typeof snapshot.credentialId !== "string" || !snapshot.credentialId.trim()
@@ -1190,6 +1231,7 @@ function validateUsageSnapshot(capability: ProviderCapabilityDescriptor, credent
     : undefined;
   if (snapshot.balance !== null && !balance) throw new Error("adapter returned an invalid usage balance");
   const estimate = snapshot.estimate === undefined ? undefined : snapshot.estimate === null ? null : validateUsageEstimate(snapshot.estimate);
+  const extraUsage = snapshot.extraUsage === undefined || snapshot.extraUsage === null ? snapshot.extraUsage : validateExtraUsage(snapshot.extraUsage);
   return {
     providerId: capability.providerId,
     credentialId: snapshot.credentialId,
@@ -1203,6 +1245,7 @@ function validateUsageSnapshot(capability: ProviderCapabilityDescriptor, credent
     ...(snapshot.metadataError !== undefined ? { metadataError: safeUsageText(snapshot.metadataError) } : {}),
     windows,
     balance: balance ?? null,
+    ...(extraUsage !== undefined ? { extraUsage } : {}),
     ...(estimate !== undefined ? { estimate } : {}),
     ...(snapshot.identity !== undefined ? { identity: snapshot.identity } : {}),
     fetchedAtUtc: snapshot.fetchedAtUtc,

@@ -120,6 +120,13 @@ describe("describeOAuthCredential", () => {
     for (const secret of [access, "refresh-secret-value", "signature-value", "ignored"]) expect(text).not.toContain(secret);
   });
 
+  it("reads a plain pro claim as Pro 20x and drops a plan that holds an email", () => {
+    const withPlan = (plan: string) => describeOAuthCredential("openai-codex", { type: "oauth", access: "opaque", refresh: "r", expires: NOW + 3600_000, plan }, NOW);
+    expect(withPlan("pro")).toMatchObject({ plan: "pro", planMultiplier: 20 });
+    expect(withPlan("teams")).toMatchObject({ plan: "business" });
+    expect(withPlan("person@example.test")).not.toHaveProperty("plan");
+  });
+
   it("maps Anthropic fields, scopes and refresh timing", () => {
     const view = describeOAuthCredential("anthropic", {
       access: "a-secret", refresh: "r-secret", expires: NOW - 1000, email: "user@example.test", organizationId: "org-9",

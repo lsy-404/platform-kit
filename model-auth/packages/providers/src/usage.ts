@@ -2,14 +2,14 @@ import { anthropicClientHeaders } from "./anthropic.js";
 import { normalizeCodexPlan, planMultiplierFromTier } from "@model-auth/core";
 import type {
   ProviderUsageBalance, ProviderUsageErrorCode, ProviderUsageEstimate, ProviderUsageEstimateSource, ProviderUsageEstimateUnit,
-  ProviderUsageSnapshot, ProviderUsageStatus, ProviderUsageWindow, ProviderUsageWindowKind, ProviderUsageWindowReliability,
-  ProviderUsageWindowScope, ProviderUsageWindowStatus,
+  ProviderUsageExtraUsage, ProviderUsageSnapshot, ProviderUsageStatus, ProviderUsageWindow, ProviderUsageWindowKind,
+  ProviderUsageWindowReliability, ProviderUsageWindowScope, ProviderUsageWindowStatus,
 } from "@model-auth/core";
 import { classifyUsageHttp } from "@model-auth/core";
 
 export type {
   ProviderUsageBalance, ProviderUsageErrorCode, ProviderUsageEstimate, ProviderUsageEstimateSource, ProviderUsageEstimateUnit,
-  ProviderUsageSnapshot, ProviderUsageStatus, ProviderUsageWindow, ProviderUsageWindowKind, ProviderUsageWindowReliability,
+  ProviderUsageExtraUsage, ProviderUsageSnapshot, ProviderUsageStatus, ProviderUsageWindow, ProviderUsageWindowKind, ProviderUsageWindowReliability,
   ProviderUsageWindowScope, ProviderUsageWindowStatus,
 };
 
@@ -74,6 +74,7 @@ export interface ProviderUsageData {
   readonly metadataError?: string | null;
   readonly windows: readonly ProviderUsageWindow[];
   readonly balance: ProviderUsageBalance | null;
+  readonly extraUsage?: ProviderUsageExtraUsage | null;
   readonly estimate?: ProviderUsageEstimate | null;
   readonly identity?: string | null;
   readonly error?: string | null;
@@ -128,6 +129,7 @@ export function usageSnapshot(providerId: string, credentialId: string, data: Pr
         : {}),
     })),
     balance: data.balance ? { ...data.balance } : null,
+    ...(data.extraUsage !== undefined ? { extraUsage: data.extraUsage ? { ...data.extraUsage } : null } : {}),
     ...(data.estimate !== undefined ? { estimate: data.estimate ? { ...data.estimate } : null } : {}),
     ...(data.identity !== undefined ? { identity: data.identity } : {}),
     fetchedAtUtc: new Date().toISOString(),
@@ -153,8 +155,12 @@ export function usageErrorSnapshot(providerId: string, credentialId: string, err
 
 type Json = Record<string, unknown>;
 
+function isRecord(value: unknown): value is Json {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
 function record(value: unknown): Json {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Json : {};
+  return isRecord(value) ? value : {};
 }
 
 function numberValue(...values: unknown[]): number | null {
@@ -292,6 +298,7 @@ export function parseCodexUsage(payload: unknown, metadata: { plan?: unknown; su
     windows,
     balance: credits === null ? null : { amount: credits, unit: "credits" },
     planMultiplier: planMultiplier(root) ?? reportedPlan.multiplier,
+    planTier: reportedPlan.tier,
     subscriptionExpiresAt: timestamp(metadata.subscriptionExpiresAt),
   };
 }
@@ -340,11 +347,48 @@ export function parseAnthropicUsage(payload: unknown): ProviderUsageData {
       if (window) windows.push(window);
     }
   }
-  const credits = numberValue(record(root.credits).balance, root.credit_balance);
   return {
     plan: stringValue(root.subscription_type, root.subscriptionType, root.plan_type),
     windows,
-    balance: credits === null ? null : { amount: credits, unit: "credits" },
+    balance: null,
+    extraUsage: parseAnthropicExtraUsage(root),
+  };
+}
+
+function finiteNumber(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function minorUnits(amount: unknown, exponent: unknown): number | null {
+  const minor = finiteNumber(amount);
+  if (minor === null) return null;
+  const digits = finiteNumber(exponent);
+  return minor / 10 ** (digits !== null && Number.isInteger(digits) && digits >= 0 && digits <= 8 ? digits : 2);
+}
+
+/** Extra-usage (pay-as-you-go) spend; `spend` outranks the legacy `extra_usage` block and its own percent is never trusted. */
+function parseAnthropicExtraUsage(root: Json): ProviderUsageExtraUsage | null {
+  if (!isRecord(root.extra_usage) && !isRecord(root.spend)) return null;
+  const extra = record(root.extra_usage);
+  const spend = record(root.spend);
+  const spendUsed = record(spend.used);
+  const spendLimit = record(spend.limit);
+  const used = minorUnits(spendUsed.amount_minor, spendUsed.exponent) ?? minorUnits(extra.used_credits, extra.decimal_places);
+  const limit = minorUnits(spendLimit.amount_minor, spendLimit.exponent) ?? minorUnits(extra.monthly_limit, extra.decimal_places);
+  const reported = finiteNumber(extra.utilization);
+  const computed = used !== null && limit !== null && limit > 0 ? Math.round((used * 100 / limit) * 1e4) / 1e4 : null;
+  const usedPercent = reported ?? computed;
+  return {
+    enabled: spend.enabled === true || extra.is_enabled === true,
+    used,
+    limit,
+    usedPercent: usedPercent === null ? null : Math.max(0, Math.min(100, usedPercent)),
+    currency: stringValue(spendUsed.currency, spendLimit.currency, extra.currency),
   };
 }
 
@@ -571,4 +615,77 @@ function normalizeBillingInterval(value: unknown): string | undefined {
   if (interval === "month" || interval === "monthly") return "month";
   if (interval === "year" || interval === "yearly" || interval === "annual") return "year";
   return undefined;
+}
+
+export const CLAUDE_WEB_ORIGIN = "https://claude.ai";
+
+export interface ClaudePrepaidRequestOptions {
+  /** Fetch bound to a signed-in claude.ai web session; the session owns cookies, this module never sees them. */
+  readonly fetchImpl: typeof fetch;
+  readonly signal?: AbortSignal;
+  readonly credentialId?: string;
+  /** Required only when the session belongs to several chat organizations. */
+  readonly organizationId?: string;
+}
+
+const PREPAID_TIMEOUT_MS = 12_000;
+
+function claudeOrganizationId(value: unknown): string {
+  const row = record(value);
+  return stringValue(row.uuid, row.id, row.organization_uuid) ?? "";
+}
+
+function claudeCapabilities(value: unknown): Set<string> {
+  const list = record(value).capabilities;
+  return new Set(Array.isArray(list) ? list.flatMap(item => typeof item === "string" && item.trim() ? [item.trim().toLowerCase()] : []) : []);
+}
+
+/** Organizations that can chat; falls back to anything that is not API-only. */
+function claudeEligibleOrganizations(body: unknown): unknown[] {
+  const root = record(body);
+  const list = Array.isArray(body) ? body : Array.isArray(root.organizations) ? root.organizations : Array.isArray(root.data) ? root.data : [];
+  const candidates = list.filter(item => claudeOrganizationId(item));
+  const chat = candidates.filter(item => claudeCapabilities(item).has("chat"));
+  if (chat.length) return chat;
+  const nonApi = candidates.filter(item => {
+    const capabilities = claudeCapabilities(item);
+    return capabilities.size !== 1 || !capabilities.has("api");
+  });
+  return nonApi.length ? nonApi : candidates;
+}
+
+/** Prepaid credit pool of a claude.ai organization; the OAuth token cannot read it, only a web session can. */
+export async function queryClaudePrepaidCredits(options: ClaudePrepaidRequestOptions): Promise<ProviderUsageSnapshot> {
+  const credentialId = options.credentialId ?? "claude-web";
+  const timeout = AbortSignal.timeout(PREPAID_TIMEOUT_MS);
+  const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
+  const get = async (path: string): Promise<unknown> => {
+    let response: Response;
+    try {
+      response = await options.fetchImpl(`${CLAUDE_WEB_ORIGIN}${path}`, { headers: { accept: "application/json" }, redirect: "manual", signal });
+    } catch {
+      throw new UsageRequestError("unreachable", signal.aborted ? "Claude prepaid request was cancelled." : "Claude prepaid request failed.");
+    }
+    const code = classifyUsageHttp(response.status);
+    if (code !== "ok") throw new UsageRequestError(code, `Claude prepaid request failed (${response.status}).`, response.status);
+    try { return await response.json(); } catch { throw new UsageRequestError("unreadable", "Claude prepaid response is not valid JSON.", response.status); }
+  };
+  try {
+    const organizations = claudeEligibleOrganizations(await get("/api/organizations"));
+    const selected = options.organizationId?.trim();
+    const organization = selected ? organizations.find(item => claudeOrganizationId(item) === selected) : organizations.length === 1 ? organizations[0] : undefined;
+    if (!organization) {
+      throw new UsageRequestError("unreadable", organizations.length > 1 && !selected ? "Choose a Claude organization." : "Claude organization is not available.");
+    }
+    const payload = record(await get(`/api/organizations/${encodeURIComponent(claudeOrganizationId(organization))}/prepaid/credits`));
+    const minor = finiteNumber(payload.amount);
+    if (minor === null || minor < 0) throw new UsageRequestError("unreadable", "Claude prepaid credits response has no balance.");
+    const unit = (stringValue(payload.currency) ?? "USD").toUpperCase();
+    return usageSnapshot("anthropic", credentialId, { status: "ok", plan: null, windows: [], balance: { amount: minor / 100, unit } });
+  } catch (error) {
+    if (error instanceof UsageRequestError) {
+      return usageSnapshot("anthropic", credentialId, { status: "error", plan: null, windows: [], balance: null, error: error.message, errorCode: error.code });
+    }
+    return usageSnapshot("anthropic", credentialId, { status: "error", plan: null, windows: [], balance: null, error: "Claude prepaid request failed.", errorCode: "unreachable" });
+  }
 }

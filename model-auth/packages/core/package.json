@@ -1,6 +1,6 @@
 {
   "name": "@model-auth/core",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Framework-neutral AI provider access, credential routing and usage contracts.",
   "type": "module",
   "main": "./dist/index.js",

@@ -93,6 +93,25 @@ describe("plan multipliers", () => {
     expect(parseCodexUsage({ plan_type: "plus" })).toMatchObject({ plan: "plus", planMultiplier: null });
   });
 
+  it("maps every ChatGPT plan alias to its tier", () => {
+    const table: Array<[string, string, number | null]> = [
+      ["prolite", "pro", 5], ["pro_lite", "pro", 5], ["pro-lite", "pro", 5], ["Pro Lite", "pro", 5],
+      ["pro", "pro", 20],
+      ["team", "business", null], ["teams", "business", null], ["business", "business", null], ["self_serve_business_usage_based", "business", null],
+      ["enterprise", "enterprise", null], ["enterprise_cbp_usage_based", "enterprise", null],
+      ["free", "free", null], ["go", "go", null], ["plus", "plus", null], ["edu", "edu", null],
+    ];
+    for (const [raw, plan, multiplier] of table) {
+      expect(parseCodexUsage({ plan_type: raw }), raw).toMatchObject({ plan, planTier: plan, planMultiplier: multiplier });
+    }
+  });
+
+  it("lets an explicit multiplier win and never surfaces an email as a plan", () => {
+    expect(parseCodexUsage({ plan_type: "pro", plan_multiplier: 5 })).toMatchObject({ plan: "pro", planMultiplier: 5 });
+    expect(parseCodexUsage({ plan_type: "owner@example.test" })).toMatchObject({ plan: null, planTier: null, planMultiplier: null });
+    expect(parseCodexUsage({}, { plan: "prolite" })).toMatchObject({ plan: "pro", planMultiplier: 5 });
+  });
+
   it("reads the Anthropic tier from the profile and keeps unknown tiers", async () => {
     const run = async (tier: string) => {
       clearAnthropicProfileCache();

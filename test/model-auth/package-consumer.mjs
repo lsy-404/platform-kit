@@ -91,7 +91,9 @@ import { authorizeTrae, refreshTrae, listTraeModels, streamTrae } from "@model-a
 import { authorizeGrok, queryGrokUsage } from "@model-auth/providers/grok";
 import { authorizeOllamaWeb, queryOllamaUsage, parseOllamaSettings } from "@model-auth/providers/ollama";
 import { queryOpencodeGoKeyUsage, parseOpencodeGoUsage } from "@model-auth/providers/opencode";
-import { queryProviderUsage } from "@model-auth/providers/usage";
+import { queryProviderUsage, queryClaudePrepaidCredits, parseAnthropicUsage } from "@model-auth/providers/usage";
+import type { ProviderUsageExtraUsage } from "@model-auth/core";
+const extraUsage: ProviderUsageExtraUsage | null | undefined = parseAnthropicUsage({}).extraUsage;
 const providers: ModelAuthProvider[] = [];
 const dialogProps: InstanceType<typeof ModelAuthDialog>["$props"] = { separateAuthMethods: false };
 void dialogProps;
@@ -99,7 +101,7 @@ const target: ClientVersionTarget = "codex";
 const pending: Promise<string> = latestClientVersion(target);
 const models: readonly OpenAICodexModel[] = parseOpenAICodexModels({ models: [] });
 const router = new CredentialRouter([createCredentialMetadata({ id: "one", providerId: "sample", authMethod: "api-key", modelIds: ["sample"] })]);
-void [providers, router, ModelAuthDialog, registerModelAuthElement, authorizeWorkBuddy, refreshWorkBuddy, authorizeTrae, refreshTrae, listTraeModels, streamTrae, authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic, authorizeGrok, queryGrokUsage, authorizeOllamaWeb, queryOllamaUsage, parseOllamaSettings, queryOpencodeGoKeyUsage, parseOpencodeGoUsage, queryProviderUsage, listOpenAICodexModels, CLIENT_VERSION_FLOORS, pending, models];
+void [providers, router, ModelAuthDialog, registerModelAuthElement, authorizeWorkBuddy, refreshWorkBuddy, authorizeTrae, refreshTrae, listTraeModels, streamTrae, authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic, authorizeGrok, queryGrokUsage, authorizeOllamaWeb, queryOllamaUsage, parseOllamaSettings, queryOpencodeGoKeyUsage, parseOpencodeGoUsage, queryProviderUsage, queryClaudePrepaidCredits, extraUsage, listOpenAICodexModels, CLIENT_VERSION_FLOORS, pending, models];
 `);
 execFileSync(process.execPath, [join(root, "node_modules/typescript/bin/tsc"), "--noEmit", "--strict", "--skipLibCheck", "--moduleResolution", "bundler", "--module", "esnext", "--target", "es2023", join(consumer, "entry.ts")], { stdio: "pipe", cwd: consumer });
 execFileSync(process.execPath, [join(root, "node_modules/typescript/bin/tsc"), "--noEmit", "--strict", "--skipLibCheck", "--moduleResolution", "node", "--module", "commonjs", "--target", "es2023", join(consumer, "entry.ts")], { stdio: "pipe", cwd: consumer });
@@ -113,10 +115,15 @@ import { authorizeAnthropic, refreshAnthropic } from "@model-auth/providers/anth
 import { authorizeGrok, queryGrokUsage } from "@model-auth/providers/grok";
 import { authorizeOllamaWeb, queryOllamaUsage, parseOllamaSettings } from "@model-auth/providers/ollama";
 import { queryOpencodeGoKeyUsage, parseOpencodeGoUsage } from "@model-auth/providers/opencode";
+import { queryClaudePrepaidCredits, parseAnthropicUsage } from "@model-auth/providers/usage";
 const ollama = parseOllamaSettings("<span>Cloud Usage</span><span>Pro</span><div>Weekly usage</div><span>25% used</span>");
 if (ollama.plan !== "Pro" || ollama.windows[0]?.remainingPercent !== 75) throw new Error("Installed Ollama settings parser unavailable");
 const opencode = await queryOpencodeGoKeyUsage("consumer-key", { fetchImpl: async () => Response.json({ usage: { rolling: { percent: 10 }, weekly: { percent: 25 } } }) });
 if (opencode.plan !== "Go" || opencode.windows[1]?.remainingPercent !== 75) throw new Error("Installed OpenCode Go usage unavailable");
+const extra = parseAnthropicUsage({ spend: { enabled: true, used: { amount_minor: 235, currency: "USD", exponent: 2 }, limit: { amount_minor: 2000, currency: "USD", exponent: 2 } } }).extraUsage;
+if (extra?.used !== 2.35 || extra.limit !== 20 || extra.usedPercent !== 11.75) throw new Error("Installed Claude extra usage unavailable");
+const prepaid = await queryClaudePrepaidCredits({ fetchImpl: async url => Response.json(String(url).endsWith("/api/organizations") ? [{ uuid: "org-1" }] : { amount: 1234, currency: "USD" }) });
+if (prepaid.balance?.amount !== 12.34) throw new Error("Installed Claude prepaid credits unavailable");
 if (typeof authorizeWorkBuddy !== "function" || typeof refreshWorkBuddy !== "function") throw new Error("Installed providers unavailable");
 for (const provider of [authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic, authorizeGrok, queryGrokUsage, authorizeOllamaWeb, queryOllamaUsage, parseOllamaSettings, queryOpencodeGoKeyUsage, parseOpencodeGoUsage]) {
   if (typeof provider !== "function") throw new Error("Installed browser OAuth unavailable");
