@@ -67,6 +67,13 @@ function sliderValue(value: number, min: number, max: number, snap: FluentSlider
   return bounded;
 }
 
+// Each labelled stop owns one cell sized by the closest pair, so the track ends half a cell in.
+function sliderLabelCells(values: readonly number[], min: number, max: number): number {
+  const positions = [...new Set(values.map((value) => sliderPercentage(value, min, max) / 100))].sort((a, b) => a - b);
+  const gap = positions.slice(1).reduce((closest, position, i) => Math.min(closest, position - (positions[i] ?? 0)), 1);
+  return positions.length < 2 || gap <= 0 ? 2 : 1 / gap + 1;
+}
+
 function sliderTicks(min: number, max: number, frequency: number | undefined, available: readonly number[]): number[] {
   if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return [];
   const ticks = [...available];
@@ -480,7 +487,10 @@ export const FluentSlider = defineComponent({
         "data-value": tick,
         style: markPosition(tick),
       })));
-      return h("label", { style: labelled.length ? { "--fluent-slider-stops": labelled.length } : undefined, class: ["fluent-slider", {
+      return h("label", { style: labelled.length ? {
+        "--fluent-slider-stops": labelled.length,
+        "--fluent-slider-cells": sliderLabelCells(labelled.map((stop) => stop.value), props.min, props.max),
+      } : undefined, class: ["fluent-slider", {
         "fluent-slider--disabled": props.disabled,
         "fluent-slider--vertical": props.orientation === "vertical",
         "fluent-slider--neutral": props.tone === "neutral",
@@ -526,6 +536,7 @@ export const FluentSlider = defineComponent({
         ]),
         labelled.length ? h("span", { class: "fluent-slider__labels", "aria-hidden": "true" }, labelled.map((stop) => h("span", {
           key: stop.value,
+          "data-value": stop.value,
           class: ["fluent-slider__stop-label", {
             "fluent-slider__stop-label--active": stop.value === targetValue.value,
             "fluent-slider__stop-label--disabled": stop.disabled,

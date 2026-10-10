@@ -56,6 +56,28 @@ try {
     assert.ok(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top, `slider labels ${i} and ${j} intersect`);
   }
 
+  for (const id of ["slider-labelled", "slider-edge-labels", "slider-wrapped-labels", "slider-uneven-labels"]) {
+    const geometry = await page.getByTestId(id).locator("xpath=ancestor::label[1]").evaluate(slider => {
+      const box = slider.getBoundingClientRect();
+      const centre = node => { const r = node.getBoundingClientRect(); return (r.left + r.right) / 2; };
+      const ticks = new Map([...slider.querySelectorAll(".fluent-slider__ticks--end .fluent-slider__tick")].map(tick => [tick.dataset.value, centre(tick)]));
+      const row = slider.querySelector(".fluent-slider__labels").getBoundingClientRect();
+      return { left: box.left, right: box.right, rowBottom: row.bottom, ticks: Object.fromEntries(ticks), labels: [...slider.querySelectorAll(".fluent-slider__stop-label")].map(node => {
+        const r = node.getBoundingClientRect();
+        return { value: node.dataset.value, centre: centre(node), left: r.left, right: r.right, top: r.top, bottom: r.bottom, clipped: node.scrollWidth > node.clientWidth };
+      }) };
+    });
+    for (const label of geometry.labels) {
+      assert.ok(Math.abs(label.centre - geometry.ticks[label.value]) <= 1, `${id} label ${label.value} centred at ${label.centre}, stop at ${geometry.ticks[label.value]}`);
+      assert.ok(label.left >= geometry.left - 0.5 && label.right <= geometry.right + 0.5, `${id} label ${label.value} leaves the slider box`);
+      assert.ok(label.bottom <= geometry.rowBottom + 0.5, `${id} label ${label.value} spills below its row`);
+      assert.ok(!label.clipped, `${id} label ${label.value} is truncated`);
+    }
+    geometry.labels.forEach((a, i) => geometry.labels.slice(i + 1).forEach(b => {
+      assert.ok(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top, `${id} labels ${a.value} and ${b.value} intersect`);
+    }));
+  }
+
   const bar = page.locator(".fluent-progress-bar--indeterminate .fluent-progress-bar__value");
   const first = await bar.evaluate(el => getComputedStyle(el).transform);
   await page.waitForTimeout(300);

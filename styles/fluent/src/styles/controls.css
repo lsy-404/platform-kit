@@ -609,25 +609,36 @@ textarea.fluent-field__input {
   .fluent-slider__input:disabled::-moz-range-track { background: GrayText !important; }
 }
 
-.fluent-slider--labelled { min-inline-size: calc(var(--fluent-slider-stops) * 4.5em); }
+.fluent-slider--labelled { --fluent-slider-cell: calc(100% / var(--fluent-slider-cells)); }
+.fluent-slider--labelled:not(.fluent-slider--vertical) { min-inline-size: calc(var(--fluent-slider-stops) * 4.5em); }
+/* The thumb already sits 8px inside the input, so the rail only adds the rest of the half cell. */
+.fluent-slider--labelled:not(.fluent-slider--vertical) .fluent-slider__rail {
+  margin-inline: max(0px, calc(var(--fluent-slider-cell) / 2 - 8px));
+}
 .fluent-slider--neutral {
   --fluent-accent: var(--fluent-text);
   --fluent-accent-text: var(--fluent-surface);
 }
 .fluent-slider__tick--disabled { opacity: 0.4; }
+/* Labels share one grid area so the row grows with the tallest wrapped label. */
 .fluent-slider__labels {
-  position: relative;
-  display: block;
-  height: 1.4em;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   margin-inline: 8px;
   color: var(--fluent-muted);
   font-size: 12px;
 }
+.fluent-slider--labelled .fluent-slider__labels { margin-inline: max(8px, calc(var(--fluent-slider-cell) / 2)); }
 .fluent-slider__stop-label {
-  position: absolute;
-  top: 0;
+  position: relative;
+  grid-area: 1 / 1;
+  justify-self: start;
+  inline-size: max-content;
+  max-inline-size: calc(100% / max(1, var(--fluent-slider-cells) - 1));
+  line-height: 1.4;
+  text-align: center;
+  overflow-wrap: anywhere;
   transform: translateX(-50%);
-  white-space: nowrap;
 }
 .fluent-slider:dir(rtl) .fluent-slider__stop-label { transform: translateX(50%); }
 .fluent-slider__stop-label--active { color: var(--fluent-text); }

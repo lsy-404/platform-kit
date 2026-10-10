@@ -140,7 +140,7 @@ describe("Fluent controls", () => {
       disabled: false,
     }, emit);
     expect(String(node.props.class)).toContain("fluent-slider--neutral");
-    expect(node.props.style).toEqual({ "--fluent-slider-stops": 5 });
+    expect(node.props.style).toEqual({ "--fluent-slider-stops": 5, "--fluent-slider-cells": 5 });
     const labels = node.children.at(-1).children;
     expect(labels.map((l: { children: string }) => l.children)).toEqual(["A", "B", "C", "D", "E"]);
     const input = node.children[1].children[0];
@@ -151,6 +151,16 @@ describe("Fluent controls", () => {
     input.props.onKeydown({ key: "ArrowRight", target: { value: "1" }, preventDefault: vi.fn() });
     expect(emit).toHaveBeenCalledWith("change", 3);
     vi.unstubAllGlobals();
+  });
+
+  it("sizes label cells by the closest pair of labelled stops", () => {
+    const cells = (stops: { value: number; label?: string }[], max = 4) =>
+      render(FluentSlider, { modelValue: 0, min: 0, max, stops, disabled: false }, vi.fn()).props.style?.["--fluent-slider-cells"];
+    expect(cells([{ value: 0, label: "A" }, { value: 1, label: "B" }, { value: 4, label: "C" }])).toBe(5);
+    expect(cells([{ value: 0, label: "Off" }, { value: 10, label: "On" }], 10)).toBe(2);
+    expect(cells([{ value: 0, label: "A" }, { value: 1, label: "B" }, { value: 3, label: "C" }], 3)).toBeCloseTo(4);
+    expect(cells([{ value: 2, label: "Only" }, { value: 3 }])).toBe(2);
+    expect(cells([{ value: 0 }, { value: 4 }])).toBeUndefined();
   });
 
   it("snaps pointer input and keyboard navigation to available values", () => {
