@@ -1,8 +1,10 @@
-import AxeBuilder from "@axe-core/playwright";
+import { readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+import type { AxeResults, RunOptions } from "axe-core";
 import type { Page } from "playwright";
 import type { BrowserResult, CheckId, RawFinding, Skipped, State } from "./types.js";
 
-export type AxeResults = Awaited<ReturnType<AxeBuilder["analyze"]>>;
+export type { AxeResults };
 
 interface AxeCheck { data?: unknown; message?: string }
 interface AxeNode {
@@ -13,11 +15,24 @@ interface AxeNode {
   none?: AxeCheck[];
 }
 
-// Never call .options(): it replaces the runOnly that withRules() sets and runs every default rule.
+const axeHandle = "__appearanceCheckAxe";
+let axeSource: Promise<string> | undefined;
+
+// Navigation discards the injected copy, so presence is checked on every run.
+async function ensureAxe(page: Page): Promise<void> {
+  if (await page.evaluate(key => key in globalThis, axeHandle)) return;
+  axeSource ??= readFile(createRequire(import.meta.url).resolve("axe-core/axe.min.js"), "utf8");
+  await page.evaluate(`${await axeSource};globalThis.${axeHandle}=globalThis.axe;undefined`);
+}
+
+// Iframe contents are reported as an out-of-scope coverage gap, so frames are not messaged.
 export async function runAxe(page: Page, rules: string[], include?: string): Promise<AxeResults> {
-  const builder = new AxeBuilder({ page }).withRules(rules);
-  if (include) builder.include(include);
-  return builder.analyze();
+  await ensureAxe(page);
+  const options: RunOptions = { runOnly: { type: "rule", values: rules }, iframes: false };
+  return page.evaluate(({ key, include, options }) => {
+    const axe = (globalThis as unknown as Record<string, typeof import("axe-core")>)[key]!;
+    return axe.run(include ? { include: [include] } : document, options);
+  }, { key: axeHandle, include, options });
 }
 
 const incompleteReasons: Record<string, string> = {

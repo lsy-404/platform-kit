@@ -21,7 +21,7 @@ test("current appearance archive installs with CLI, typed reports and Vite 8 bui
     assert.equal(manifest.version, expected.version);
     assert.equal(manifest.private, undefined);
     assert.equal(manifest.scripts, undefined);
-    assert(manifest.dependencies.playwright && manifest.dependencies["@axe-core/playwright"] && manifest.dependencies.culori);
+    assert(manifest.dependencies.playwright && manifest.dependencies["axe-core"] && manifest.dependencies.culori);
     const list = execFileSync("corepack", ["pnpm@10.17.1", "exec", "appearance-check", "--list"], { cwd: root, encoding: "utf8" });
     assert.match(list, /AP001 text-contrast/);
     assert.match(list, /AP008 surface-layering/);
@@ -43,7 +43,7 @@ test("current appearance archive installs with CLI, typed reports and Vite 8 bui
         const again = summarize(report, ['AP003'], report.pages.length);
       }})]});`);
     execFileSync("corepack", ["pnpm@10.17.1", "exec", "tsc", "--noEmit", "--moduleResolution", "bundler", "--module", "esnext", "--target", "es2024", "--strict", "--skipLibCheck", "consumer.ts"], { cwd: root, stdio: "pipe" });
-    await writeFile(join(root, "index.html"), `<!doctype html><div style="background:#123;border-radius:24px;padding:4px;width:240px;height:150px"><div id="inner" style="background:#fff;border-radius:24px;height:100%">Surface</div></div>`);
+    await writeFile(join(root, "index.html"), `<!doctype html><div style="background:#123;border-radius:24px;padding:4px;width:240px;height:150px"><div id="inner" style="background:#fff;color:#aaa;border-radius:24px;height:100%">Surface</div></div>`);
     const script = `import assert from 'node:assert/strict';
       import {checks,summarize} from '@platform-kit/appearance-check';
       import {appearanceCheck} from '@platform-kit/appearance-check/vite';
@@ -51,10 +51,13 @@ test("current appearance archive installs with CLI, typed reports and Vite 8 bui
       assert.equal(checks.length,23);
       assert.equal(typeof summarize,'function');
       const messages=[]; const logger=createLogger('silent'); logger.warn=m=>messages.push(m); let report;
-      await build({root:process.cwd(),configFile:false,customLogger:logger,plugins:[appearanceCheck({checks:['AP003'],colorSchemes:['light','dark'],viewports:[{width:800,height:600}],executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE,onReport(value){report=value;}})]});
+      await build({root:process.cwd(),configFile:false,customLogger:logger,plugins:[appearanceCheck({checks:['AP001','AP003'],colorSchemes:['light','dark'],viewports:[{width:800,height:600}],executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE,onReport(value){report=value;}})]});
+      assert(messages.some(m=>m.includes('[AP001 normative]') && m.includes('800x600 light')));
+      assert(messages.some(m=>m.includes('[AP001 normative]') && m.includes('800x600 dark')));
       assert(messages.some(m=>m.includes('[AP003 advisory]') && m.includes('800x600 light')));
       assert(messages.some(m=>m.includes('[AP003 advisory]') && m.includes('800x600 dark')));
       assert.deepEqual(report.pages.map(page=>page.colorScheme),['light','dark']);
+      assert.equal(report.findings.filter(f=>f.checkId==='AP001' && f.target==='#inner' && f.evidence.requiredRatio===4.5).length,2);
       assert.equal(report.coverage.length,0);
       console.log('Packed appearance package CLI, exports and consumer build passed.');`;
     console.log(execFileSync(process.execPath, ["--input-type=module", "-e", script], { cwd: root, encoding: "utf8", env: process.env }));

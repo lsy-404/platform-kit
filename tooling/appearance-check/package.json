@@ -31,9 +31,9 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "playwright": "1.63.0",
-    "@axe-core/playwright": "4.13.0",
-    "culori": "4.0.2"
+    "axe-core": "4.13.0",
+    "culori": "4.0.2",
+    "playwright": "1.63.0"
   },
   "peerDependencies": {
     "vite": "^7.0.0 || ^8.0.0"
