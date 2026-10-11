@@ -63,6 +63,12 @@ try {
   assert(!conservative.findings.some(f => f.checkId === "AP004"), "clipped, hidden and off-screen text cannot create overlap findings");
   assert(!conservative.findings.some(f => f.checkId === "AP005"), "nested ellipsis and scroll regions are intentional containment");
   assert(conservative.findings.some(f => f.checkId === "AP007" && f.target.includes("unlabeled-icon")), "icon discovery must not require annotations or accessible labels");
+  await page.setContent(`<main><h2 id="parent" style="font:400 14px Arial;margin:0">Parent</h2><h3 id="inverted" style="font:700 24px Arial;margin:0">Child</h3><h2 id="next" style="font:700 28px Arial;margin:0">Next</h2><h3 id="ordered" style="font:700 20px Arial;margin:0">Fine</h3></main>`);
+  const inversion = await page.evaluate(inspectLayout, ["AP006"]);
+  const inverted = inversion.findings.filter(f => f.checkId === "AP006" && f.evidence.kind === "level-inversion");
+  assert.deepEqual(inverted.map(f => f.target.split(" ").pop()), ["h3#inverted"], "only the stronger subheading is a level inversion");
+  assert.ok(inverted[0].related.includes("parent"));
+  assert.equal(inversion.findings.filter(f => f.evidence.kind === "weaker-than-body").length, 0);
   await page.setContent(`<h1 style="font:64px/0.9 Arial">Tight heading line height</h1>`);
   const tightHeading = await page.evaluate(inspectLayout, ["AP005"]);
   assert.equal(tightHeading.findings.length, 0, "visible glyph overflow from tight leading is not clipping");
@@ -70,6 +76,9 @@ try {
   const rotated = await page.evaluate(inspectLayout, ["AP005"]);
   assert.equal(rotated.findings.length, 0);
   assert(rotated.skipped.some(s => s.checkId === "AP005"));
+  await page.setContent(`<style>body{margin:20px}svg{width:24px;height:24px;transform:rotate(240deg)} input{position:absolute;width:1px;height:1px;clip-path:inset(50%)}</style><button><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="black"/></svg></button><input type="checkbox">`);
+  const decorative = await page.evaluate(inspectLayout, ["AP008"]);
+  assert.equal(decorative.skipped.length, 0, "rotated spinners and clipped inputs are never surface candidates");
   console.log(`Appearance layout browser checks passed: ${result.findings.length} findings, ${result.skipped.length} skipped`);
 } finally {
   await browser.close();

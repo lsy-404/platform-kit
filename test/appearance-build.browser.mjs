@@ -35,7 +35,7 @@ test("Vite build warns for each theme without altering any production asset", as
     let report;
     await build({ ...config, plugins: [appearanceCheck({ checks: ["AP003"], colorSchemes: ["light", "dark"], executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE, viewports: [{ width: 800, height: 600 }], onReport(value) { report = value; } })] });
     assert(report.findings.some(f => f.checkId === "AP003" && f.target === "#inner"));
-    assert(warnings.some(message => message.includes("[AP003]")));
+    assert(warnings.some(message => message.includes("[AP003 advisory]")));
     assert.deepEqual(await files(join(root, "dist")), baseline, "Every production asset must remain byte-identical");
     assert.equal(report.coverage.length, 0);
     assert.deepEqual(report.pages.map(page => page.colorScheme), ["light", "dark"]);

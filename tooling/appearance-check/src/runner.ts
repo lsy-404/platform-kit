@@ -1,10 +1,21 @@
 import { chromium } from "playwright";
-import type { Page } from "playwright";
-import { checks, isCheckId } from "./catalog.js";
+import type { BrowserContext, Page } from "playwright";
+import { checkInfo, checks, isCheckId } from "./catalog.js";
+import { summarize } from "./summary.js";
 import { scanSurfaces } from "./surfaces.js";
 import { inspectLayout } from "./layout.js";
-import { inspectColors } from "./colors.js";
-import type { AuditOptions, BrowserResult, Finding, Ignore, Report, State } from "./types.js";
+import { inspectDefaultAxe, inspectDocumentAxe } from "./axe.js";
+import { discoverControls, runInteractions } from "./interaction.js";
+import { inspectNonText } from "./nontext.js";
+import { inspectRhythm } from "./rhythm.js";
+import { inspectFonts, inspectTypography } from "./typography.js";
+import { checkTextSpacing } from "./text-spacing.js";
+import { collectDesign } from "./design.js";
+import { analyzeDesign } from "./metrics.js";
+import { installKit } from "./kit.js";
+import { probeReflow, settlePage } from "./reflow.js";
+import { probeMotion } from "./motion.js";
+import type { AuditOptions, BrowserResult, CheckId, ColorScheme, Dimension, Finding, GapLevel, Ignore, Report, State, Viewport } from "./types.js";
 
 export function validateOptions(options: AuditOptions): void {
   if (!Array.isArray(options.urls) || !options.urls.length) throw new Error("At least one URL is required");
@@ -31,46 +42,35 @@ export function pageMatches(pattern: string, url: string): boolean {
   return regex.test(url) || regex.test(parsed.pathname) || parsed.hash.startsWith("#/") && regex.test(parsed.hash.slice(1).split("?")[0]!);
 }
 
-async function matchesIgnore(page: Page, finding: Finding, ignore: Ignore): Promise<boolean> {
+async function matchesIgnore(getPage: () => Promise<Page>, finding: Finding, ignore: Ignore): Promise<boolean> {
   if (ignore.checkId && ignore.checkId !== finding.checkId || ignore.state && ignore.state !== finding.state || ignore.colorScheme && ignore.colorScheme !== finding.colorScheme || ignore.page && !pageMatches(ignore.page, finding.page)) return false;
   if (!ignore.selector) return true;
+  const page = await getPage();
   return page.locator(finding.target).first().evaluate((element, selector) => element.matches(selector) || element.closest(selector) !== null, ignore.selector);
 }
 
-async function settle(page: Page): Promise<void> {
-  const delay = await page.evaluate(() => {
-    let longest = 0;
-    for (const element of document.querySelectorAll("body *")) {
-      const style = getComputedStyle(element);
-      const milliseconds = (value: string) => value.split(",").map(v => parseFloat(v) * (v.trim().endsWith("ms") ? 1 : 1000));
-      const durations = milliseconds(style.transitionDuration), delays = milliseconds(style.transitionDelay);
-      for (let i = 0; i < durations.length; i++) longest = Math.max(longest, (durations[i] ?? 0) + (delays[i % delays.length] ?? 0));
-    }
-    return Math.min(2000, longest + 50);
-  });
-  await page.waitForTimeout(delay);
-}
+const DEFAULT_VIEWPORTS: Viewport[] = [{ width: 1280, height: 800 }, { width: 390, height: 844 }];
 
 export async function auditAppearance(options: AuditOptions): Promise<Report> {
   validateOptions(options);
   const enabled = options.checks ?? checks.map(check => check.id);
-  const report: Report = { findings: [], suppressed: [], coverage: [], pages: [] };
+  const viewports = options.viewports ?? DEFAULT_VIEWPORTS, schemes = options.colorSchemes ?? ["light" as const];
+  const timeout = options.timeoutMs ?? 15000;
+  const firstVp = viewports[0]!, firstScheme = schemes[0]!;
+  const report: Omit<Report, "verdict" | "summary"> = { findings: [], suppressed: [], coverage: [], pages: [], metrics: [] };
+  const notes: Partial<Record<Dimension, Set<string>>> = {};
   const browser = await chromium.launch({ headless: true, executablePath: options.executablePath });
   try {
-    for (const url of options.urls) for (const viewport of options.viewports ?? [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) for (const colorScheme of options.colorSchemes ?? ["light" as const]) {
-      const context = await browser.newContext({ viewport, colorScheme });
-      const page = await context.newPage();
-      page.setDefaultTimeout(options.timeoutMs ?? 15000);
-      const errors: string[] = [];
-      page.on("pageerror", error => errors.push("Page error: " + error.message));
-      page.on("response", response => { if (response.status() >= 400) errors.push("HTTP " + response.status() + ": " + response.url()); });
-      const add = async (result: BrowserResult, state: State) => {
-        for (const skipped of result.skipped) report.coverage.push({ ...skipped, page: url, viewport, colorScheme, state });
+    for (const url of options.urls) {
+      // Ignore selectors are resolved on the page the finding came from; probes open one on demand.
+      const adder = (viewport: Viewport, colorScheme: ColorScheme, getPage: () => Promise<Page>) => async (result: BrowserResult, state: State) => {
+        for (const skipped of result.skipped) if (enabled.includes(skipped.checkId)) report.coverage.push({ ...skipped, page: url, viewport, colorScheme, state, level: "check" });
         for (const raw of result.findings) {
           if (!enabled.includes(raw.checkId)) continue;
-          const finding: Finding = { ...raw, page: url, viewport, colorScheme, state };
+          const info = checkInfo(raw.checkId);
+          const finding: Finding = { ...raw, page: url, viewport, colorScheme, state, severity: info.severity, dimensions: [...info.dimensions] };
           let suppressed = false;
-          for (const ignore of options.ignores ?? []) if (await matchesIgnore(page, finding, ignore)) {
+          for (const ignore of options.ignores ?? []) if (await matchesIgnore(getPage, finding, ignore)) {
             report.suppressed.push({ ...finding, reason: ignore.reason });
             suppressed = true;
             break;
@@ -78,77 +78,112 @@ export async function auditAppearance(options: AuditOptions): Promise<Report> {
           if (!suppressed) report.findings.push(finding);
         }
       };
-      try {
-        const response = await page.goto(url, { waitUntil: "load" });
-        if (response && response.status() >= 400) throw new Error("HTTP " + response.status());
-        await page.waitForLoadState("networkidle", { timeout: Math.min(options.timeoutMs ?? 15000, 2000) }).catch(() => {
-          report.coverage.push({ page: url, viewport, colorScheme, state: "default", target: "document", reason: "Network did not settle; current rendered state was inspected" });
+      const runProbe = async (kind: "reflow" | "motion") => {
+        const viewport = kind === "reflow" ? { width: 320, height: 640 } : firstVp;
+        let context: BrowserContext | undefined;
+        let pagePromise: Promise<Page> | undefined;
+        const getPage = () => pagePromise ??= (async () => {
+          context = await browser.newContext({ viewport, colorScheme: firstScheme, ...(kind === "motion" ? { reducedMotion: "reduce" as const } : {}), deviceScaleFactor: 1 });
+          const page = await context.newPage();
+          page.setDefaultTimeout(timeout);
+          await page.goto(url, { waitUntil: "load" });
+          return page;
+        })();
+        try {
+          const { result, page } = kind === "reflow"
+            ? await probeReflow(browser, url, firstScheme, { timeoutMs: timeout })
+            : await probeMotion(browser, url, firstVp, firstScheme, { timeoutMs: timeout });
+          report.pages.push(page);
+          try {
+            await adder(page.viewport, firstScheme, getPage)(result, "default");
+          } catch (error) {
+            report.coverage.push({ page: url, viewport: page.viewport, colorScheme: firstScheme, state: "default", target: "document", checkId: kind === "reflow" ? "AP014" : "AP017", reason: String(error), level: "check" });
+          }
+        } finally { await context?.close(); }
+      };
+      for (const viewport of viewports) for (const colorScheme of schemes) {
+        const context = await browser.newContext({ viewport, colorScheme, deviceScaleFactor: 1 });
+        const page = await context.newPage();
+        page.setDefaultTimeout(timeout);
+        const errors: Array<{ reason: string; level: GapLevel }> = [];
+        page.on("pageerror", error => errors.push({ reason: "Page error: " + error.message, level: "info" }));
+        page.on("response", response => {
+          const request = response.request();
+          if (response.status() < 400 || request.isNavigationRequest() && request.frame() === page.mainFrame()) return;
+          errors.push({ reason: "HTTP " + response.status() + ": " + response.url(), level: request.resourceType() === "stylesheet" ? "blocking" : "info" });
         });
-        await page.evaluate(() => document.fonts.ready);
-        await settle(page);
-        if (enabled.includes("AP003")) {
-          const scan = await page.evaluate(scanSurfaces);
-          await add({
-            findings: scan.findings.map(f => ({ checkId: "AP003", target: f.inner, related: f.outer, message: "Nested radii differ from outer radius minus measured inset", confidence: "heuristic", evidence: { relationship: f.relationship, corners: f.evidence, maxError: f.maxError } })),
-            skipped: scan.skipped.map(s => ({ checkId: "AP003", target: s.target, reason: s.reason })),
-          }, "default");
-        }
-        await add(await page.evaluate(inspectLayout, enabled), "default");
-        if (enabled.includes("AP001")) await add(await inspectColors(page, "default"), "default");
-        const controls = await page.evaluate(() => {
-          function selector(element: Element): string {
-            if (element.id && document.querySelectorAll("#" + CSS.escape(element.id)).length === 1) return "#" + CSS.escape(element.id);
-            const parts: string[] = [];
-            for (let node: Element | null = element; node && node !== document.body; node = node.parentElement) {
-              const siblings = [...(node.parentElement?.children ?? [])].filter(child => child.tagName === node!.tagName);
-              parts.unshift(node.tagName.toLowerCase() + ":nth-of-type(" + (siblings.indexOf(node) + 1) + ")");
-            }
-            return "body > " + parts.join(" > ");
+        page.on("requestfailed", request => {
+          if (request.isNavigationRequest() && request.frame() === page.mainFrame()) return;
+          errors.push({ reason: "Request failed: " + request.url() + " (" + (request.failure()?.errorText ?? "unknown") + ")", level: request.resourceType() === "stylesheet" ? "blocking" : "info" });
+        });
+        const add = adder(viewport, colorScheme, async () => page);
+        // A failing step becomes check-level gaps so the remaining checks still run.
+        const step = async (ids: CheckId[], run: () => Promise<void>) => {
+          const active = ids.filter(id => enabled.includes(id));
+          if (!active.length) return;
+          try { await run(); } catch (error) {
+            for (const checkId of active) report.coverage.push({ page: url, viewport, colorScheme, state: "default", target: "document", checkId, reason: String(error), level: "check" });
           }
-          function visible(element: Element): boolean {
-            const box = element.getBoundingClientRect();
-            return element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) && box.width > 0 && box.height > 0 && box.top >= 0 && box.left >= 0 && box.bottom <= innerHeight && box.right <= innerWidth;
-          }
-          return [...document.querySelectorAll("button,a[href],input:not([type=hidden]),select,textarea,[role=button],[role=link],[role=tab],[role=switch],[role=checkbox],[tabindex]")].flatMap(element => {
-            if (element.matches(":disabled,[aria-disabled=true],[tabindex='-1']")) return [];
-            const labels = element instanceof HTMLInputElement && (element.type === "checkbox" || element.type === "radio")
-              ? [...element.labels ?? []].filter(visible) : [];
-            if (!element.checkVisibility({ checkVisibilityCSS: true }) || !visible(element) && !labels.length) return [];
-            return [{ target: selector(element), hoverTarget: selector(labels[0] ?? element), colorTargets: (labels.length ? labels : [element]).map(selector) }];
+        };
+        try {
+          const response = await page.goto(url, { waitUntil: "load" });
+          if (response && response.status() >= 400) throw new Error("HTTP " + response.status());
+          await page.waitForLoadState("networkidle", { timeout: Math.min(timeout, 2000) }).catch(() => {
+            report.coverage.push({ page: url, viewport, colorScheme, state: "default", target: "document", reason: "Network did not settle; current rendered state was inspected", level: "info" });
           });
-        });
-        report.pages.push({ page: url, viewport, colorScheme, controls: controls.length });
-        if (enabled.includes("AP002")) {
-          const limit = options.maxControls ?? 40;
-          for (const { target } of controls.slice(limit)) report.coverage.push({ page: url, viewport, colorScheme, state: "hover", target, checkId: "AP002", reason: "Control limit reached; hover and focus were not inspected" });
-          for (const { target, hoverTarget, colorTargets } of controls.slice(0, limit)) {
-            const control = page.locator(target);
-            for (const state of ["hover", "focus"] as const) {
-              try {
-                await page.mouse.move(0, 0);
-                await page.evaluate(() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); });
-                if (state === "hover") await page.locator(hoverTarget).hover({ timeout: 2000 });
-                else {
-                  await page.keyboard.press("Tab");
-                  await control.focus({ timeout: 2000 });
-                }
-                await settle(page);
-                for (const colorTarget of colorTargets) await add(await inspectColors(page, state, colorTarget), state);
-              } catch (error) {
-                report.coverage.push({ page: url, viewport, colorScheme, state, target, checkId: "AP002", reason: String(error) });
-              }
+          await page.evaluate(() => document.fonts.ready);
+          await settlePage(page);
+          await page.evaluate(installKit);
+          const entry: Report["pages"][number] = { page: url, viewport, colorScheme, kind: "scan", controls: 0 };
+          report.pages.push(entry);
+          const firstSchemeScan = colorScheme === firstScheme, firstViewportScan = viewport === firstVp;
+
+          await step(["AP003"], async () => {
+            const scan = await page.evaluate(scanSurfaces);
+            await add({
+              findings: scan.findings.map(f => ({ checkId: "AP003", target: f.inner, related: f.outer, message: "Nested radii differ from outer radius minus measured inset", confidence: "heuristic", evidence: { relationship: f.relationship, corners: f.evidence, maxError: f.maxError } })),
+              skipped: scan.skipped.map(s => ({ checkId: "AP003", target: s.target, reason: s.reason })),
+            }, "default");
+          });
+          await step(["AP004", "AP005", "AP006", "AP007", "AP008"], async () => add(await page.evaluate(inspectLayout, enabled), "default"));
+          await step(["AP001", "AP009", "AP010"], async () => add(await inspectDefaultAxe(page, enabled), "default"));
+          await step(["AP016"], async () => add(await page.evaluate(inspectNonText), "default"));
+          if (firstSchemeScan) {
+            await step(["AP020"], async () => add(await page.evaluate(inspectRhythm, enabled), "default"));
+            await step(["AP021", "AP022"], async () => add(await page.evaluate(inspectTypography, enabled), "default"));
+            await step(["AP015"], async () => add(await checkTextSpacing(page), "default"));
+          }
+          if (firstViewportScan) {
+            try {
+              const design = analyzeDesign(await page.evaluate(collectDesign));
+              report.metrics.push({ page: url, viewport, colorScheme, ...design.metrics });
+              for (const [dimension, list] of Object.entries(design.notes) as Array<[Dimension, string[]]>) for (const note of list) (notes[dimension] ??= new Set()).add(note);
+              await add(design.drift, "default");
+            } catch (error) {
+              report.coverage.push({ page: url, viewport, colorScheme, state: "default", target: "document", ...(enabled.includes("AP019") ? { checkId: "AP019" as const, reason: String(error), level: "check" as const } : { reason: "Design metrics unavailable: " + String(error), level: "info" as const }) });
             }
           }
+          if (firstSchemeScan && firstViewportScan) {
+            await step(["AP011", "AP018"], async () => add(await inspectDocumentAxe(page, enabled), "default"));
+            await step(["AP023"], async () => add(await page.evaluate(inspectFonts), "default"));
+          }
+          const controls = await page.evaluate(discoverControls);
+          entry.controls = controls.length;
+          await step(["AP002", "AP012", "AP013"], () => runInteractions(page, controls, { enabled, maxControls: options.maxControls ?? 40 }, add));
+          const unsupported = await page.evaluate(() => [...document.querySelectorAll("body *")].filter(el => el.shadowRoot || el.tagName === "IFRAME").filter(el => el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })).map(el => el.tagName.toLowerCase()));
+          for (const target of unsupported) report.coverage.push({ page: url, viewport, colorScheme, state: "default", target, reason: "Shadow DOM and iframe contents are outside the inspected document", level: "info" });
+        } catch (error) {
+          report.coverage.push({ page: url, viewport, colorScheme, state: "default", target: "document", reason: String(error), level: "blocking" });
+        } finally {
+          for (const { reason, level } of errors) report.coverage.push({ page: url, viewport, colorScheme, state: "default", target: "document", reason, level });
+          await context.close();
         }
-        const unsupported = await page.evaluate(() => [...document.querySelectorAll("body *")].filter(el => el.shadowRoot || el.tagName === "IFRAME").filter(el => el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })).map(el => el.tagName.toLowerCase()));
-        for (const target of unsupported) report.coverage.push({ page: url, viewport, colorScheme, state: "default", target, reason: "Shadow DOM and iframe contents are outside the inspected document" });
-      } catch (error) {
-        report.coverage.push({ page: url, viewport, colorScheme, state: "default", target: "document", reason: String(error) });
-      } finally {
-        for (const reason of errors) report.coverage.push({ page: url, viewport, colorScheme, state: "default", target: "document", reason });
-        await context.close();
       }
+      if (enabled.includes("AP014")) await runProbe("reflow");
+      if (enabled.includes("AP017")) await runProbe("motion");
     }
-    return report;
+    const { verdict, summary } = summarize(report, enabled, report.pages.filter(p => p.kind === "scan").length);
+    for (const row of summary) row.notes = [...notes[row.dimension] ?? []];
+    return { verdict, summary, ...report };
   } finally { await browser.close(); }
 }

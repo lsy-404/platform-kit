@@ -17,20 +17,22 @@ const help = `appearance-check --url http://localhost:5173 [options]
   --timeout N           Page timeout in milliseconds (default 15000)
   --json                Print JSON instead of text
   --output FILE         Save the report instead of printing
+  --fail-on fail|warn   Also exit 2 on advisory warnings (default fail)
   --warn-only           Findings and coverage gaps do not set a failure exit
   --list                List stable check IDs
-Exit: 0 clean, 1 invalid input or incomplete coverage, 2 findings.`;
+Exit: 0 clean or advisory-only, 1 invalid input or incomplete coverage, 2 normative findings (or warnings with --fail-on warn).`;
 
 try {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
     url: { type: "string", multiple: true }, config: { type: "string" }, checks: { type: "string" },
     "ignore-check": { type: "string", multiple: true }, viewport: { type: "string", multiple: true },
     "color-scheme": { type: "string", multiple: true }, "executable-path": { type: "string" }, "max-controls": { type: "string" }, timeout: { type: "string" },
-    json: { type: "boolean" }, output: { type: "string" }, "warn-only": { type: "boolean" }, list: { type: "boolean" }, help: { type: "boolean", short: "h" },
+    json: { type: "boolean" }, output: { type: "string" }, "warn-only": { type: "boolean" }, "fail-on": { type: "string" }, list: { type: "boolean" }, help: { type: "boolean", short: "h" },
   } });
   if (values.help) console.log(help);
-  else if (values.list) console.log(checks.map(check => `${check.id} ${check.name} — ${check.description}`).join("\n"));
+  else if (values.list) console.log(checks.map(check => `${check.id} ${check.name} [${check.dimensions.join(",")}; ${check.severity}] — ${check.description}`).join("\n"));
   else {
+    if (values["fail-on"] !== undefined && values["fail-on"] !== "fail" && values["fail-on"] !== "warn") throw new Error("--fail-on must be fail or warn");
     const options: AuditOptions = values.config ? JSON.parse(await readFile(values.config, "utf8")) : { urls: [] };
     const urls = [...values.url ?? [], ...positionals];
     if (urls.length) options.urls = urls;
@@ -59,7 +61,10 @@ try {
     const output = values.json ? JSON.stringify(report, null, 2) : formatReport(report);
     if (values.output) await writeFile(values.output, output + "\n");
     else console.log(output);
-    if (!values["warn-only"]) process.exitCode = report.coverage.length ? 1 : report.findings.length ? 2 : 0;
+    if (!values["warn-only"]) {
+      const incomplete = report.summary.some(row => row.verdict === "incomplete") || report.coverage.some(gap => gap.level === "blocking");
+      process.exitCode = report.verdict === "fail" || values["fail-on"] === "warn" && report.summary.some(row => row.verdict === "warn") ? 2 : incomplete ? 1 : 0;
+    }
   }
 } catch (error) {
   console.error("appearance-check: " + (error instanceof Error ? error.message : String(error)));

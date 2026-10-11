@@ -33,7 +33,7 @@ export function appearanceCheck(options: AppearanceCheckOptions = {}): Plugin {
           return origin + base.replace(/\/$/, "") + "/" + path.replace(/^\//, "");
         });
         const report = await auditAppearance({ ...options, urls });
-        if (report.findings.length || report.coverage.length) config.logger.warn(formatReport(report));
+        if (report.verdict === "fail" || report.verdict === "warn" || report.verdict === "incomplete" || report.coverage.some(gap => gap.level === "info")) config.logger.warn(formatReport(report));
         if (options.onReport) await options.onReport(report);
       } catch (error) {
         config.logger.warn("[appearance-check] Build audit incomplete: " + String(error));

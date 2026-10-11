@@ -163,7 +163,7 @@ test("identifies Vue slot and Teleport surfaces from their rendered DOM", async 
         if (process.env.APPEARANCE_SCREENSHOT)
             await page.screenshot({ path: process.env.APPEARANCE_SCREENSHOT, fullPage: true });
         const processResult = await promisify(execFile)(process.execPath, ["tooling/appearance-check/dist/cli.js", "--url", url, "--checks", "AP003", "--viewport", "1280x900", "--json", ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? ["--executable-path", process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE] : [])], { cwd: new URL("..", import.meta.url), env: process.env }).catch(error => error);
-        assert.equal(processResult.code, 2);
+        assert.equal(processResult.code, undefined);
         const cliScan = JSON.parse(processResult.stdout);
         assert.equal(cliScan.findings.length, 2);
     }
