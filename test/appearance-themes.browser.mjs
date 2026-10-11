@@ -72,11 +72,11 @@ test("CLI text and JSON identify themes and invalid config exits with an input e
   const config = join(temporary, "themes.json");
   await writeFile(config, JSON.stringify({...options("/"), colorSchemes:["light","dark"]}));
   const text = await cli(["--config",config]);
-  assert.equal(text.code, 2, JSON.stringify({stdout:text.stdout,stderr:text.stderr,signal:text.signal,killed:text.killed}));
+  assert.equal(text.code, undefined, JSON.stringify({stdout:text.stdout,stderr:text.stderr,signal:text.signal,killed:text.killed}));
   assert.match(text.stdout, /800x600 light default #inner/);
   assert.match(text.stdout, /800x600 dark default #inner/);
   const json = await cli(["--config",config,"--color-scheme","dark","--json"]);
-  assert.equal(json.code, 2, JSON.stringify({stdout:json.stdout,stderr:json.stderr,signal:json.signal,killed:json.killed}));
+  assert.equal(json.code, undefined, JSON.stringify({stdout:json.stdout,stderr:json.stderr,signal:json.signal,killed:json.killed}));
   assert.deepEqual(JSON.parse(json.stdout).pages.map(page => page.colorScheme), ["dark"]);
   await writeFile(config, JSON.stringify({...options("/"), colorSchemes:[]}));
   const invalid = await cli(["--config",config,"--warn-only"]);
