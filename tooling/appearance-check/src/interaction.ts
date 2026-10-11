@@ -160,9 +160,9 @@ async function settle(page: Page): Promise<void> {
   await page.waitForTimeout(delay);
 }
 
-async function reset(page: Page): Promise<void> {
+async function reset(page: Page, scroll: [number, number]): Promise<void> {
   await page.mouse.move(0, 0);
-  await page.evaluate(() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); });
+  await page.evaluate(([x, y]) => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); window.scrollTo(x, y); }, scroll);
 }
 
 export async function runInteractions(page: Page, controls: Control[], options: InteractionOptions, add: Add): Promise<void> {
@@ -177,11 +177,12 @@ export async function runInteractions(page: Page, controls: Control[], options: 
     await gaps("focus", "document", `Control limit reached; ${controls.length - options.maxControls} control(s) were not inspected`);
   }
 
+  const scroll = await page.evaluate((): [number, number] => [window.scrollX, window.scrollY]);
   for (const { target, hoverTarget, colorTargets } of controls.slice(0, options.maxControls)) {
     const control = page.locator(target);
     if (colors) {
       try {
-        await reset(page);
+        await reset(page, scroll);
         await page.locator(hoverTarget).hover({ timeout: 2000 });
         await settle(page);
         for (const colorTarget of colorTargets) await add(await inspectColors(page, "hover", colorTarget), "hover");
@@ -190,7 +191,7 @@ export async function runInteractions(page: Page, controls: Control[], options: 
       }
     }
     try {
-      await reset(page);
+      await reset(page, scroll);
       await settle(page);
       let before: { image: string; probe: FocusProbe } | undefined;
       if (visible) {
@@ -198,7 +199,7 @@ export async function runInteractions(page: Page, controls: Control[], options: 
         if (probe.area < 4 || probe.clip.width < 1 || probe.clip.height < 1) await gaps("focus", target, "No visible region to compare", ["AP012"]);
         else before = { probe, image: (await page.screenshot({ clip: probe.clip, animations: "disabled", caret: "hide", scale: "css" })).toString("base64") };
       }
-      await page.keyboard.press("Tab");
+      await page.keyboard.press("Shift");
       await control.focus({ timeout: 2000 });
       await settle(page);
       const after = await page.evaluate(probeFocus, target);

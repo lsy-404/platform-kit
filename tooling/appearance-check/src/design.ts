@@ -95,7 +95,7 @@ export function collectDesign(): DesignSample {
   for (let y = step / 2; y < innerHeight; y += step) {
     for (let x = step / 2; x < innerWidth; x += step) {
       const first = document.elementsFromPoint(x, y)[0];
-      if (first && /^(img|video|canvas|svg)$/i.test(first.tagName)) { surfaces.set("media", (surfaces.get("media") ?? 0) + 1); continue; }
+      if (first && (first.closest("svg") || /^(img|video|canvas)$/i.test(first.tagName))) { surfaces.set("media", (surfaces.get("media") ?? 0) + 1); continue; }
       const behind = kit.paintBehind(x, y);
       if (!behind) continue;
       const key = hex(behind);

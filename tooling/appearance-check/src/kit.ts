@@ -19,7 +19,6 @@ export interface AppearanceKit {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var __appearanceKit: AppearanceKit | undefined;
 }
 
@@ -106,7 +105,7 @@ export function installKit(): void {
     const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
     while (walker.nextNode()) {
       const node = walker.currentNode as Text;
-      if (!node.data.trim()) continue;
+      if (!node.data.trim() || node.parentElement?.closest("rt, rp, sup, sub")) continue;
       const range = document.createRange();
       range.selectNodeContents(node);
       for (const rect of Array.from(range.getClientRects())) if (rect.width > 0 && rect.height > 0) rects.push(rect);

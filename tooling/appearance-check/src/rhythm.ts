@@ -10,7 +10,7 @@ export function inspectRhythm(enabled: CheckId[]): BrowserResult {
 
   interface Member { element: Element; rect: DOMRect; classes: Set<string>; signature: string }
   type Item = Member | null;
-  const MAX_CONTAINERS = 2000, MAX_FINDINGS = 50;
+  const MAX_CONTAINERS = 2000;
 
   const median = (values: number[]): number => {
     const sorted = [...values].sort((a, b) => a - b);
@@ -34,7 +34,6 @@ export function inspectRhythm(enabled: CheckId[]): BrowserResult {
     const outliers = gaps.map((g, i) => ({ g, i })).filter(({ g }) => Math.abs(g - m) > Math.max(1.5, 0.15 * m) && g <= 2 * m + 2);
     if (!outliers.length || outliers.length > Math.floor(gaps.length / 3)) return;
     for (const { g, i } of outliers) {
-      if (findings.length >= MAX_FINDINGS) return;
       findings.push({
         checkId: "AP020",
         target: kit.selector(ordered[i + 1]!.element),

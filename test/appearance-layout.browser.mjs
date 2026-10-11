@@ -76,6 +76,9 @@ try {
   const rotated = await page.evaluate(inspectLayout, ["AP005"]);
   assert.equal(rotated.findings.length, 0);
   assert(rotated.skipped.some(s => s.checkId === "AP005"));
+  await page.setContent(`<style>body{margin:20px}svg{width:24px;height:24px;transform:rotate(240deg)} input{position:absolute;width:1px;height:1px;clip-path:inset(50%)}</style><button><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="black"/></svg></button><input type="checkbox">`);
+  const decorative = await page.evaluate(inspectLayout, ["AP008"]);
+  assert.equal(decorative.skipped.length, 0, "rotated spinners and clipped inputs are never surface candidates");
   console.log(`Appearance layout browser checks passed: ${result.findings.length} findings, ${result.skipped.length} skipped`);
 } finally {
   await browser.close();

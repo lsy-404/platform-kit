@@ -60,23 +60,43 @@ try {
     const boxes = Array.from({ length: 3 }, (_, i) => `<div id="bg${i}" style="background:#202020;height:20px">x</div>`).join("");
     const result = await drift(`${boxes}<div id="minor" style="background:#1c1c1c;height:20px">x</div>`);
     assert.equal(result.findings.filter(f => f.target.includes("minor")).length, 0, "neutral channel delta of 4 is a real step");
+    assert.equal(result.skipped.length, 0);
   }
   {
     const result = await drift(`<p><span id="a" style="color:#333">word</span><span id="minor" style="color:#343434">word</span></p>`);
     assert.equal(driftFor(result, "minor").length, 0, "no majority color means no drift");
+    assert.equal(result.skipped.length, 0);
   }
   {
-    const result = await drift(`<p>${spans("#2563eb", 3, "maj")}<span id="minor" style="color:rgba(37,99,235,.5)">word</span></p>`);
+    const result = await drift(`<p>${spans("#2563eb", 3, "maj")}<span id="minor" style="color:rgba(37,99,236,.5)">word</span></p>`);
     assert.equal(result.findings.length, 0, "translucent values are not sampled");
+    assert.equal(result.skipped.length, 0);
   }
   {
     const result = await drift(`<p>${spans("#2563eb", 3, "maj")}</p><pre><code id="minor" style="color:#2563ec">code</code></pre>`);
     assert.equal(result.findings.length, 0, "code content is not sampled");
+    assert.equal(result.skipped.length, 0);
+  }
+
+  {
+    const hex = n => "#" + n.toString(16).padStart(2, "0").repeat(3);
+    const groups = Array.from({ length: 40 }, (_, i) => `<p style="margin:0;font:10px/10px Arial">${spans(hex(10 + 5 * i), 3, "m" + i + "_")}<span id="n${i}" style="color:${hex(11 + 5 * i)}">word</span></p>`).join("");
+    const result = await drift(groups);
+    assert.equal(result.findings.length, 20, "AP019 stops at 20 findings");
+    assert.ok(result.skipped.some(s => s.checkId === "AP019" && /limit/i.test(s.reason)), "the reached cap is visible as a gap");
+  }
+  {
+    const { page, context } = await open(`<style>body{background:#fff}</style><svg style="position:fixed;left:0;top:0;width:100%;height:100%"><rect width="100%" height="100%" fill="#2563eb"/></svg><p>x</p>`);
+    try {
+      const { metrics } = analyzeDesign(await page.evaluate(collectDesign));
+      const white = metrics.palette.surfaces.find(entry => entry.color === "#ffffff");
+      assert.ok((white?.share ?? 0) < 0.5, "a full-viewport SVG covers the white page background");
+    } finally { await context.close(); }
   }
 
   // AP020 sibling rhythm
-  const rhythm = async (html, enabled = ["AP020"]) => {
-    const { page, context } = await open(html);
+  const rhythm = async (html, enabled = ["AP020"], options = {}) => {
+    const { page, context } = await open(html, options);
     try { return await page.evaluate(inspectRhythm, enabled); } finally { await context.close(); }
   };
   const list = (items, extra = {}) => `<ul style="margin:0;padding:0;list-style:none">${items.map((_, i) => `<li id="i${i + 1}" class="${extra[i + 1]?.cls ?? ""}" style="margin:0 0 ${extra[i + 1]?.mb ?? 8}px">Item ${i + 1}</li>`).join("")}</ul>`;
@@ -91,6 +111,10 @@ try {
     assert.equal((await rhythm(html, [])).findings.length, 0, "disabled check reports nothing");
   }
   {
+    const result = await rhythm(`<div style="display:flex;flex-wrap:wrap">${Array.from({ length: 60 }, () => `<div style="width:100px">${list([1, 2, 3, 4, 5], { 3: { mb: 11 } })}</div>`).join("")}</div>`, ["AP020"], { viewport: { width: 1400, height: 1400 } });
+    assert.equal(result.findings.length, 60, "no finding is dropped silently");
+  }
+  {
     const result = await rhythm(list([1, 2, 3, 4, 5]));
     assert.equal(result.findings.length, 0, "equal gaps");
     assert.equal(result.skipped.length, 0);
@@ -98,14 +122,17 @@ try {
   {
     const result = await rhythm(list([1, 2, 3, 4, 5], { 3: { mb: 32 } }));
     assert.equal(result.findings.length, 0, "a deliberate group separator is not an outlier");
+    assert.equal(result.skipped.length, 0);
   }
   {
     const result = await rhythm(list([1, 2, 3], { 2: { mb: 14 } }));
     assert.equal(result.findings.length, 0, "runs shorter than 4 are ignored");
+    assert.equal(result.skipped.length, 0);
   }
   {
     const result = await rhythm(list([1, 2, 3, 4, 5], { 2: { cls: "active" } }));
     assert.equal(result.findings.length, 0, "a state class on one member does not split or flag the run");
+    assert.equal(result.skipped.length, 0);
   }
 
   // metrics

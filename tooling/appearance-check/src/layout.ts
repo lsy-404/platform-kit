@@ -41,6 +41,10 @@ export function inspectLayout(enabled: CheckId[]): BrowserResult {
     }
     return true;
   };
+  const isSrOnly = (element: Element): boolean => {
+    const box = element.getBoundingClientRect(), style = getComputedStyle(element);
+    return (box.width <= 1 && box.height <= 1) || style.clip === "rect(0px, 0px, 0px, 0px)" || style.clipPath === "inset(50%)";
+  };
   const visible = (element: Element): boolean => {
     if (!element.isConnected || !element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) return false;
     const box = element.getBoundingClientRect();
@@ -150,7 +154,7 @@ export function inspectLayout(enabled: CheckId[]): BrowserResult {
   if (enabled.includes("AP006")) {
     const headings = Array.from(document.querySelectorAll("h1,h2,h3,h4,h5,h6,[role=heading]"));
     for (const heading of headings) {
-      if (!visible(heading) || !geometrySupported(heading, "AP006") || !heading.textContent?.trim()) continue;
+      if (!visible(heading) || isSrOnly(heading) || !geometrySupported(heading, "AP006") || !heading.textContent?.trim()) continue;
       const headingStyle = getComputedStyle(heading);
       const headingSize = parseFloat(headingStyle.fontSize);
       const headingWeight = parseInt(headingStyle.fontWeight, 10) || 400;
@@ -169,7 +173,7 @@ export function inspectLayout(enabled: CheckId[]): BrowserResult {
   }
 
   if (enabled.includes("AP006")) {
-    const headings = Array.from(document.querySelectorAll("h1,h2,h3,h4,h5,h6,[role=heading]")).filter(heading => visible(heading) && geometrySupported(heading, "AP006") && heading.textContent?.trim());
+    const headings = Array.from(document.querySelectorAll("h1,h2,h3,h4,h5,h6,[role=heading]")).filter(heading => visible(heading) && !isSrOnly(heading) && geometrySupported(heading, "AP006") && heading.textContent?.trim());
     const levelOf = (heading: Element): number => Number(heading.getAttribute("aria-level")) || (/^H[1-6]$/.test(heading.tagName) ? Number(heading.tagName[1]) : 2);
     const metrics = (heading: Element) => { const style = getComputedStyle(heading); return { level: levelOf(heading), fontSize: parseFloat(style.fontSize), fontWeight: parseInt(style.fontWeight, 10) || 400 }; };
     const scope = "main, article, section, aside, body";
@@ -215,7 +219,7 @@ export function inspectLayout(enabled: CheckId[]): BrowserResult {
   if (enabled.includes("AP008")) {
     const surfaces: Array<{ element: Element; rect: DOMRect; signature: string; kind: string }> = [];
     for (const element of Array.from(document.querySelectorAll("body *"))) {
-      if (!visible(element) || !geometrySupported(element, "AP008")) continue;
+      if (!visible(element)) continue;
       const rect = element.getBoundingClientRect();
       if (rect.width < 18 || rect.height < 18) continue;
       const style = getComputedStyle(element);
@@ -223,6 +227,7 @@ export function inspectLayout(enabled: CheckId[]): BrowserResult {
       const border = borderWidth >= 1 && style.borderTopStyle !== "none" && style.borderTopStyle !== "hidden" && style.borderTopColor !== "rgba(0, 0, 0, 0)";
       const shadow = style.boxShadow !== "none";
       if (!border && !shadow) continue;
+      if (!geometrySupported(element, "AP008")) continue;
       const radius = `${style.borderTopLeftRadius}|${style.borderTopRightRadius}|${style.borderBottomRightRadius}|${style.borderBottomLeftRadius}`;
       const signature = `${border ? `b:${style.borderTopStyle}:${style.borderTopColor}:${Math.round(borderWidth)}` : ""}|${shadow ? `s:${style.boxShadow.replace(/\d+(?:\.\d+)?px/g, "#px")}` : ""}`;
       surfaces.push({ element, rect, signature: `${signature}|r:${radius}`, kind: `${border ? "border" : ""}${border && shadow ? "+" : ""}${shadow ? "shadow" : ""}` });

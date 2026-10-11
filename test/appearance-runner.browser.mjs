@@ -16,8 +16,15 @@ const html = `<!doctype html><style>
  </style><section class="outer"><div id="inner" class="inner">Surface</div></section><button id="control">Action</button>`;
 const server = createServer((request, response) => {
   if (request.url === "/api-missing") { response.writeHead(501); response.end("Unavailable fixture"); return; }
+  if (request.url === "/missing.woff2") { response.writeHead(404); response.end("Not found"); return; }
+  if (request.url === "/nf") { response.writeHead(404, { "Content-Type": "text/html" }); response.end("<p>Not found</p>"); return; }
   if (request.url === "/missing.css") { response.writeHead(404); response.end("Not found"); return; }
   response.setHeader("Content-Type", "text/html");
+  if (request.url === "/wide") { response.end('<!doctype html><body style="margin:0"><div id="wide" style="width:600px;font:16px Arial">wide text</div>'); return; }
+  if (request.url === "/motion") { response.end('<!doctype html><style>@keyframes slide{to{transform:translateX(100px)}}</style><div id="mover" style="width:50px;height:20px;background:#357;animation:slide 2s infinite"></div>'); return; }
+  if (request.url === "/dead-css") { response.end('<!doctype html><link rel="stylesheet" href="http://127.0.0.1:1/app.css"><p style="color:#111;background:#fff">Plain text</p>'); return; }
+  if (request.url === "/font") { response.end('<!doctype html><style>@font-face{font-family:Missing;src:url(/missing.woff2)} p{font-family:Missing,sans-serif;color:#111;background:#fff}</style><p id="t">Hello there</p>'); return; }
+  if (request.url === "/spacing") { response.end('<!doctype html><style>body{margin:8px;font:14px Arial}</style><div id="chip" style="width:84px;height:20px;line-height:20px;overflow:hidden;white-space:nowrap">Short label</div>'); return; }
   if (request.url === "/gap") { response.end(html + '<button id="second">Second</button>'); return; }
   if (request.url === "/clean-css") { response.end('<!doctype html><link rel="stylesheet" href="/missing.css"><p style="color:#111;background:#fff">Plain text</p>'); return; }
   response.end(html + (request.url === "/broken" ? '<script>fetch("/api-missing")</script>' : ""));
@@ -98,9 +105,40 @@ try {
   assert.equal((await run(["--config", normativeConfig, "--warn-only"])).code, 0);
   const unavailable = await auditAppearance({ ...options, urls: ["http://127.0.0.1:1"], checks: ["AP003"], timeoutMs: 1000 });
   assert.equal(unavailable.pages.length, 0);
-  assert(unavailable.coverage.length > 0);
+  assert(unavailable.coverage.some(g => g.level === "blocking"));
   await assert.rejects(() => auditAppearance({ ...options, checks: ["AP999"] }), /Unknown check ID/);
   await assert.rejects(() => auditAppearance({ ...options, ignores: [{ checkId: "AP003", reason: "" }] }), /reason/);
+  const ids = report => report.findings.map(f => f.checkId);
+  const probeOn = await auditAppearance({ ...options, urls: [url + "/wide"], checks: ["AP014"] });
+  assert(probeOn.findings.some(f => f.checkId === "AP014" && f.target.includes("#wide")));
+  assert(probeOn.pages.some(p => p.kind === "reflow"));
+  const probeOff = await auditAppearance({ ...options, urls: [url + "/wide"], checks: ["AP003"] });
+  assert(!ids(probeOff).includes("AP014") && !probeOff.pages.some(p => p.kind === "reflow"), "disabled AP014 runs no probe");
+  const probeIgnored = await auditAppearance({ ...options, urls: [url + "/wide"], checks: ["AP014"], ignores: [{ checkId: "AP014", selector: "#wide", reason: "Known overflow" }] });
+  assert.equal(probeIgnored.findings.length, 0);
+  assert(probeIgnored.suppressed.some(f => f.checkId === "AP014"));
+  const probeBadIgnore = await auditAppearance({ ...options, urls: [url + "/wide"], checks: ["AP014"], timeoutMs: 2000, ignores: [{ checkId: "AP014", selector: ".never", reason: "Does not match" }] });
+  assert(probeBadIgnore.findings.some(f => f.checkId === "AP014"), "a non-matching selector ignore leaves the finding");
+  const motionOn = await auditAppearance({ ...options, urls: [url + "/motion"], checks: ["AP017"] });
+  assert(motionOn.findings.some(f => f.checkId === "AP017" && f.target.includes("#mover")));
+  assert(motionOn.pages.some(p => p.kind === "motion"));
+  const motionOff = await auditAppearance({ ...options, urls: [url + "/motion"], checks: ["AP003"] });
+  assert(!ids(motionOff).includes("AP017") && !motionOff.pages.some(p => p.kind === "motion"));
+  const motionIgnored = await auditAppearance({ ...options, urls: [url + "/motion"], checks: ["AP017"], ignores: [{ checkId: "AP017", selector: "#mover", reason: "Known motion" }] });
+  assert.equal(motionIgnored.findings.length, 0);
+  assert(motionIgnored.suppressed.some(f => f.checkId === "AP017"));
+  const twoSchemes = await auditAppearance({ ...options, urls: [url + "/spacing"], checks: ["AP015"], colorSchemes: ["light", "dark"] });
+  assert.equal(twoSchemes.findings.filter(f => f.checkId === "AP015").length, 1, "AP015 runs for the first scheme only");
+  assert.equal(twoSchemes.pages.filter(p => p.kind === "scan").length, 2);
+  const deadCss = await auditAppearance({ ...options, urls: [url + "/dead-css"], checks: ["AP001"] });
+  assert(deadCss.coverage.some(g => g.level === "blocking" && g.reason.includes("app.css")), "a stylesheet that never loads is blocking");
+  const notFound = await auditAppearance({ ...options, urls: [url + "/nf"], checks: ["AP001"] });
+  assert.equal(notFound.coverage.filter(g => g.level === "blocking").length, 1);
+  assert.equal(notFound.coverage.filter(g => g.level === "info" && /HTTP 404/.test(g.reason)).length, 0, "a main document error is one blocking gap only");
+  const font = await auditAppearance({ ...options, urls: [url + "/font"], checks: ["AP023"] });
+  assert(font.findings.some(f => f.checkId === "AP023"));
+  assert(font.coverage.some(g => g.level === "info" && /^HTTP 404: .*\/missing\.woff2$/.test(g.reason)), "the missing font is an info gap");
+  assert.equal(font.coverage.filter(g => g.level === "blocking").length, 0);
   console.log("Appearance IDs, state discovery, CLI exits and scoped suppressions passed.");
 } finally {
   await new Promise(resolve => server.close(resolve));

@@ -104,8 +104,13 @@ try {
     const high = await run(button(100) + banner("#fff"), only);
     assert.equal(findings(high, "under", "AP013").length, 0, "control above the banner");
 
-    const overlay = await run(`<button id="under" style="display:block;position:static;margin:100px 20px 0">Target</button><div style="position:static;height:60px;margin-top:-50px;background:#fff"></div>`, only);
-    assert.equal(findings(overlay, "under", "AP013").length, 0, "static overlay is not fixed or sticky content");
+    const cover = position => `<button id="under" style="position:absolute;left:20px;top:100px;width:100px;height:30px">Target</button><div id="cover" style="position:${position};left:0;top:90px;width:200px;height:60px;z-index:1;background:#fff"></div>`;
+    const overlay = await run(cover("absolute"), only);
+    assert.equal(findings(overlay, "under", "AP013").length, 0, "an opaque overlay that is neither fixed nor sticky is not reported");
+    assert.equal(gaps(overlay, "under", "AP013").length, 0);
+    const overlayFixed = await run(cover("fixed"), only);
+    assert.equal(findings(overlayFixed, "under", "AP013").length, 1, "the same overlay with position:fixed hides the control");
+    assert.equal(gaps(high, "under", "AP013").length, 0);
 
     const sr = await run(`<input id="sr" type="checkbox" style="position:absolute;left:20px;top:560px;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0)">` + banner("#fff"), only);
     assert.equal(findings(sr, "sr", "AP013").length, 0, "1x1 screen-reader-only input is not sampled");
@@ -114,6 +119,16 @@ try {
     const sticky = await run(`<div id="bar" style="position:sticky;top:0;z-index:1;height:60px;background:#fff"></div><button id="under" style="position:absolute;left:20px;top:10px">Target</button>`, only);
     assert.equal(findings(sticky, "under", "AP013").length, 1, "sticky content hides the control as well");
     assert.equal(findings(sticky, "under", "AP013")[0].evidence.obscurerPosition, "sticky");
+  }
+
+  {
+    const long = `<a class="s" id="top" href="#">Top</a><a id="far" href="#" style="position:absolute;left:20px;top:2000px">Far link</a><div style="height:3000px"></div><button id="accept" style="position:fixed;right:10px;bottom:10px">Accept</button>`;
+    const r = await run(long, { enabled: ["AP012", "AP013"] });
+    assert.equal(gaps(r, "accept").length, 0, "a below-the-fold link elsewhere must not make a fixed control a gap");
+
+    const under = `<a class="s" id="top" href="#">Top</a><button id="under" style="position:absolute;left:20px;top:520px">Target</button><a id="far" href="#" style="position:absolute;left:20px;top:2000px">Far link</a><div style="height:3000px"></div><div id="banner" style="position:fixed;left:0;right:0;bottom:0;height:120px;background:#fff">Cookie banner</div>`;
+    const u = await run(under, { enabled: ["AP013"] });
+    assert.equal(findings(u, "under", "AP013").length, 1, "a control under the banner is still found when an unrelated far link exists");
   }
 
   {

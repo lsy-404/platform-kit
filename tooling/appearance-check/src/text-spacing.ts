@@ -10,7 +10,6 @@ interface Tracked { target: number | null; related: number | null; raw: RawFindi
 interface Baseline { inlineBlocked: Skipped[]; truncated: number[]; visibleOwners: Element[] }
 
 declare global {
-  // eslint-disable-next-line no-var
   var __textSpacing: { baseline: Baseline; observer: MutationObserver; mutated: Set<Element>; keys: Set<string> } | undefined;
 }
 
@@ -30,14 +29,15 @@ function resolve(selectors: Array<string | undefined>): Array<number | null> {
 function begin(): { inlineBlocked: Skipped[] } {
   const kit = globalThis.__appearanceKit;
   if (!kit) throw new Error("Appearance kit not installed");
-  const inlineBlocked: Skipped[] = [];
+  const inlineAll: Skipped[] = [];
   for (const element of Array.from(document.body.querySelectorAll<HTMLElement>("[style]"))) {
-    if (inlineBlocked.length >= 10) break;
     if (!kit.visible(element)) continue;
     if (["line-height", "letter-spacing", "word-spacing", "margin-bottom"].some(property => element.style.getPropertyPriority(property) === "important")) {
-      inlineBlocked.push({ checkId: "AP015", target: kit.selector(element), reason: "Inline !important spacing blocks the override; not measured" });
+      inlineAll.push({ checkId: "AP015", target: kit.selector(element), reason: "Inline !important spacing blocks the override; not measured" });
     }
   }
+  const inlineBlocked = inlineAll.slice(0, 10);
+  if (inlineAll.length > 10) inlineBlocked.push({ checkId: "AP015", target: "body", reason: `Inline !important limit reached; ${inlineAll.length - 10} more not reported` });
   const truncatedNow = (): Element[] => {
     const result = new Set<Element>();
     for (const { owner } of kit.textRuns()) {
@@ -101,10 +101,14 @@ function judge(candidates: Array<{ target: number | null; related: number | null
     }
   }
   const truncated = [...truncatedElements].filter(element => !baseTruncated.has(kit.identity(element)) && !insideMutation(element)).map(element => ({ target: kit.selector(element) }));
-  const mutated = [...new Set([...state.mutated].filter(node => node.isConnected && state.baseline.visibleOwners.some(owner => node.contains(owner))).map(node => kit.selector(node)))].slice(0, 5);
+  const mutatedAll = [...new Set([...state.mutated].filter(node => node.isConnected && state.baseline.visibleOwners.some(owner => node.contains(owner))).map(node => kit.selector(node)))];
+  const mutated = mutatedAll.slice(0, 5);
   return {
     findings,
-    mutated: mutated.map(target => ({ checkId: "AP015", target, reason: "Content re-rendered during override" })),
+    mutated: [
+      ...mutated.map(target => ({ checkId: "AP015" as const, target, reason: "Content re-rendered during override" })),
+      ...(mutatedAll.length > 5 ? [{ checkId: "AP015" as const, target: "body", reason: `Re-render limit reached; ${mutatedAll.length - 5} more not reported` }] : []),
+    ],
     truncated: truncated.map(item => ({ checkId: "AP015", target: item.target, reason: "Text truncated under override; full text must be available another way" })),
   };
 }

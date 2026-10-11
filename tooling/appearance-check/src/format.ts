@@ -49,6 +49,6 @@ export function formatReport(report: Report): string {
   }
   const normative = report.findings.filter(f => f.severity === "normative").length;
   const count = (level: string) => report.coverage.filter(gap => gap.level === level).length;
-  lines.push(`${report.findings.length} finding(s) (${normative} normative, ${report.findings.length - normative} advisory), ${report.suppressed.length} suppressed, ${report.coverage.length} coverage gap(s) (${count("blocking")} blocking, ${count("info")} info); ${report.pages.length} scan(s).`);
+  lines.push(`${report.findings.length} finding(s) (${normative} normative, ${report.findings.length - normative} advisory), ${report.suppressed.length} suppressed, ${report.coverage.length} coverage gap(s) (${count("blocking")} blocking, ${count("info")} info); ${report.pages.filter(p => p.kind === "scan").length} scan(s).`);
   return lines.join("\n");
 }

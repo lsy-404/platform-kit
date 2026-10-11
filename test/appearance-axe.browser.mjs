@@ -67,7 +67,10 @@ try {
   const vp = content => `<meta name="viewport" content="${content}">`;
   await page.setContent(`<!doctype html><html lang="en"><head><title>t</title>${vp("width=device-width,user-scalable=no")}</head><body><p>x</p></body></html>`);
   const zoomBad = await inspectDocumentAxe(page, DOC);
-  assert(zoomBad.findings.some(f => f.checkId === "AP011"), "user-scalable=no should fail AP011");
+  const zoomFinding = zoomBad.findings.find(f => f.checkId === "AP011");
+  assert(zoomFinding, "user-scalable=no should fail AP011");
+  assert.equal(zoomFinding.evidence.data.value, "user-scalable=no");
+  assert.equal("0" in zoomFinding.evidence.data, false, "string check data is not spread into character keys");
   assert(!(await inspectDocumentAxe(page, ["AP018"])).findings.some(f => f.checkId === "AP011"), "disabled AP011 must not report");
   await page.setContent(`<!doctype html><html lang="en"><head><title>t</title>${vp("width=device-width,initial-scale=1")}</head><body><p>x</p></body></html>`);
   const zoomOk = await inspectDocumentAxe(page, DOC);
@@ -97,17 +100,24 @@ try {
   assert(small, "16px #aaa on white should fail");
   assert.equal(small.evidence.requiredRatio, 4.5);
   assert.equal(small.evidence.largeText, false);
-  assert.ok(Math.abs(small.evidence.margin - (4.5 - small.evidence.contrastRatio)) < 0.011);
-  await load(`<p id="big" style="font-size:24px;color:#aaa">Large low contrast</p>`);
+  assert.equal(small.evidence.contrastRatio, 2.32, "#aaa on white is 2.32:1");
+  assert.ok(Math.abs(small.evidence.margin - 2.18) < 0.011);
+  await load(`<p id="big" style="font-size:24px;color:#969696">Large low contrast</p>`);
   const big = (await inspectColors(page, "default")).findings.find(f => f.target === "#big");
-  assert(big, "24px #aaa (2.32:1) should fail the 3:1 requirement");
+  assert(big, "24px #969696 (2.96:1) should fail the 3:1 requirement");
   assert.equal(big.evidence.requiredRatio, 3);
   assert.equal(big.evidence.largeText, true);
   await load(`<p id="ok" style="font-size:24px;color:#949494">Large adequate contrast</p>`);
   assert(untouched(await inspectColors(page, "default"), "#ok"), "24px #949494 (3.03:1) passes");
+  await load(`<div id="host"></div>`);
+  await page.evaluate(() => document.getElementById("host").attachShadow({ mode: "open" }).innerHTML = '<p style="color:#bbb">Shadow low contrast</p>');
+  const shadow = await inspectDefaultAxe(page, ALL);
+  assert(shadow.skipped.some(s => s.checkId === "AP001" && s.target === "document" && /multi-part/.test(s.reason)), "shadow DOM nodes give a multi-part gap");
+  assert.equal(shadow.findings.filter(f => f.checkId === "AP001").length, 0, "shadow DOM nodes give no finding");
   await load(`<p id="grad" style="color:#777;background:linear-gradient(90deg,#fff,#000)">Over gradient</p>`);
   const grad = await inspectColors(page, "default");
   assert(grad.skipped.some(s => s.checkId === "AP001" && s.target === "#grad" && /gradient/.test(s.reason)), "gradient backgrounds give a gap naming the gradient");
+  assert(!grad.findings.some(f => f.target === "#grad"), "gradient gives a gap, not a finding");
 
   // Default scan also reports AP001 and honours its flag
   await load(`<p id="small" style="color:#aaa">Low</p>`);

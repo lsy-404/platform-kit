@@ -49,14 +49,17 @@ try {
 
   await page.locator("#equal").hover();
   const hoverEqual = await inspectColors(page, "hover", "#equal");
-  const equalFinding = hoverEqual.findings.find(f => f.checkId === "AP002" && f.target === "#equal" && f.evidence.contrastRatio === 1);
+  const equalFinding = hoverEqual.findings.find(f => f.checkId === "AP002" && f.evidence.contrastRatio === 1);
   assert(equalFinding, "identical hover text and fill colors should fail");
   assert.equal(equalFinding.evidence.foreground, equalFinding.evidence.background);
-  assert.equal(hoverEqual.skipped.some(f => f.target === "#equal"), false, "exact same-color evidence should resolve axe's incomplete result");
+  assert.equal(equalFinding.target, "span", "the finding names the text-bearing element axe reports");
+  assert.equal(hoverEqual.skipped.some(f => f.target === "#equal" || f.target === "span"), false, "exact same-color evidence should resolve axe's incomplete result");
+  assert.equal(hoverEqual.findings.filter(f => f.checkId === "AP002").length, 1, "one visual defect is one finding");
 
   await page.locator("#good").hover();
   const hoverGood = await inspectColors(page, "hover", "#good");
   assert.equal(hoverGood.findings.length, 0, "adequate hover contrast should pass");
+  assert.equal(hoverGood.skipped.some(s => s.target === "#good"), false, "adequate hover contrast must not bail out to a gap");
 
   await page.locator("#focus-bad").focus();
   const focusBad = await inspectColors(page, "focus", "#focus-bad");
@@ -70,6 +73,20 @@ try {
   await page.setContent(`<style>body{background:#fff} #outlined{color:#fff;background:#fff;text-shadow:1px 0 #000,-1px 0 #000}</style><span id="outlined">Outlined text</span>`);
   const outlined = await inspectColors(page, "default");
   assert(!outlined.findings.some(f => f.evidence.foreground === f.evidence.background && f.evidence.contrastRatio === 1), "text shadows need separate paint analysis");
+  assert.equal(outlined.findings.some(f => f.target === "#outlined"), false, "outlined text must not produce any finding");
+
+  // negative twins of #invisible: the backdrop is painted outside the ancestor chain
+  await page.setContent(`<style>body{background:#fff;margin:0} .hero{position:relative;height:60px} .hero::before{content:"";position:absolute;inset:0;background:#000} #pseudo{position:relative;color:#fff}</style><div class="hero"><p id="pseudo">White on a dark pseudo-element</p></div>`);
+  const pseudo = await inspectColors(page, "default");
+  assert.equal(pseudo.findings.some(f => f.target === "#pseudo"), false, "a dark ::before backdrop is not same-color text");
+  assert(pseudo.skipped.some(f => f.target === "#pseudo" && /pseudo-element content/.test(f.reason)), "the pseudo-element backdrop is a gap");
+  await page.setContent(`<style>body{background:#fff;margin:0} #dark{position:absolute;left:0;top:0;width:300px;height:80px;background:#000} #ghost{position:absolute;left:10px;top:10px;color:#fff;background:transparent;border:0;padding:12px}</style><div id="dark"></div><button id="ghost">Ghost</button>`);
+  await page.locator("#ghost").hover();
+  const ghost = await inspectColors(page, "hover", "#ghost");
+  assert.equal(ghost.findings.some(f => f.target === "#ghost" || f.target === "#ghost span"), false, "a transparent button over a dark sibling is not same-color text");
+  await page.locator("#ghost").focus();
+  const ghostFocus = await inspectColors(page, "focus", "#ghost");
+  assert.equal(ghostFocus.findings.length, 0);
   await page.setContent(`<style>#uncertain { color:#fff; background-image:url('missing-image.png'); background-color:#fff }</style><span id="uncertain">Uncertain</span>`);
   const incomplete = await inspectColors(page, "default");
   assert(incomplete.skipped.some(f => f.checkId === "AP001" && f.target === "#uncertain"), "axe incomplete contrast should be reported as skipped");

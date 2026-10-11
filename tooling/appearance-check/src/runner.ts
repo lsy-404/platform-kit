@@ -81,19 +81,24 @@ export async function auditAppearance(options: AuditOptions): Promise<Report> {
       const runProbe = async (kind: "reflow" | "motion") => {
         const viewport = kind === "reflow" ? { width: 320, height: 640 } : firstVp;
         let context: BrowserContext | undefined;
-        const getPage = async () => {
-          context = await browser.newContext({ viewport, colorScheme: firstScheme, deviceScaleFactor: 1 });
+        let pagePromise: Promise<Page> | undefined;
+        const getPage = () => pagePromise ??= (async () => {
+          context = await browser.newContext({ viewport, colorScheme: firstScheme, ...(kind === "motion" ? { reducedMotion: "reduce" as const } : {}), deviceScaleFactor: 1 });
           const page = await context.newPage();
           page.setDefaultTimeout(timeout);
           await page.goto(url, { waitUntil: "load" });
           return page;
-        };
+        })();
         try {
           const { result, page } = kind === "reflow"
             ? await probeReflow(browser, url, firstScheme, { timeoutMs: timeout })
             : await probeMotion(browser, url, firstVp, firstScheme, { timeoutMs: timeout });
           report.pages.push(page);
-          await adder(page.viewport, firstScheme, getPage)(result, "default");
+          try {
+            await adder(page.viewport, firstScheme, getPage)(result, "default");
+          } catch (error) {
+            report.coverage.push({ page: url, viewport: page.viewport, colorScheme: firstScheme, state: "default", target: "document", checkId: kind === "reflow" ? "AP014" : "AP017", reason: String(error), level: "check" });
+          }
         } finally { await context?.close(); }
       };
       for (const viewport of viewports) for (const colorScheme of schemes) {
@@ -102,7 +107,15 @@ export async function auditAppearance(options: AuditOptions): Promise<Report> {
         page.setDefaultTimeout(timeout);
         const errors: Array<{ reason: string; level: GapLevel }> = [];
         page.on("pageerror", error => errors.push({ reason: "Page error: " + error.message, level: "info" }));
-        page.on("response", response => { if (response.status() >= 400) errors.push({ reason: "HTTP " + response.status() + ": " + response.url(), level: response.request().resourceType() === "stylesheet" ? "blocking" : "info" }); });
+        page.on("response", response => {
+          const request = response.request();
+          if (response.status() < 400 || request.isNavigationRequest() && request.frame() === page.mainFrame()) return;
+          errors.push({ reason: "HTTP " + response.status() + ": " + response.url(), level: request.resourceType() === "stylesheet" ? "blocking" : "info" });
+        });
+        page.on("requestfailed", request => {
+          if (request.isNavigationRequest() && request.frame() === page.mainFrame()) return;
+          errors.push({ reason: "Request failed: " + request.url() + " (" + (request.failure()?.errorText ?? "unknown") + ")", level: request.resourceType() === "stylesheet" ? "blocking" : "info" });
+        });
         const add = adder(viewport, colorScheme, async () => page);
         // A failing step becomes check-level gaps so the remaining checks still run.
         const step = async (ids: CheckId[], run: () => Promise<void>) => {
@@ -147,7 +160,7 @@ export async function auditAppearance(options: AuditOptions): Promise<Report> {
               for (const [dimension, list] of Object.entries(design.notes) as Array<[Dimension, string[]]>) for (const note of list) (notes[dimension] ??= new Set()).add(note);
               await add(design.drift, "default");
             } catch (error) {
-              if (enabled.includes("AP019")) report.coverage.push({ page: url, viewport, colorScheme, state: "default", target: "document", checkId: "AP019", reason: String(error), level: "check" });
+              report.coverage.push({ page: url, viewport, colorScheme, state: "default", target: "document", ...(enabled.includes("AP019") ? { checkId: "AP019" as const, reason: String(error), level: "check" as const } : { reason: "Design metrics unavailable: " + String(error), level: "info" as const }) });
             }
           }
           if (firstSchemeScan && firstViewportScan) {
@@ -169,7 +182,7 @@ export async function auditAppearance(options: AuditOptions): Promise<Report> {
       if (enabled.includes("AP014")) await runProbe("reflow");
       if (enabled.includes("AP017")) await runProbe("motion");
     }
-    const { verdict, summary } = summarize(report, enabled, report.pages.length);
+    const { verdict, summary } = summarize(report, enabled, report.pages.filter(p => p.kind === "scan").length);
     for (const row of summary) row.notes = [...notes[row.dimension] ?? []];
     return { verdict, summary, ...report };
   } finally { await browser.close(); }

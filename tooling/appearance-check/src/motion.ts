@@ -8,7 +8,7 @@ export function inspectMotion(): BrowserResult {
   const kit = globalThis.__appearanceKit;
   if (!kit) throw new Error("Appearance kit not installed");
   const findings: RawFinding[] = [];
-  const MOTION = new Set(["transform", "translate", "rotate", "scale", "left", "top", "right", "bottom", "inset", "offsetDistance", "backgroundPosition"]);
+  const MOTION = new Set(["transform", "translate", "rotate", "scale", "left", "top", "right", "bottom", "inset", "offsetDistance", "backgroundPosition", "backgroundPositionX", "backgroundPositionY"]);
   const NON_PROPERTY = new Set(["offset", "easing", "composite", "computedOffset"]);
   const seen = new Set<Element>();
   for (const animation of document.getAnimations()) {

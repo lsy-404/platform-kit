@@ -28,7 +28,9 @@ export function inspectTypography(enabled: CheckId[]): BrowserResult {
       skipped.push({ checkId: leading ? "AP021" : "AP022", target: "body", reason: "Prose block limit reached; remaining blocks were not checked." });
       break;
     }
-    const text = (block.textContent ?? "").replace(/\s+/g, " ").trim();
+    const ruby = block.cloneNode(true) as Element;
+    for (const annotation of Array.from(ruby.querySelectorAll("rt, rp"))) annotation.remove();
+    const text = (ruby.textContent ?? "").replace(/\s+/g, " ").trim();
     const lines = kit.lines(block);
     if (lines.length < 3) continue;
     const fontSize = parseFloat(style.fontSize);

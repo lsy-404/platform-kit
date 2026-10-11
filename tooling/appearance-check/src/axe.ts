@@ -4,7 +4,7 @@ import type { BrowserResult, CheckId, RawFinding, Skipped, State } from "./types
 
 export type AxeResults = Awaited<ReturnType<AxeBuilder["analyze"]>>;
 
-interface AxeCheck { data?: Record<string, unknown>; message?: string }
+interface AxeCheck { data?: unknown; message?: string }
 interface AxeNode {
   target: unknown[];
   failureSummary?: string;
@@ -27,6 +27,7 @@ const incompleteReasons: Record<string, string> = {
   bgOverlap: "overlapped by another element",
   fgAlpha: "translucent text",
   elmPartiallyObscured: "partially obscured",
+  elmPartiallyObscuring: "partially overlapping other elements",
   pseudoContent: "pseudo-element content",
   shadowOutlineEmMax: "text shadow or outline",
 };
@@ -43,7 +44,12 @@ function allChecks(node: AxeNode): AxeCheck[] {
 }
 
 function mergedData(node: AxeNode): Record<string, unknown> {
-  return Object.assign({}, ...allChecks(node).map(check => check.data ?? {}));
+  const out: Record<string, unknown> = {};
+  for (const { data } of allChecks(node)) {
+    if (data !== null && typeof data === "object" && !Array.isArray(data)) Object.assign(out, data);
+    else if (data !== undefined && data !== null) out.value = data;
+  }
+  return out;
 }
 
 function summaryFor(node: AxeNode): string {
@@ -176,8 +182,8 @@ export async function colorContrastResult(page: Page, results: AxeResults, state
 
   for (const node of nodesOf(results.incomplete, "color-contrast")) {
     const selector = selectorFor(node);
-    if (selector) uncertain.add(selector);
     const key = messageKey(node);
+    if (selector && key === "equalRatio") uncertain.add(selector);
     skipped.push({
       checkId,
       target: selector ?? target ?? "document",
@@ -185,7 +191,6 @@ export async function colorContrastResult(page: Page, results: AxeResults, state
     });
   }
 
-  if (target && !seen.has(target)) uncertain.add(target);
   for (const candidate of uncertain) {
     if (seen.has(candidate)) continue;
     const equality = await sameColorEvidence(page, candidate);

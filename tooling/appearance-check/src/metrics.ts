@@ -19,7 +19,7 @@ const channelDelta = (a: string, b: string): number => {
   return Math.max(...x.map((v, i) => Math.abs(v - (y[i] ?? 0))));
 };
 
-function detectDrift(colors: DesignColor[]): RawFinding[] {
+function detectDrift(colors: DesignColor[]): { findings: RawFinding[]; capped: boolean } {
   const findings: RawFinding[] = [];
   for (const role of ["text", "background", "border"] as const) {
     const group = colors.filter(c => c.role === role).sort((a, b) => b.count - a.count);
@@ -37,6 +37,7 @@ function detectDrift(colors: DesignColor[]): RawFinding[] {
         if (flagged && (!best || delta < best.delta)) best = { major, delta, channel };
       }
       if (!best || reported.has(minor.value)) continue;
+      if (findings.length >= 20) return { findings, capped: true };
       reported.add(minor.value);
       findings.push({
         checkId: "AP019",
@@ -46,10 +47,9 @@ function detectDrift(colors: DesignColor[]): RawFinding[] {
         confidence: "heuristic",
         evidence: { role, color: minor.value, nearest: best.major.value, deltaEOK: best.delta, channelDelta: best.channel, usage: { color: minor.count, nearest: best.major.count }, examples: minor.examples },
       });
-      if (findings.length >= 20) return findings;
     }
   }
-  return findings;
+  return { findings, capped: false };
 }
 
 function paletteMetrics(sample: DesignSample): PageMetrics["palette"] {
@@ -163,6 +163,8 @@ export function analyzeDesign(sample: DesignSample): {
   notes: Partial<Record<Dimension, string[]>>;
 } {
   const skipped: Skipped[] = sample.skipped.map(entry => ({ checkId: "AP019", target: entry.target, reason: entry.reason }));
+  const drift = detectDrift(sample.colors);
+  if (drift.capped) skipped.push({ checkId: "AP019", target: "body", reason: "Color drift finding limit (20) reached; further drift not reported" });
   const palette = paletteMetrics(sample), type = typeMetrics(sample), spacing = spacingMetrics(sample);
 
   const color: string[] = [], typography: string[] = [], layout: string[] = [];
@@ -187,5 +189,5 @@ export function analyzeDesign(sample: DesignSample): {
   if (color.length) notes.color = color;
   if (layout.length) notes.layout = layout;
   if (typography.length) notes.typography = typography;
-  return { drift: { findings: detectDrift(sample.colors), skipped }, metrics: { palette, type, spacing }, notes };
+  return { drift: { findings: drift.findings, skipped }, metrics: { palette, type, spacing }, notes };
 }

@@ -59,14 +59,17 @@ test("AP014 reflow", async () => {
     const scroller = await run(`<div id=sc style="overflow-x:auto"><table id=tbl style="width:600px"><tr><td>cell</td></tr></table></div>`);
     assert.equal(scroller.result.findings.length, 0, "content inside its own scroller is reachable");
     assert.equal(gapsFor(scroller.result, "#tbl").length, 0, "no gap for the scroller twin");
+    assert.equal(scroller.result.skipped.length, 0, "the scroller twin has no gap of any kind");
 
     const skipLink = await run(`<a id=skip href=# style="position:absolute;left:-9999px">Skip</a><p>Body</p>`, "html{overflow-x:hidden}");
     assert.equal(skipLink.result.findings.length, 0, "a parked skip link is not a reflow culprit");
     assert.equal(gapsFor(skipLink.result, "#skip").length, 0);
+    assert.equal(skipLink.result.skipped.length, 0);
 
     const offCanvas = await run(`<nav id=menu style="position:absolute;left:100%;top:0;width:200px">Menu</nav><p>Body</p>`, "html{overflow-x:hidden}");
     assert.equal(offCanvas.result.findings.length, 0, "an off-canvas panel under root clipping is by design");
     assert.equal(gapsFor(offCanvas.result, "#menu").length, 0);
+    assert.equal(offCanvas.result.skipped.length, 0);
 
     const offCanvasOpen = await run(`<nav id=menu style="position:absolute;left:100%;top:0;width:200px">Menu</nav><p>Body</p>`);
     assert.equal(findingsFor(offCanvasOpen.result, "AP014", "#menu").length, 1, "the same panel is reachable by page scroll without root clipping");
@@ -75,6 +78,21 @@ test("AP014 reflow", async () => {
     assert.equal(findingsFor(image.result, "AP014", "#pic").length, 0, "2-D content is an exception, not a finding");
     assert.equal(gapsFor(image.result, "#pic").length, 1, "2-D overflow needs review");
     assert.equal(image.result.skipped[0].checkId, "AP014");
+
+    const scrolled = await run(`<div id=app><main id=inner style="width:354px">text</main></div><script>addEventListener("load",()=>scrollTo(16,0))</script>`);
+    assert.equal(findingsFor(scrolled.result, "AP014", "#inner").length, 1, "the inner box is the culprit even if the page scrolled on load");
+    assert.equal(findingsFor(scrolled.result, "AP014", "#app").length, 0, "a full-width wrapper is not blamed because of scroll offset");
+
+    const keyframes = "@keyframes slide{to{transform:translateX(250%)}}";
+    const track = await run(`<div id=track style="margin:0 10px;width:200px;overflow:hidden"><span id=bar style="display:block;height:4px;width:100px;background:#357;animation:slide 2s infinite"></span></div>`, keyframes);
+    assert.equal(track.result.findings.length, 0, "a moving child inside an in-viewport overflow:hidden track cannot cause page scroll");
+    assert.equal(track.result.skipped.length, 0);
+    const trackWide = await run(`<div id=track style="width:600px;overflow:hidden"><span>text</span></div>`);
+    assert.equal(findingsFor(trackWide.result, "AP014", "#track").length, 1, "the clipper itself overflowing the viewport is still reported");
+
+    const many = await run(Array.from({ length: 12 }, (_, i) => `<div id=w${i} style="width:600px">text</div>`).join(""));
+    assert.equal(many.result.findings.length, 10);
+    assert.ok(many.result.skipped.some(s => s.checkId === "AP014" && /limit reached/.test(s.reason)), "a truncated culprit list says so");
 
     const fits = await run(`<div id=ok style="width:300px">text</div>`);
     assert.equal(fits.result.findings.length + fits.result.skipped.length, 0, "content that fits is clean");
@@ -137,6 +155,34 @@ test("AP015 text spacing", async () => {
     await page.evaluate(installKit);
     const preexisting = await checkTextSpacing(page);
     assert.equal(findingsFor(preexisting, "AP015", "#pre").length, 0, "pre-existing clipping belongs to AP005");
+    assert.equal(preexisting.skipped.length, 0, "no gap of any kind for pre-existing clipping");
+
+    // overlap that only appears under the override, with a twin that stays apart
+    await page.setContent(`<!doctype html><style>body{margin:8px;font:14px Arial}span{position:absolute;white-space:nowrap}</style>
+      <span id=l1 style="left:0;top:0">Hello World</span><span id=l2 style="left:84px;top:0">Hello World</span>
+      <span id=f1 style="left:0;top:100px">Hello World</span><span id=f2 style="left:400px;top:100px">Hello World</span>`);
+    await page.evaluate(installKit);
+    const overlap = await checkTextSpacing(page);
+    const pair = overlap.findings.filter(f => f.checkId === "AP015" && f.evidence.kind === "overlap");
+    assert.equal(pair.length, 1, "a pair that collides only under the override is one finding");
+    assert.ok(pair[0].target.includes("#l1") || pair[0].target.includes("#l2"));
+    assert.ok(pair[0].related, "the colliding partner is named");
+    assert.equal(findingsFor(overlap, "AP015", "#f1").length + findingsFor(overlap, "AP015", "#f2").length, 0, "the distant twin is clean");
+
+    // content rewritten by a script when the override stylesheet appears
+    await page.setContent(`<!doctype html><style>body{margin:8px;font:14px Arial}</style><p id=rr>Original text</p>
+      <script>new MutationObserver(() => { document.getElementById("rr").textContent = "Rewritten " + Math.random(); }).observe(document.head, { childList: true });</script>`);
+    await page.evaluate(installKit);
+    const rerender = await checkTextSpacing(page);
+    assert.equal(gapsFor(rerender, "#rr").filter(g => /re-rendered/i.test(g.reason)).length, 1, "re-rendered content is a gap");
+    assert.equal(findingsFor(rerender, "AP015", "#rr").length, 0);
+
+    // the inline !important list is capped with a visible limit entry
+    await page.setContent(`<!doctype html><style>body{margin:8px;font:14px Arial}</style>${Array.from({ length: 15 }, (_, i) => `<p id=i${i} style="letter-spacing:0 !important">Text ${i}</p>`).join("")}`);
+    await page.evaluate(installKit);
+    const capped = await checkTextSpacing(page);
+    assert.equal(capped.skipped.filter(s => /Inline !important/.test(s.reason)).length, 11, "ten entries plus one limit entry");
+    assert.ok(capped.skipped.some(s => /limit reached; 5 more/.test(s.reason)));
     await context.close();
 });
 
@@ -173,6 +219,9 @@ test("AP017 persistent motion", async () => {
       assert.equal(gapsFor(motion.result, "#" + id).length, 0, `${id} has no gap`);
     }
     assert.equal(motion.result.findings.length, 2, "only the two persistent animations are reported");
+
+    const shimmer = await probeMotion(browser, serve("/shimmer", `<div id=shim style="width:300px;height:40px;background:linear-gradient(90deg,#ccc,#eee);animation:bg 2s linear infinite"></div>`, "@keyframes bg{to{background-position:200px 0}}"), { width: 800, height: 600 }, "light");
+    assert.equal(findingsFor(shimmer.result, "AP017", "#shim").length, 1, "an infinite background-position shimmer is persistent motion");
 });
 
 after(async () => {

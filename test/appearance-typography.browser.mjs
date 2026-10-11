@@ -30,18 +30,19 @@ async function run(html, fn, arg) {
 const words = "the quick brown fox jumps over a lazy dog while reading some text ";
 const latin = n => words.repeat(Math.ceil(n / words.length)).slice(0, n);
 const cjk = n => "天地玄黄宇宙洪荒日月盈昃辰宿列张寒来暑往秋收冬藏".repeat(Math.ceil(n / 24)).slice(0, n);
-const hit = (result, id, fragment) => result.findings.filter(f => f.checkId === id && f.target.includes(fragment));
+const last = selector => selector.split(" ").pop();
+const hit = (result, id, fragment) => result.findings.filter(f => f.checkId === id && last(f.target) === fragment);
 
 try {
   // AP021 prose leading
   {
     const html = id => lh => `<p id="${id}" style="width:300px;margin:0;font:16px/${lh} Arial">${latin(260)}</p>`;
     const tight = await run(html("tight")("16px"), inspectTypography, ["AP021"]);
-    const f = hit(tight, "AP021", "tight");
+    const f = hit(tight, "AP021", "p#tight");
     assert.equal(f.length, 1, "line-height 1.0 is reported");
     assert.ok(f[0].evidence.ratio < 1.2 && f[0].evidence.lines >= 4);
     assert.equal(f[0].evidence.fontSize, 16);
-    assert.equal(hit(await run(html("t")("1.15"), inspectTypography, ["AP021"]), "AP021", "t").length, 1, "1.15 is below 1.2");
+    assert.equal(hit(await run(html("t")("1.15"), inspectTypography, ["AP021"]), "AP021", "p#t").length, 1, "1.15 is below 1.2");
     const ok = await run(html("ok")("1.25"), inspectTypography, ["AP021"]);
     assert.equal(ok.findings.length, 0, "1.25 passes");
     assert.equal(ok.skipped.length, 0);
@@ -56,10 +57,18 @@ try {
     assert.equal(short.findings.length, 0, "under 80 characters is excluded");
   }
 
+  // ruby and superscripts do not form fake lines
+  {
+    const ruby = await run(`<p id="rb" lang="ja" style="width:400px;margin:0;font:16px/1.8 sans-serif">${"<ruby>漢字<rt>かんじ</rt></ruby>".repeat(40)}</p>`, inspectTypography, ["AP021"]);
+    assert.equal(hit(ruby, "AP021", "p#rb").length, 0, "furigana rects are not counted as lines");
+    const sup = await run(`<p id="sp" style="width:500px;margin:0;font:16px/1.5 Arial">${latin(70)} claim<sup>12</sup> ${latin(70)}</p>`, inspectTypography, ["AP021"]);
+    assert.equal(hit(sup, "AP021", "p#sp").length, 0, "a superscript does not create an extra line");
+  }
+
   // AP022 line length
   {
     const wide = await run(`<p id="wide" style="width:1200px;margin:0;font:16px Arial">${latin(600)}</p>`, inspectTypography, ["AP022"]);
-    const f = hit(wide, "AP022", "wide");
+    const f = hit(wide, "AP022", "p#wide");
     assert.equal(f.length, 1);
     assert.ok(f[0].evidence.charsPerLine > 80 && f[0].evidence.script === "latin");
     assert.equal((await run(`<p id="wide" style="width:1200px;margin:0;font:16px Arial">${latin(600)}</p>`, inspectTypography, [])).findings.length, 0);
@@ -67,7 +76,7 @@ try {
     assert.equal(narrow.findings.length, 0, "60ch measure passes");
     assert.equal(narrow.skipped.length, 0);
     const longCjk = await run(`<p id="cjk" style="width:50em;margin:0;font:16px Arial">${cjk(400)}</p>`, inspectTypography, ["AP022"]);
-    const g = hit(longCjk, "AP022", "cjk");
+    const g = hit(longCjk, "AP022", "p#cjk");
     assert.equal(g.length, 1, "50 CJK characters per line exceeds 40");
     assert.equal(g[0].evidence.script, "cjk");
     const shortCjk = await run(`<p id="cjk" style="width:30em;margin:0;font:16px Arial">${cjk(400)}</p>`, inspectTypography, ["AP022"]);
@@ -102,7 +111,7 @@ try {
       };
       const bad = await visit("/bad");
       assert.ok(bad.failures.some(url => url.endsWith("/missing.woff2")), "the font request failed with 404");
-      const found = hit(bad.result, "AP023", "t");
+      const found = hit(bad.result, "AP023", "p#t");
       assert.equal(found.length, 1, "unloadable declared font is reported on its first user");
       assert.equal(found[0].evidence.family.replace(/["']/g, ""), "Missing");
       assert.ok(found[0].evidence.owners.length >= 1);
@@ -120,9 +129,10 @@ try {
   {
     const layout = async html => run(html, inspectLayout, ["AP006"]);
     const bad = await layout(`<main><h2 id="a" style="font:400 14px Arial;margin:0">A</h2><h3 id="b" style="font:700 24px Arial;margin:0">B</h3></main>`);
-    const f = bad.findings.filter(x => x.checkId === "AP006" && x.target.includes("b"));
+    const f = bad.findings.filter(x => x.checkId === "AP006" && last(x.target) === "h3#b");
     assert.equal(f.length, 1, "a stronger subheading is reported");
-    assert.ok(f[0].related?.includes("a"));
+    assert.equal(last(f[0].target), "h3#b");
+    assert.equal(last(f[0].related), "h2#a");
     assert.equal(f[0].evidence.kind, "level-inversion");
     assert.equal(f[0].evidence.heading.level, 3);
     assert.equal(f[0].evidence.parentHeading.level, 2);
@@ -133,6 +143,8 @@ try {
     assert.equal(upper.findings.length, 0, "uppercase eyebrow headings are exempt");
     const ordered = await layout(`<main><h2 style="font:700 28px Arial;margin:0">A</h2><h3 id="b" style="font:700 20px Arial;margin:0">B</h3></main>`);
     assert.equal(ordered.findings.length, 0, "a smaller subheading is fine");
+    const hidden = await layout(`<main><p>Intro</p><h2 class="sr" style="position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);font:400 16px Arial">Section</h2><h3 id="b" style="font:700 24px Arial;margin:0">Visible title</h3></main>`);
+    assert.equal(hidden.findings.length, 0, "a screen-reader-only heading is not a visible parent");
     const split = await layout(`<main><section><h2 style="font:400 14px Arial;margin:0">A</h2></section><section><h3 id="b" style="font:700 24px Arial;margin:0">B</h3></section></main>`);
     assert.equal(split.findings.length, 0, "headings in different sections are not compared");
   }

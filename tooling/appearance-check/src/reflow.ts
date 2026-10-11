@@ -30,6 +30,10 @@ export function inspectReflow(): BrowserResult {
     for (let node: Element | null = el; node && node !== document.body; node = node.parentElement) {
       const style = getComputedStyle(node);
       if (style.position === "fixed" || node !== el && /^(auto|scroll)$/.test(style.overflowX)) { skip = true; break; }
+      if (node !== el && /^(hidden|clip)$/.test(style.overflowX)) {
+        const bounds = node.getBoundingClientRect();
+        if (bounds.left >= -1 && bounds.right <= vw + 1) { skip = true; break; }
+      }
     }
     if (skip || rect.right <= 0) continue;
     if (rect.left >= vw && rootClips) continue;
@@ -42,13 +46,16 @@ export function inspectReflow(): BrowserResult {
   const real = topmost.filter(el => !el.closest(TWO_D));
   const box = (r: DOMRect) => ({ x: r.x, y: r.y, width: r.width, height: r.height });
   if ((docOverflow > 1 || rootClips) && real.length) {
-    for (const el of real.sort((a, b) => culprits.get(b)! - culprits.get(a)!).slice(0, 10)) {
+    const ranked = real.sort((a, b) => culprits.get(b)! - culprits.get(a)!);
+    if (ranked.length > 10) skipped.push({ checkId: "AP014", target: "document", reason: `Overflow culprit limit reached; ${ranked.length - 10} more not reported` });
+    for (const el of ranked.slice(0, 10)) {
       findings.push({
         checkId: "AP014", target: kit.selector(el), message: MESSAGE, confidence: "measured",
         evidence: { kind: rootClips ? "cut-off" : "overflow", viewportWidth: vw, documentScrollWidth: scroller.scrollWidth, overshoot: culprits.get(el)!, rect: box(el.getBoundingClientRect()), rootClips },
       });
     }
   }
+  if (twoD.length > 5) skipped.push({ checkId: "AP014", target: "document", reason: `2-D overflow limit reached; ${twoD.length - 5} more not reported` });
   for (const el of twoD.slice(0, 5)) skipped.push({ checkId: "AP014", target: kit.selector(el), reason: "Overflow from 2-D content (image, table, media, code); exception needs review" });
   return { findings, skipped };
 }
@@ -88,6 +95,7 @@ export async function probeReflow(browser: Browser, url: string, scheme: ColorSc
     if (response && response.status() >= 400) throw new Error("HTTP " + response.status());
     await page.waitForLoadState("networkidle", { timeout: Math.min(timeout, 2000) }).catch(() => undefined);
     await page.evaluate(() => document.fonts.ready);
+    await page.evaluate(() => window.scrollTo(0, 0));
     await settlePage(page);
     await page.evaluate(installKit);
     const reflow = await page.evaluate(inspectReflow);
