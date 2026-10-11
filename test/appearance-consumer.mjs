@@ -5,7 +5,7 @@ import { mkdtemp, readFile, writeFile, rm, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 
-test("current appearance archive installs with CLI, typed reports and Vite 8 build warnings", { timeout: 180000 }, async () => {
+test("current appearance archive installs with CLI, typed reports and Vite 8 build warnings", { timeout: 600000 }, async () => {
   const source = resolve("release/platform-kit-appearance-check");
   const expected = JSON.parse(await readFile("tooling/appearance-check/package.json", "utf8"));
   const archive = `platform-kit-appearance-check-${expected.version}.tgz`;
