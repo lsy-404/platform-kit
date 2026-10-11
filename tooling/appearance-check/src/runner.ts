@@ -1,10 +1,11 @@
 import { chromium } from "playwright";
 import type { Page } from "playwright";
-import { checks, isCheckId } from "./catalog.js";
+import { checkInfo, checks, isCheckId } from "./catalog.js";
+import { summarize } from "./summary.js";
 import { scanSurfaces } from "./surfaces.js";
 import { inspectLayout } from "./layout.js";
 import { inspectColors } from "./colors.js";
-import type { AuditOptions, BrowserResult, Finding, Ignore, Report, State } from "./types.js";
+import type { AuditOptions, BrowserResult, Finding, GapLevel, Ignore, Report, State } from "./types.js";
 
 export function validateOptions(options: AuditOptions): void {
   if (!Array.isArray(options.urls) || !options.urls.length) throw new Error("At least one URL is required");
@@ -54,21 +55,22 @@ async function settle(page: Page): Promise<void> {
 export async function auditAppearance(options: AuditOptions): Promise<Report> {
   validateOptions(options);
   const enabled = options.checks ?? checks.map(check => check.id);
-  const report: Report = { findings: [], suppressed: [], coverage: [], pages: [] };
+  const report: Omit<Report, "verdict" | "summary"> = { findings: [], suppressed: [], coverage: [], pages: [], metrics: [] };
   const browser = await chromium.launch({ headless: true, executablePath: options.executablePath });
   try {
     for (const url of options.urls) for (const viewport of options.viewports ?? [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) for (const colorScheme of options.colorSchemes ?? ["light" as const]) {
       const context = await browser.newContext({ viewport, colorScheme });
       const page = await context.newPage();
       page.setDefaultTimeout(options.timeoutMs ?? 15000);
-      const errors: string[] = [];
-      page.on("pageerror", error => errors.push("Page error: " + error.message));
-      page.on("response", response => { if (response.status() >= 400) errors.push("HTTP " + response.status() + ": " + response.url()); });
+      const errors: Array<{ reason: string; level: GapLevel }> = [];
+      page.on("pageerror", error => errors.push({ reason: "Page error: " + error.message, level: "info" }));
+      page.on("response", response => { if (response.status() >= 400) errors.push({ reason: "HTTP " + response.status() + ": " + response.url(), level: response.request().resourceType() === "stylesheet" ? "blocking" : "info" }); });
       const add = async (result: BrowserResult, state: State) => {
-        for (const skipped of result.skipped) report.coverage.push({ ...skipped, page: url, viewport, colorScheme, state });
+        for (const skipped of result.skipped) report.coverage.push({ ...skipped, page: url, viewport, colorScheme, state, level: "check" });
         for (const raw of result.findings) {
           if (!enabled.includes(raw.checkId)) continue;
-          const finding: Finding = { ...raw, page: url, viewport, colorScheme, state };
+          const info = checkInfo(raw.checkId);
+          const finding: Finding = { ...raw, page: url, viewport, colorScheme, state, severity: info.severity, dimensions: [...info.dimensions] };
           let suppressed = false;
           for (const ignore of options.ignores ?? []) if (await matchesIgnore(page, finding, ignore)) {
             report.suppressed.push({ ...finding, reason: ignore.reason });
@@ -82,7 +84,7 @@ export async function auditAppearance(options: AuditOptions): Promise<Report> {
         const response = await page.goto(url, { waitUntil: "load" });
         if (response && response.status() >= 400) throw new Error("HTTP " + response.status());
         await page.waitForLoadState("networkidle", { timeout: Math.min(options.timeoutMs ?? 15000, 2000) }).catch(() => {
-          report.coverage.push({ page: url, viewport, colorScheme, state: "default", target: "document", reason: "Network did not settle; current rendered state was inspected" });
+          report.coverage.push({ page: url, viewport, colorScheme, state: "default", target: "document", reason: "Network did not settle; current rendered state was inspected", level: "info" });
         });
         await page.evaluate(() => document.fonts.ready);
         await settle(page);
@@ -117,10 +119,10 @@ export async function auditAppearance(options: AuditOptions): Promise<Report> {
             return [{ target: selector(element), hoverTarget: selector(labels[0] ?? element), colorTargets: (labels.length ? labels : [element]).map(selector) }];
           });
         });
-        report.pages.push({ page: url, viewport, colorScheme, controls: controls.length });
+        report.pages.push({ page: url, viewport, colorScheme, kind: "scan", controls: controls.length });
         if (enabled.includes("AP002")) {
           const limit = options.maxControls ?? 40;
-          for (const { target } of controls.slice(limit)) report.coverage.push({ page: url, viewport, colorScheme, state: "hover", target, checkId: "AP002", reason: "Control limit reached; hover and focus were not inspected" });
+          for (const { target } of controls.slice(limit)) report.coverage.push({ page: url, viewport, colorScheme, state: "hover", target, checkId: "AP002", reason: "Control limit reached; hover and focus were not inspected", level: "check" });
           for (const { target, hoverTarget, colorTargets } of controls.slice(0, limit)) {
             const control = page.locator(target);
             for (const state of ["hover", "focus"] as const) {
@@ -135,20 +137,20 @@ export async function auditAppearance(options: AuditOptions): Promise<Report> {
                 await settle(page);
                 for (const colorTarget of colorTargets) await add(await inspectColors(page, state, colorTarget), state);
               } catch (error) {
-                report.coverage.push({ page: url, viewport, colorScheme, state, target, checkId: "AP002", reason: String(error) });
+                report.coverage.push({ page: url, viewport, colorScheme, state, target, checkId: "AP002", reason: String(error), level: "check" });
               }
             }
           }
         }
         const unsupported = await page.evaluate(() => [...document.querySelectorAll("body *")].filter(el => el.shadowRoot || el.tagName === "IFRAME").filter(el => el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })).map(el => el.tagName.toLowerCase()));
-        for (const target of unsupported) report.coverage.push({ page: url, viewport, colorScheme, state: "default", target, reason: "Shadow DOM and iframe contents are outside the inspected document" });
+        for (const target of unsupported) report.coverage.push({ page: url, viewport, colorScheme, state: "default", target, reason: "Shadow DOM and iframe contents are outside the inspected document", level: "info" });
       } catch (error) {
-        report.coverage.push({ page: url, viewport, colorScheme, state: "default", target: "document", reason: String(error) });
+        report.coverage.push({ page: url, viewport, colorScheme, state: "default", target: "document", reason: String(error), level: "blocking" });
       } finally {
-        for (const reason of errors) report.coverage.push({ page: url, viewport, colorScheme, state: "default", target: "document", reason });
+        for (const { reason, level } of errors) report.coverage.push({ page: url, viewport, colorScheme, state: "default", target: "document", reason, level });
         await context.close();
       }
     }
-    return report;
+    return { ...summarize(report, enabled, report.pages.length), ...report };
   } finally { await browser.close(); }
 }

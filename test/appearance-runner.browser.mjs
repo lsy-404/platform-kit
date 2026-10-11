@@ -27,7 +27,7 @@ const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE;
 const options = { urls: [url + "/bad"], checks: ["AP002", "AP003"], viewports: [{ width: 800, height: 600 }], executablePath };
 const run = (args) => promisify(execFile)(process.execPath, [cli, ...args], { timeout: 60000 }).catch(error => error);
 try {
-  assert.deepEqual(checks.map(c => c.id), ["AP001", "AP002", "AP003", "AP004", "AP005", "AP006", "AP007", "AP008"]);
+  assert.deepEqual(checks.map(c => c.id), Array.from({ length: 23 }, (_, i) => "AP" + String(i + 1).padStart(3, "0")));
   const report = await auditAppearance(options);
   assert(report.findings.some(f => f.checkId === "AP003" && f.target === "#inner"));
   assert(report.findings.some(f => f.checkId === "AP002" && f.state === "hover"));
