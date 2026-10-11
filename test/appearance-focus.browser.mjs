@@ -53,6 +53,7 @@ try {
   {
     const r = await run(`<style>
         .ring:focus-visible{outline:none;box-shadow:0 0 0 3px #0057b8}
+        .tint{border:1px solid #888;background:#fff}
         .tint:focus-visible{outline:none;background:#e0e0e0}
         .sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0)}
         .pick{display:inline-block;width:20px;height:20px;border:1px solid #333;vertical-align:middle}
@@ -60,7 +61,7 @@ try {
       </style>
       <button class="s" id="ua">Default ring</button>
       <button class="s ring" id="ring">Shadow ring</button>
-      <button class="s tint" id="tint" style="border:1px solid #888;background:#fff">Tint only</button>
+      <button class="s tint" id="tint">Tint only</button>
       <label class="s" id="lab"><input class="sr" id="sr" type="checkbox"><span class="pick"></span> Option</label>`);
     for (const id of ["ua", "ring", "tint", "sr"]) {
       assert.equal(findings(r, id, "AP012").length, 0, id + " shows a focus indicator");
@@ -110,7 +111,7 @@ try {
     assert.equal(findings(sr, "sr", "AP013").length, 0, "1x1 screen-reader-only input is not sampled");
     assert.equal(gaps(sr, "sr", "AP013").length, 0);
 
-    const sticky = await run(`<div id="bar" style="position:sticky;top:0;height:60px;background:#fff"></div><button id="under" style="position:absolute;left:20px;top:10px">Target</button>`, only);
+    const sticky = await run(`<div id="bar" style="position:sticky;top:0;z-index:1;height:60px;background:#fff"></div><button id="under" style="position:absolute;left:20px;top:10px">Target</button>`, only);
     assert.equal(findings(sticky, "under", "AP013").length, 1, "sticky content hides the control as well");
     assert.equal(findings(sticky, "under", "AP013")[0].evidence.obscurerPosition, "sticky");
   }
