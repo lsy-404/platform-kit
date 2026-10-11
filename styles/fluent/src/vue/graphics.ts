@@ -5,102 +5,115 @@ import { fluentThemeKey } from "../theme.js";
 type GraphicPoint = { x: number; y: number };
 type GraphicBounds = GraphicPoint & { width: number; height: number };
 type GraphicMeasurement = { width: number; height: number; bounds: GraphicBounds | null; center: GraphicPoint | null; offset: GraphicPoint | null; status: "estimated" | "empty" | "no-contrast"; svg: string };
-type GraphicsResult = { measurement: GraphicMeasurement; referenceAscent: number };
+type GraphicsResult = { measurement: GraphicMeasurement; referenceMiddle: number };
 
-function resolvedColor(element: HTMLElement, value: string | undefined, property: "color" | "backgroundColor", fallback: string): string {
-  const style = getComputedStyle(element);
+function resolvedColor(element: HTMLElement, value: string | undefined, property: "color" | "backgroundColor"): string {
   const canvas = document.createElement("canvas").getContext("2d");
-  if (!canvas) return fallback;
+  if (!canvas) throw new Error("Canvas 2D is unavailable");
   const pixel = (candidate: string): [number, number, number, number] => {
+    if (!CSS.supports("color", candidate)) throw new Error("Expected a CSS color");
     canvas.clearRect(0, 0, 1, 1);
-    canvas.fillStyle = "#000";
     canvas.fillStyle = candidate;
     canvas.fillRect(0, 0, 1, 1);
     const [r, g, b, a] = canvas.getImageData(0, 0, 1, 1).data;
     return [r!, g!, b!, a! / 255];
   };
-  if (property === "color") { canvas.fillStyle = value ?? style.color; return canvas.fillStyle; }
-  const stack: string[] = [];
-  let ancestor: HTMLElement | null = element;
-  while (ancestor) {
-    const ancestorStyle = getComputedStyle(ancestor);
-    if (!value && ancestorStyle.backgroundImage !== "none") throw new Error("Set background explicitly for gradient or image surfaces");
-    stack.push(ancestorStyle.backgroundColor);
-    ancestor = ancestor.parentElement;
+  if (property === "color") {
+    const [r,g,b,a] = pixel(value ?? getComputedStyle(element).color);
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
   }
-  if (value) stack.push(value);
-  let color = pixel(fallback).slice(0, 3) as [number, number, number];
-  for (const layer of stack.reverse()) {
-    const [r, g, b, alpha] = pixel(layer);
-    color = [r * alpha + color[0] * (1 - alpha), g * alpha + color[1] * (1 - alpha), b * alpha + color[2] * (1 - alpha)];
+  if (value !== undefined) {
+    const [r,g,b,a] = pixel(value);
+    if (a !== 1) throw new Error("An explicit background must be opaque");
+    return `rgb(${r}, ${g}, ${b})`;
   }
-  return `rgb(${color.map(channel => Math.round(channel)).join(", ")})`;
+  let red = 0, green = 0, blue = 0, coverage = 0;
+  for (let ancestor: HTMLElement | null = element; ancestor && coverage < 1; ancestor = ancestor.parentElement) {
+    const style = getComputedStyle(ancestor);
+    if (style.backgroundImage !== "none") throw new Error("Set background explicitly for gradient or image surfaces");
+    const [r,g,b,a] = pixel(style.backgroundColor);
+    const contribution = (1 - coverage) * a;
+    red += r * contribution; green += g * contribution; blue += b * contribution; coverage += contribution;
+  }
+  const canvasColor = pixel("Canvas");
+  const channels = [red + (1-coverage)*canvasColor[0],green + (1-coverage)*canvasColor[1],blue + (1-coverage)*canvasColor[2]];
+  return `rgb(${channels.map(Math.round).join(", ")})`;
 }
 
-function fontReference(script: string, font: string, context: CanvasRenderingContext2D): number {
+function fontReference(script: string, font: string): number {
+  const context = document.createElement("canvas").getContext("2d");
+  if (!context) throw new Error("Canvas 2D is unavailable");
   context.font = font;
   const metrics = context.measureText(script);
-  return metrics.actualBoundingBoxAscent || context.measureText("H").actualBoundingBoxAscent || 1;
+  return (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2;
 }
 
 function useMeasurement(props: { svg: string; size: number; trim: boolean; optical: boolean; foreground?: string; background?: string }, element: () => HTMLElement | null, text: () => string, emit: (event: "ready" | "error", value: GraphicMeasurement | Error) => void) {
   const theme = inject(fluentThemeKey, undefined);
   const result = ref<GraphicsResult>();
   const status = ref<GraphicMeasurement["status"] | "pending" | "error">("pending");
-  let alive = true;
-  let run = 0;
+  let alive = true, run = 0, queued = false, lastKey = "";
   const observers: MutationObserver[] = [];
   let resizeObserver: ResizeObserver | undefined;
-  let fontSignature = "";
+  let media: MediaQueryList | undefined;
+  let interaction: Element | null = null;
+  const interactionEvents = ["pointerenter","pointerleave","pointerdown","pointerup","focusin","focusout","keydown","keyup","transitionend"];
   const refresh = async () => {
     const node = element();
-    if (!node || typeof document === "undefined") return;
+    if (!node || !alive || typeof document === "undefined") return;
     const id = ++run;
-    status.value = "pending";
     try {
       await document.fonts?.ready;
-      const fg = resolvedColor(node, props.foreground, "color", "#000");
-      const style = getComputedStyle(node);
-      const bg = resolvedColor(node, props.background, "backgroundColor", "#fff");
-      const measurement = await measureSvg(props.svg, { width: finiteSize(props.size), height: finiteSize(props.size), background: bg, color: fg }) as GraphicMeasurement;
-      const canvas = document.createElement("canvas").getContext("2d");
-      const label = text();
-      const script = /[\u2e80-\u9fff\uf900-\ufaff]/u.test(label) ? "中" : "H";
-      const ascent = canvas ? fontReference(script, style.font, canvas) : finiteSize(props.size);
-      if (alive && id === run) { result.value = { measurement, referenceAscent: ascent }; status.value = measurement.status; emit("ready", measurement); }
+      if (!alive || id !== run) return;
+      if (!Number.isFinite(props.size) || props.size <= 0 || props.size > 2048) throw new Error("Icon size must be between 0 and 2048 pixels");
+      const fg = resolvedColor(node, props.foreground, "color");
+      const bg = resolvedColor(node, props.background, "backgroundColor");
+      const font = getComputedStyle(node.querySelector(".fluent-icon-text__label") ?? node).font;
+      const script = /[\u2e80-\u9fff\uf900-\ufaff]/u.test(text()) ? "中" : "H";
+      const referenceMiddle = fontReference(script, font);
+      const key = JSON.stringify([props.svg,props.size,fg,bg,font,referenceMiddle]);
+      if (key === lastKey && result.value) { status.value = result.value.measurement.status; return; }
+      status.value = "pending";
+      const measurement = await measureSvg(props.svg, {width:props.size,height:props.size,background:bg,color:fg});
+      if (alive && id === run) { lastKey = key; result.value = {measurement,referenceMiddle}; status.value = measurement.status; emit("ready",measurement); }
     } catch (error) {
-      if (alive && id === run) { result.value = undefined; status.value = "error"; emit("error", error instanceof Error ? error : new Error("SVG measurement failed")); }
+      if (alive && id === run) { lastKey = ""; result.value = undefined; status.value = "error"; emit("error",error instanceof Error ? error : new Error("SVG measurement failed")); }
     }
+  };
+  const schedule = () => {
+    if (queued || !alive) return;
+    queued = true;
+    queueMicrotask(() => { queued = false; void refresh(); });
   };
   onMounted(() => {
     const node = element();
-    const labelNode = node?.querySelector(".fluent-icon-text__label");
-    if (labelNode) {
-      const observer = new MutationObserver(refresh);
-      observer.observe(labelNode, { childList: true, characterData: true, subtree: true });
-      observers.push(observer);
+    const label = node?.querySelector(".fluent-icon-text__label");
+    if (label) {
+      const observer = new MutationObserver(schedule);
+      observer.observe(label,{childList:true,characterData:true,subtree:true}); observers.push(observer);
     }
-    let ancestor = node?.parentElement ?? null;
-    while (ancestor) {
-      const observer = new MutationObserver(refresh);
-      observer.observe(ancestor, { attributes: true, attributeFilter: ["class", "style", "dir", "data-fluent-theme"] });
-      observers.push(observer);
-      ancestor = ancestor.parentElement;
+    for (let ancestor = node; ancestor; ancestor = ancestor.parentElement) {
+      const observer = new MutationObserver(schedule);
+      observer.observe(ancestor,{attributes:true,attributeFilter:["class","style","dir","data-fluent-theme","disabled","aria-disabled","aria-pressed"]}); observers.push(observer);
     }
-    if (node && typeof ResizeObserver !== "undefined") {
-      fontSignature = getComputedStyle(node).font;
-      resizeObserver = new ResizeObserver(() => {
-        const next = node.isConnected ? getComputedStyle(node).font : "";
-        if (next !== fontSignature) { fontSignature = next; refresh(); }
-      });
-      resizeObserver.observe(node);
-    }
-    document.fonts?.addEventListener("loadingdone", refresh);
-    refresh();
+    if (node && typeof ResizeObserver !== "undefined") { resizeObserver = new ResizeObserver(schedule); resizeObserver.observe(node); }
+    interaction = node?.closest("button,a,label,[role=button],[role=link]") ?? node;
+    for (const event of interactionEvents) interaction?.addEventListener(event,schedule);
+    media = window.matchMedia("(prefers-color-scheme: dark)");
+    media.addEventListener("change",schedule);
+    window.addEventListener("resize",schedule);
+    document.fonts?.addEventListener("loadingdone",schedule);
+    schedule();
   });
-  watch(() => [props.svg, props.size, props.trim, props.optical, props.foreground, props.background, theme?.value.mode, theme?.value.accent, theme?.value.accentText, theme?.value.resolveTokens?.(), text()], refresh, { deep: true });
-  onBeforeUnmount(() => { alive = false; run++; observers.forEach(observer => observer.disconnect()); resizeObserver?.disconnect(); document.fonts?.removeEventListener("loadingdone", refresh); });
-  return { result, status };
+  watch(() => [props.svg,props.size,props.foreground,props.background,theme?.value],schedule,{deep:true,flush:"post"});
+  onBeforeUnmount(() => {
+    alive = false; run++; observers.forEach(observer => observer.disconnect()); resizeObserver?.disconnect();
+    for (const event of interactionEvents) interaction?.removeEventListener(event,schedule);
+    media?.removeEventListener("change",schedule);
+    if (typeof window !== "undefined") window.removeEventListener("resize",schedule);
+    if (typeof document !== "undefined") document.fonts?.removeEventListener("loadingdone",schedule);
+  });
+  return {result,status};
 }
 
 function finiteSize(size: number): number { return Number.isFinite(size) && size > 0 ? size : 16; }
@@ -119,16 +132,18 @@ export const FluentSvgIcon = defineComponent({
     return () => {
       const size = finiteSize(props.size);
       const data = result.value?.measurement;
-      const bounds = props.trim ? data?.bounds : null;
-      const center = props.optical && data?.center ? data.center : bounds ? { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 } : { x: (data?.width ?? size) / 2, y: (data?.height ?? size) / 2 };
-      const extent = bounds ? Math.max(center.x - bounds.x, bounds.x + bounds.width - center.x, center.y - bounds.y, bounds.y + bounds.height - center.y) : Math.max(data?.width ?? size, data?.height ?? size) / 2;
-      const scale = props.trim && extent > 0 ? size / (2 * extent) : (data ? Math.min(size / data.width, size / data.height) : 1);
-      const sx = scale;
-      const sy = scale;
-      const dx = props.trim ? size / 2 - center.x * scale : (size - (data?.width ?? size) * scale) / 2 + (props.optical ? Math.max(-center.x * scale, Math.min(size - (data?.width ?? size) * scale - center.x * scale, size / 2 - center.x * scale)) : 0);
-      const dy = props.trim ? size / 2 - center.y * scale : (size - (data?.height ?? size) * scale) / 2 + (props.optical ? size / 2 - center.y * scale : 0);
+      const bounds = data?.bounds;
+      const sourceWidth = data?.width ?? size, sourceHeight = data?.height ?? size;
+      const center = props.optical && data?.center ? data.center
+        : props.trim && bounds ? {x:bounds.x+bounds.width/2,y:bounds.y+bounds.height/2}
+        : {x:sourceWidth/2,y:sourceHeight/2};
+      const extent = bounds ? Math.max(center.x-bounds.x,bounds.x+bounds.width-center.x,center.y-bounds.y,bounds.y+bounds.height-center.y) : 0;
+      const baseScale = size / Math.max(sourceWidth,sourceHeight);
+      const containedScale = extent > 0 ? size / (2*extent) : baseScale;
+      const scale = props.trim && bounds ? containedScale : Math.min(baseScale,containedScale);
+      const dx = size/2-center.x*scale, dy = size/2-center.y*scale;
       return h("span", { ...attrs, ref: root, class: ["fluent-svg-icon", attrs.class], "data-status": status.value, style: [{ "--fluent-graphic-size": `${size}px` }, attrs.style], role: props.label ? "img" : undefined, "aria-label": props.label, "aria-hidden": props.label ? undefined : "true" }, [
-        h("span", { class: "fluent-svg-icon__paint", style: { width: `${data?.width ?? size}px`, height: `${data?.height ?? size}px`, transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})` } }, data ? [h("img", { src: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(data.svg)}`, alt: "", draggable: false })] : []),
+        h("span", { class: "fluent-svg-icon__paint", style: { width: `${data?.width ?? size}px`, height: `${data?.height ?? size}px`, transform: `translate(${dx}px, ${dy}px) scale(${scale})` } }, data ? [h("img", { src: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(data.svg)}`, alt: "", draggable: false })] : []),
       ]);
     };
   },
@@ -149,14 +164,18 @@ export const FluentIconText = defineComponent({
     return () => {
       const size = finiteSize(props.size);
       const data = result.value?.measurement;
-      const bounds = props.trim ? data?.bounds : null;
-      const paintWidth = bounds?.width ?? data?.width ?? size;
-      const scale = bounds ? size / Math.max(bounds.width, bounds.height) : (data ? Math.min(size / data.width, size / data.height) : 1);
-      const dx = bounds ? -bounds.x * scale : 0;
-      const referenceAscent = result.value?.referenceAscent ?? size;
-      const center = props.optical ? data?.center?.y ?? (bounds ? bounds.y + bounds.height / 2 : size / 2) : (bounds ? bounds.y + bounds.height / 2 : size / 2);
-      const y = size - referenceAscent / 2 - center * scale;
-      const img = h("span", { class: "fluent-icon-text__icon", "aria-hidden": "true", style: { width: `${paintWidth * scale}px`, height: `${size}px` } }, [
+      const bounds = data?.bounds;
+      const sourceWidth = data?.width ?? size, sourceHeight = data?.height ?? size;
+      const center = props.optical && data?.center ? data.center.y
+        : props.trim && bounds ? bounds.y + bounds.height / 2 : sourceHeight / 2;
+      const extent = bounds ? Math.max(center-bounds.y,bounds.y+bounds.height-center) : sourceHeight/2;
+      const paintWidth = props.trim && bounds ? bounds.width : sourceWidth;
+      const containedScale = size / Math.max(paintWidth,2*extent);
+      const scale = props.trim && bounds ? containedScale : Math.min(size/Math.max(sourceWidth,sourceHeight),containedScale);
+      const dx = props.trim && bounds ? -bounds.x * scale : 0;
+      const referenceMiddle = result.value?.referenceMiddle ?? size/2;
+      const y = size/2 - center * scale;
+      const img = h("span", { class: "fluent-icon-text__icon", "aria-hidden": "true", style: { width: `${paintWidth * scale}px`, height: `${size}px`, verticalAlign: `${referenceMiddle-size/2}px` } }, [
         h("span", { class: "fluent-icon-text__paint", style: { width: `${data?.width ?? size}px`, height: `${data?.height ?? size}px`, transform: `translate(${dx}px, ${y}px) scale(${scale})` } }, data ? [h("img", { src: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(data.svg)}`, alt: "", draggable: false })] : []),
       ]);
       return h("span", { ...attrs, ref: root, class: ["fluent-icon-text", attrs.class], "data-status": status.value, style: [{ "--fluent-graphic-size": `${size}px` }, attrs.style] }, [img, h("span", { class: "fluent-icon-text__label" }, slots.default?.())]);

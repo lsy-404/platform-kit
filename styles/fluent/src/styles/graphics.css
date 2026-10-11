@@ -29,18 +29,16 @@
 }
 
 .fluent-icon-text {
-  gap: 0.35em;
+  display: inline-block;
   line-height: inherit;
-  align-items: baseline;
 }
 
 .fluent-icon-text__icon {
   position: relative;
   display: inline-block;
-  flex: 0 0 auto;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .fluent-icon-text__label {
-  min-width: 0;
+  margin-inline-start: 0.35em;
 }

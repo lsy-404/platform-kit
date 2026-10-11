@@ -1,27 +1,15 @@
-import { createApp, h, ref } from "vue";
-import { FluentIconText, FluentSvgIcon, FluentTheme } from "../../styles/fluent/src/vue/index.js";
+import { createApp, h, reactive } from "vue";
+import { FluentIconText, FluentSvgIcon, FluentTheme } from "../../styles/fluent/dist/vue/index.js";
+import "../../styles/fluent/dist/style.css";
 
-declare global { interface Window { graphicResults: Array<{ status: string; bounds: unknown }>; graphicErrors: string[] } }
-window.graphicResults = [];
-window.graphicErrors = [];
-
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect x="10" y="7" width="12" height="18" fill="none" stroke="currentColor" stroke-width="4"/></svg>`;
-const dark = ref(false);
-const label = ref("Save");
-const source = ref(svg);
-const events = ref(0);
-const app = createApp({ setup: () => () => h(FluentTheme, { mode: dark.value ? "dark" : "light" }, {
-  default: () => h("main", { style: { backgroundColor: "#eef0f4" } }, [
-    h(FluentSvgIcon, { svg: source.value, size: 24, label: "File", onReady: result => { events.value++; window.graphicResults.push(result); }, onError: error => window.graphicErrors.push(error.message) }),
-    h(FluentSvgIcon, { svg, size: 24 }),
-    h(FluentIconText, { svg, size: 20, dir: "rtl", onReady: result => { events.value++; window.graphicResults.push(result); }, onError: error => window.graphicErrors.push(error.message) }, { default: () => label.value }),
-    h(FluentSvgIcon, { svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"/>`, size: 16, label: "Empty" }),
-    h("button", { id: "toggle", onClick: () => { dark.value = !dark.value; } }, "theme"),
-    h("button", { id: "label", onClick: () => { label.value = "保存"; } }, "label"),
-    h("button", { id: "play", onClick: () => { label.value = "Play"; } }, "play"),
-    h("button", { id: "gyp", onClick: () => { label.value = "gyp"; } }, "gyp"),
-    h("button", { id: "source", onClick: () => { source.value = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path fill="currentColor" d="M3 16 29 3 22 29z"/></svg>`; } }, "source"),
-    h("output", { id: "events" }, String(events.value)),
-  ]),
-}) });
-app.mount("#app");
+const stroke = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect x="8" y="10" width="12" height="8" fill="none" stroke="currentColor" stroke-width="4"/></svg>';
+const state = reactive({svg:stroke,trim:true,optical:true,background:undefined as string|undefined,surface:"#fff",image:"none",foreground:"#111",label:"Play",fontSize:20,textSize:20,dir:"ltr",dark:false});
+const events = {icon:0,text:0};
+const measurements: Record<string, unknown> = {};
+const errors: string[] = [];
+Object.assign(window, {setGraphics:(value:Partial<typeof state>)=>Object.assign(state,value),graphicEvents:events,graphicMeasurements:measurements,graphicErrors:errors});
+createApp({render:()=>h(FluentTheme,{mode:state.dark?"dark":"light"},()=>h("main",{style:{backgroundColor:state.surface,backgroundImage:state.image,color:state.foreground,font:`${state.fontSize}px/1.5 Arial`,padding:"48px"}},[
+  h(FluentSvgIcon,{id:"named",svg:state.svg,size:24,trim:state.trim,optical:state.optical,background:state.background,label:"File",onReady:(value:unknown)=>{events.icon++;measurements.icon=value},onError:(error:Error)=>errors.push(error.message)}),
+  h(FluentSvgIcon,{id:"decorative",svg:stroke,size:24,background:state.background}),
+  h(FluentIconText,{id:"text",class:"state-color",svg:state.svg,size:state.textSize,trim:state.trim,optical:state.optical,background:state.background,dir:state.dir,onReady:(value:unknown)=>{events.text++;measurements.text=value},onError:(error:Error)=>errors.push(error.message)},()=>[state.label,h("span",{id:"baseline",style:"display:inline-block;width:0;height:0;vertical-align:baseline"})]),
+]))}).mount("#app");

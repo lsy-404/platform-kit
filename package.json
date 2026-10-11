@@ -9,7 +9,7 @@
   "scripts": {
     "build": "pnpm -r --if-present build && pnpm --dir model-auth build",
     "typecheck": "pnpm --filter @platform-kit/visual-center run build && pnpm --filter @platform-kit/fluent build && pnpm -r --if-present typecheck && pnpm --dir model-auth typecheck",
-    "test:visual-center": "node --test test/visual-center.browser.mjs test/fluent-graphics.browser.mjs",
+    "test:visual-center": "node --test --test-concurrency=1 test/visual-center.browser.mjs test/fluent-graphics.browser.mjs test/fluent-graphics-preview.browser.mjs",
     "test:appearance": "node --test --test-concurrency=1 test/appearance-*.browser.mjs",
     "test": "vitest run && pnpm --dir model-auth test",
     "check": "pnpm --dir model-auth install --frozen-lockfile && pnpm typecheck && pnpm test && pnpm build",
