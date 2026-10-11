@@ -163,9 +163,30 @@ export function inspectLayout(enabled: CheckId[]): BrowserResult {
         if (Math.abs((hs.top + hs.bottom) / 2 - (bs.top + bs.bottom) / 2) > Math.max(160, hs.height + bs.height + 80)) continue;
         const bodyStyle = getComputedStyle(bodyText);
         const bodySize = parseFloat(bodyStyle.fontSize); const bodyWeight = parseInt(bodyStyle.fontWeight, 10) || 400;
-        if (bodySize >= headingSize + 2 && bodyWeight >= headingWeight) add("AP006", heading, "A nearby body label has stronger font metrics than its heading.", "heuristic", { heading: { fontSize: headingSize, fontWeight: headingWeight }, nearbyBody: { fontSize: bodySize, fontWeight: bodyWeight }, sizeDifference: bodySize - headingSize }, bodyText);
+        if (bodySize >= headingSize + 2 && bodyWeight >= headingWeight) add("AP006", heading, "A nearby body label has stronger font metrics than its heading.", "heuristic", { kind: "weaker-than-body", heading: { fontSize: headingSize, fontWeight: headingWeight }, nearbyBody: { fontSize: bodySize, fontWeight: bodyWeight }, sizeDifference: bodySize - headingSize }, bodyText);
       }
     }
+  }
+
+  if (enabled.includes("AP006")) {
+    const headings = Array.from(document.querySelectorAll("h1,h2,h3,h4,h5,h6,[role=heading]")).filter(heading => visible(heading) && geometrySupported(heading, "AP006") && heading.textContent?.trim());
+    const levelOf = (heading: Element): number => Number(heading.getAttribute("aria-level")) || (/^H[1-6]$/.test(heading.tagName) ? Number(heading.tagName[1]) : 2);
+    const metrics = (heading: Element) => { const style = getComputedStyle(heading); return { level: levelOf(heading), fontSize: parseFloat(style.fontSize), fontWeight: parseInt(style.fontWeight, 10) || 400 }; };
+    const scope = "main, article, section, aside, body";
+    headings.forEach((heading, index) => {
+      const container = heading.closest(scope);
+      const level = levelOf(heading);
+      let parent: Element | undefined;
+      for (let i = index - 1; i >= 0; i--) {
+        const candidate = headings[i]!;
+        if (levelOf(candidate) < level && container?.contains(candidate)) { parent = candidate; break; }
+      }
+      if (!parent) return;
+      const parentStyle = getComputedStyle(parent);
+      if (parentStyle.textTransform === "uppercase" || parseFloat(parentStyle.letterSpacing) >= 0.05 * parseFloat(parentStyle.fontSize)) return;
+      const child = metrics(heading), above = metrics(parent);
+      if (child.fontSize >= above.fontSize + 2 && child.fontWeight >= above.fontWeight) add("AP006", heading, "A subheading is visually stronger than its parent heading.", "heuristic", { kind: "level-inversion", heading: child, parentHeading: above }, parent);
+    });
   }
 
   if (enabled.includes("AP007")) {
