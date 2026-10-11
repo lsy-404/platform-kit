@@ -35,6 +35,9 @@ try {
   assert.equal(normalFinding.evidence.contrastRatio, 1.28);
   assert.equal(normalFinding.evidence.fgColor, "#777777");
   assert.equal(normalFinding.evidence.bgColor, "#666666");
+  assert.equal(normalFinding.evidence.requiredRatio, 4.5);
+  assert.equal(normalFinding.evidence.largeText, false);
+  assert.ok(Math.abs(normalFinding.evidence.margin - (4.5 - 1.28)) < 0.011);
   const scopedDefault = await inspectColors(page, "default", "#normal-bad");
   assert(scopedDefault.findings.some(f => f.target === "#normal-bad"), "default inspection should accept a target scope");
   assert.equal(defaultBad.findings.some(f => f.target === "#bad" || f.target === "#good"), false);
@@ -70,6 +73,7 @@ try {
   await page.setContent(`<style>#uncertain { color:#fff; background-image:url('missing-image.png'); background-color:#fff }</style><span id="uncertain">Uncertain</span>`);
   const incomplete = await inspectColors(page, "default");
   assert(incomplete.skipped.some(f => f.checkId === "AP001" && f.target === "#uncertain"), "axe incomplete contrast should be reported as skipped");
+  assert(incomplete.skipped.some(f => f.target === "#uncertain" && /background image/.test(f.reason)), "gap reason should name the axe message key");
 } finally {
   await browser.close();
 }
