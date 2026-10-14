@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import { authorizeAnthropic, refreshAnthropic } from "../../model-auth/packages/providers/src/anthropic.js";
 import { authorizeOpenAI, refreshOpenAI } from "../../model-auth/packages/providers/src/openai.js";
 
-const token = (access = "access", refresh = "refresh") => new Response(JSON.stringify({ access_token: access, refresh_token: refresh, expires_in: 3600 }));
+const token = (access = "access", refresh = "refresh", id_token?: string) => new Response(JSON.stringify({ access_token: access, refresh_token: refresh, expires_in: 3600, id_token }));
 const requestCallbackResponse = (url: URL): Promise<{ status: number; body: string }> => new Promise((resolve, reject) => {
   const call = request({ hostname: "127.0.0.1", port: Number(url.port), path: `${url.pathname}${url.search}`, headers: { host: url.host } }, response => {
     let body = ""; response.setEncoding("utf8"); response.on("data", chunk => { body += chunk; }); response.on("end", () => resolve({ status: response.statusCode ?? 0, body }));
@@ -29,7 +29,7 @@ describe("official browser OAuth providers", () => {
   it("uses the established OpenAI PKCE parameters, fixed callback and form token exchange", async () => {
     let opened = ""; let init: RequestInit | undefined;
     const credential = await authorizeOpenAI({
-      fetchImpl: async (_url, request) => { init = request; return token(jwt("account")); },
+      fetchImpl: async (_url, request) => { init = request; return token(jwt("access-account"), "refresh", jwt("account")); },
       openExternal: async url => { opened = url; const response = await requestCallbackResponse(callback(url)); expect(response).toMatchObject({ status: 200, body: "Authorization complete. You can close this window." }); },
     });
     const url = new URL(opened), form = new URLSearchParams(String(init?.body));
@@ -38,7 +38,7 @@ describe("official browser OAuth providers", () => {
     expect(url.searchParams.get("code_challenge")).toHaveLength(43);
     expect(init?.headers).toMatchObject({ "content-type": "application/x-www-form-urlencoded" });
     expect(Object.fromEntries(form)).toMatchObject({ grant_type: "authorization_code", code: "authorization-code", redirect_uri: "http://localhost:1455/auth/callback" });
-    expect(credential).toMatchObject({ type: "oauth", access: jwt("account"), refresh: "refresh", accountId: "account" });
+    expect(credential).toMatchObject({ type: "oauth", access: jwt("access-account"), refresh: "refresh", idToken: jwt("account"), accountId: "account" });
     expect(credential.expires).toBeGreaterThan(Date.now() + 3_200_000);
     const reusable = createServer();
     await new Promise<void>((resolve, reject) => { reusable.once("error", reject); reusable.listen(1455, "127.0.0.1", resolve); });

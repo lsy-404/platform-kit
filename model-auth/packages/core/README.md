@@ -42,5 +42,5 @@ Provider authentication uses the providers package in the trusted host. API-key 
 
 ## Breaking changes in 0.11.0
 
-- `normalizeCodexPlan("pro")` and `describeOAuthCredential` no longer report a 20x multiplier for a bare `pro`; the multiplier is `null`. Names like `pro_10x` or `pro_10x_usage_based` report the encoded size and `prolite` stays 5x.
+- Codex plans `prolite`, `pro`, and `promax` identify Pro 5x, 10x, and 25x. Go and Plus remain distinct. `planTier` retains the tier identity, and an explicit usage multiplier takes precedence. OAuth views read both ID-token and access-token claims without returning token values.
 - `mergeUsageReading` rolls past-reset windows into an estimate instead of dropping them, and the returned snapshot carries `basis` and `observedAtUtc`.

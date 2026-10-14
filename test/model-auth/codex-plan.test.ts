@@ -3,15 +3,15 @@ import { normalizeCodexPlan } from "../../model-auth/packages/core/src/index.js"
 
 describe("normalizeCodexPlan multipliers", () => {
   const cases: Array<[string, string, number | null]> = [
-    ["pro", "pro", null],
-    ["Pro", "pro", null],
+    ["pro", "pro", 10],
+    ["Pro", "pro", 10],
     ["prolite", "pro", 5],
     ["pro_lite", "pro", 5],
     ["pro-lite", "pro", 5],
     ["Pro Lite", "pro", 5],
     ["pro_5x", "pro", 5],
     ["pro_10x", "pro", 10],
-    ["pro-25x", "pro", 25],
+    ["promax", "pro", 25],
     ["pro_10x_usage_based", "pro", 10],
     ["Pro-25x-Usage-Based", "pro", 25],
     ["go", "go", null],

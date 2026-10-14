@@ -94,15 +94,15 @@ describe("plan multipliers", () => {
   });
 
   it("maps every ChatGPT plan alias to its tier", () => {
-    const table: Array<[string, string, number | null]> = [
-      ["prolite", "pro", 5], ["pro_lite", "pro", 5], ["pro-lite", "pro", 5], ["Pro Lite", "pro", 5],
-      ["pro", "pro", null], ["pro_10x", "pro", 10],
-      ["team", "business", null], ["teams", "business", null], ["business", "business", null], ["self_serve_business_usage_based", "business", null],
-      ["enterprise", "enterprise", null], ["enterprise_cbp_usage_based", "enterprise", null],
-      ["free", "free", null], ["go", "go", null], ["plus", "plus", null], ["edu", "edu", null],
+    const table: Array<[string, string, number | null, string]> = [
+      ["prolite", "pro", 5, "prolite"], ["pro_lite", "pro", 5, "prolite"], ["pro-lite", "pro", 5, "prolite"], ["Pro Lite", "pro", 5, "prolite"],
+      ["pro", "pro", 10, "pro"], ["promax", "pro", 25, "promax"],
+      ["team", "business", null, "business"], ["teams", "business", null, "business"], ["business", "business", null, "business"], ["self_serve_business_usage_based", "business", null, "business"],
+      ["enterprise", "enterprise", null, "enterprise"], ["enterprise_cbp_usage_based", "enterprise", null, "enterprise"],
+      ["free", "free", null, "free"], ["go", "go", null, "go"], ["plus", "plus", null, "plus"], ["edu", "edu", null, "edu"],
     ];
-    for (const [raw, plan, multiplier] of table) {
-      expect(parseCodexUsage({ plan_type: raw }), raw).toMatchObject({ plan, planTier: plan, planMultiplier: multiplier });
+    for (const [raw, plan, multiplier, tier] of table) {
+      expect(parseCodexUsage({ plan_type: raw }), raw).toMatchObject({ plan, planTier: tier, planMultiplier: multiplier });
     }
   });
 

@@ -114,17 +114,16 @@ describe("describeOAuthCredential", () => {
   const access = `eyJhbGciOiJub25lIn0.${claims}.signature-value`;
 
   it("maps Codex credentials from token claims without exposing tokens", () => {
-    const view = describeOAuthCredential("openai-codex", { type: "oauth", access, refresh: "refresh-secret-value", expires: NOW + 3600_000, accountId: "acct-1", extra: "ignored" }, NOW);
+    const view = describeOAuthCredential("openai-codex", { type: "oauth", access: "opaque-access", idToken: access, refresh: "refresh-secret-value", expires: NOW + 3600_000, accountId: "acct-1", extra: "ignored" }, NOW);
     expect(view).toEqual({ account: "person@example.test", plan: "pro", planMultiplier: 5, tokenExpiresAt: NOW + 3600_000, status: "active" });
     const text = JSON.stringify(view);
     for (const secret of [access, "refresh-secret-value", "signature-value", "ignored"]) expect(text).not.toContain(secret);
   });
 
-  it("reads a plain pro claim without a multiplier and drops a plan that holds an email", () => {
+  it("reads official Pro tiers and drops a plan that holds an email", () => {
     const withPlan = (plan: string) => describeOAuthCredential("openai-codex", { type: "oauth", access: "opaque", refresh: "r", expires: NOW + 3600_000, plan }, NOW);
-    expect(withPlan("pro")).toMatchObject({ plan: "pro" });
-    expect(withPlan("pro")).not.toHaveProperty("planMultiplier");
-    expect(withPlan("pro_10x")).toMatchObject({ plan: "pro", planMultiplier: 10 });
+    expect(withPlan("pro")).toMatchObject({ plan: "pro", planMultiplier: 10 });
+    expect(withPlan("promax")).toMatchObject({ plan: "pro", planMultiplier: 25 });
     expect(withPlan("teams")).toMatchObject({ plan: "business" });
     expect(withPlan("person@example.test")).not.toHaveProperty("plan");
   });

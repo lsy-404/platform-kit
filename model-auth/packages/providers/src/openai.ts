@@ -12,13 +12,17 @@ const OPENAI_CONFIG = {
   scope: "openid profile email offline_access",
   extraAuthorize: { id_token_add_organizations: "true", codex_cli_simplified_flow: "true", originator: CODEX_ORIGINATOR },
   tokenEncoding: "form" as const,
-  accountIdFromAccess(access: string): string | undefined {
-    try {
-      const payload = JSON.parse(Buffer.from(access.split(".")[1] ?? "", "base64url").toString("utf8")) as Record<string, unknown>;
-      const auth = payload["https://api.openai.com/auth"] as Record<string, unknown> | undefined;
-      const accountId = typeof auth?.chatgpt_account_id === "string" ? auth.chatgpt_account_id.trim() : "";
-      return accountId || undefined;
-    } catch { return undefined; }
+  accountIdFromAccess(access: string, idToken?: string): string | undefined {
+    for (const token of [idToken, access]) {
+      if (!token) continue;
+      try {
+        const payload = JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString("utf8")) as Record<string, unknown>;
+        const auth = payload["https://api.openai.com/auth"] as Record<string, unknown> | undefined;
+        const accountId = typeof auth?.chatgpt_account_id === "string" ? auth.chatgpt_account_id.trim() : "";
+        if (accountId) return accountId;
+      } catch { /* The other token can carry the account claim. */ }
+    }
+    return undefined;
   },
 };
 

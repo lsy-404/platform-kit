@@ -4,7 +4,7 @@ import { defaultMessages, type ModelAuthMessages } from "./messages";
 import ModelAuthIcon from "./ModelAuthIcon.vue";
 import ProviderMark from "./ProviderMark.vue";
 import { formatPercentage } from "./percentage";
-import { credentialReady, fill, formatCooldown, windowRemaining } from "./usage";
+import { credentialReady, fill, formatCooldown, usagePlanLabel, windowRemaining } from "./usage";
 import type {
   AddApiKeyPayload, AuthMethod, CredentialExtend, CredentialLoginInput, CredentialReorderPayload, CredentialUpdatePayload, CatalogStatus, 
   ModelAuthProvider, ModelConnectionTarget, ProviderAuthResponseRequest, ProviderAuthState, ProviderCredential, ProviderAuthNotice, ProviderUpdatePayload, Theme, CredentialUsageEstimate, CredentialUsageWindow,
@@ -594,7 +594,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                 </div>
                 <div v-if="credential.usage || selectedProvider.usageEnabled" class="model-auth-usage" data-part="credential-usage">
                   <template v-if="credential.usage">
-                    <span v-if="credential.usage.plan">{{ credential.usage.plan }}</span>
+                    <span v-if="credential.usage.plan">{{ usagePlanLabel(credential.usage) }}</span>
                     <span v-if="credential.usage.balance">{{ credential.usage.balance.amount }} {{ credential.usage.balance.unit }}</span>
                     <span v-for="window in credential.usage.windows" :key="window.id" :title="windowTitle(window)" :data-low="windowLow(window)">{{ windowText(window) }}</span>
                     <span v-if="credential.usage.estimate">{{ usageEstimateText(credential.usage.estimate) }}</span>

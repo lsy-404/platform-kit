@@ -16,7 +16,7 @@ await secureStore.set(accountId, renewed);
 
 Use `authorizeAnthropic` and `refreshAnthropic` with the same host contract for Anthropic. Both providers implement browser authorization, PKCE, correlated loopback callbacks and token renewal. OpenAI listens on port 1455 and Anthropic on port 53692; a port already in use produces an error. Hosts open the system browser and propagate cancellation through `signal`. Authorization is bounded by `timeoutMs` (ten minutes by default). No installed provider CLI is needed.
 
-Credentials contain `type: "oauth"`, `access`, `refresh`, `expires` (Unix milliseconds), and an optional `accountId`. Store and renew them only in a trusted host process. Persist rotated refresh tokens before the next request. The package does not authenticate a user's subscription by displaying a provider card; a successful token exchange is required and service account restrictions still apply.
+Credentials contain `type: "oauth"`, `access`, `refresh`, `expires` (Unix milliseconds), and optional `accountId` and `idToken`. Store and renew them only in a trusted host process. Persist rotated tokens before the next request. A successful token exchange is required and service account restrictions still apply.
 
 ## WorkBuddy browser authorization
 
@@ -83,7 +83,7 @@ Usage queries retry transient network failures twice, never retry 429 (a `Retry-
 
 ## Codex plans and tiers
 
-`normalizeCodexPlan` maps the reported plan name to `{ plan, multiplier, tier }`: `prolite` variants are `pro` at 5x, `pro_10x`-style names, including suffixed ones such as `pro_10x_usage_based`, are `pro` at the encoded size (1 to 100), a bare `pro` is `pro` with no multiplier, `team`, `teams`, `business` and `self_serve_business_usage_based` are `business`, `enterprise` and `enterprise_cbp_usage_based` are `enterprise`, and `free`, `go`, `plus` and `edu` are kept. Other names pass through unchanged, and a value containing `@` is dropped. `tier` equals the canonical plan, and an explicit multiplier field in the response (a whole number from 1 to 100) wins over the table.
+`normalizeCodexPlan` maps the reported name to `{ plan, multiplier, tier }`. Official `prolite`, `pro`, and `promax` identify Pro 5x, 10x, and 25x; `tier` preserves those identities while `plan` is `pro`. Numeric names such as `pro_10x_usage_based` retain their encoded size (1 to 100). Go and Plus remain distinct, workspace aliases normalize to their plan family, unknown names pass through, and values containing `@` are dropped. An explicit service multiplier wins. Usage queries read token claims when the usage response omits its plan.
 
 ## OpenCode Go usage
 

@@ -268,13 +268,13 @@ describe("ChatGPT plan multipliers", () => {
   it("ignores values outside 1 to 100 or that are not whole numbers, and falls back to the plan", () => {
     for (const value of [0, -5, 101, 2.5]) {
       expect(multiplier({ plan_type: "prolite", plan_multiplier: value }), String(value)).toBe(5);
-      expect(multiplier({ plan_type: "pro", plan_multiplier: value }), String(value)).toBeNull();
+      expect(multiplier({ plan_type: "pro", plan_multiplier: value }), String(value)).toBe(10);
     }
   });
 
-  it("reports no multiplier for a bare pro, and the size encoded in the plan name otherwise", () => {
-    expect(multiplier({ plan_type: "pro" })).toBeNull();
-    expect(multiplier({ plan_type: "pro_10x" })).toBe(10);
+  it("reports the official Pro tier or the size encoded in the plan name", () => {
+    expect(multiplier({ plan_type: "pro" })).toBe(10);
+    expect(multiplier({ plan_type: "promax" })).toBe(25);
     expect(multiplier({ plan_type: "prolite" })).toBe(5);
     expect(multiplier({ plan_type: "go" })).toBeNull();
     expect(multiplier({ plan_type: "plus" })).toBeNull();

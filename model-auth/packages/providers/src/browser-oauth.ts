@@ -5,6 +5,7 @@ export interface BrowserOAuthCredential {
   readonly type: "oauth";
   readonly access: string;
   readonly refresh: string;
+  readonly idToken?: string;
   /** Expiry in Unix milliseconds. */
   readonly expires: number;
   readonly accountId?: string;
@@ -42,7 +43,7 @@ export interface BrowserOAuthConfiguration {
   readonly extraAuthorize?: Readonly<Record<string, string>>;
   readonly sendStateToToken?: boolean;
   readonly tokenEncoding: "form" | "json";
-  readonly accountIdFromAccess?: (access: string) => string | undefined;
+  readonly accountIdFromAccess?: (access: string, idToken?: string) => string | undefined;
 }
 
 const TOKEN_TIMEOUT_MS = 30_000;
@@ -146,7 +147,7 @@ async function requestToken(
   }
 }
 
-function credentialFrom(payload: unknown, accountIdFromAccess?: (access: string) => string | undefined, previousRefresh?: string, previousAccountId?: string): BrowserOAuthCredential {
+function credentialFrom(payload: unknown, accountIdFromAccess?: BrowserOAuthConfiguration["accountIdFromAccess"], previousRefresh?: string, previousAccountId?: string): BrowserOAuthCredential {
   const value = record(payload);
   const access = requiredText(value?.access_token);
   const refresh = value && value.refresh_token !== undefined && value.refresh_token !== null ? requiredText(value.refresh_token) : previousRefresh;
@@ -154,9 +155,10 @@ function credentialFrom(payload: unknown, accountIdFromAccess?: (access: string)
   if (!access || !refresh || !Number.isFinite(expiresIn) || expiresIn <= 0 || expiresIn > 365 * 86400) {
     throw new BrowserOAuthError("response", "OAuth token response is incomplete.");
   }
-  const accountId = accountIdFromAccess?.(access) ?? previousAccountId;
+  const idToken = requiredText(value?.id_token);
+  const accountId = accountIdFromAccess?.(access, idToken) ?? previousAccountId;
   const lifetimeMs = expiresIn * 1000;
-  return { type: "oauth", access, refresh, expires: Date.now() + lifetimeMs - Math.min(EXPIRY_SKEW_MS, Math.floor(lifetimeMs / 10)), ...(accountId ? { accountId } : {}) };
+  return { type: "oauth", access, refresh, expires: Date.now() + lifetimeMs - Math.min(EXPIRY_SKEW_MS, Math.floor(lifetimeMs / 10)), ...(idToken ? { idToken } : {}), ...(accountId ? { accountId } : {}) };
 }
 
 interface CallbackListener { readonly result: Promise<string>; close(force?: boolean): Promise<void>; }

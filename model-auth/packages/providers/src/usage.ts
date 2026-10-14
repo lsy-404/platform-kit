@@ -1,5 +1,5 @@
 import { anthropicClientHeaders } from "./anthropic.js";
-import { normalizeCodexPlan, planMultiplierFromTier } from "@model-auth/core";
+import { describeOAuthCredential, normalizeCodexPlan, planMultiplierFromTier } from "@model-auth/core";
 import type {
   ProviderUsageBalance, ProviderUsageErrorCode, ProviderUsageEstimate, ProviderUsageEstimateSource, ProviderUsageEstimateUnit,
   ProviderUsageExtraUsage, ProviderUsageSnapshot, ProviderUsageStatus, ProviderUsageWindow, ProviderUsageWindowKind,
@@ -94,6 +94,7 @@ export interface ProviderUsageRequestOptions {
 
 export interface ProviderUsageCredential {
   readonly access: string;
+  readonly idToken?: string;
   readonly accountId?: string;
   readonly subscriptionType?: string;
   readonly billingInterval?: string;
@@ -292,7 +293,7 @@ function planMultiplier(payload: Json): number | null {
 }
 
 /** Parser for the Codex usage response used by the IRIS provider-usage view. */
-export function parseCodexUsage(payload: unknown, metadata: { plan?: unknown; subscriptionExpiresAt?: unknown } = {}): ProviderUsageData {
+export function parseCodexUsage(payload: unknown, metadata: { plan?: unknown; planMultiplier?: unknown; subscriptionExpiresAt?: unknown } = {}): ProviderUsageData {
   const root = record(payload);
   const rate = record(root.rate_limit ?? root.rateLimit ?? root.limits);
   let windows = codexRateWindows("", "", rate, {});
@@ -312,13 +313,16 @@ export function parseCodexUsage(payload: unknown, metadata: { plan?: unknown; su
     }
   }
   const credits = numberValue(record(root.credits).balance, record(root.credits).remaining, root.credit_balance);
-  const reportedPlan = normalizeCodexPlan(stringValue(root.plan_type, root.planType, root.subscription_type, metadata.plan));
+  const rawPlan = stringValue(root.plan_type, root.planType, root.subscription_type);
+  const reportedPlan = normalizeCodexPlan(rawPlan ?? metadata.plan);
+  const multiplier = planMultiplier(root) ?? (rawPlan ? reportedPlan.multiplier : planMultiplier(metadata) ?? reportedPlan.multiplier);
+  const tier = reportedPlan.plan === "pro" && multiplier !== null ? normalizeCodexPlan(`pro_${multiplier}x`).tier : reportedPlan.tier;
   return {
     plan: reportedPlan.plan,
     windows,
     balance: credits === null ? null : { amount: credits, unit: "credits" },
-    planMultiplier: planMultiplier(root) ?? reportedPlan.multiplier,
-    planTier: reportedPlan.tier,
+    planMultiplier: multiplier,
+    planTier: tier,
     subscriptionExpiresAt: timestamp(metadata.subscriptionExpiresAt),
   };
 }
@@ -491,7 +495,8 @@ export async function queryCodexUsage(credential: ProviderUsageCredential, optio
     return headers;
   };
   const payload = await usageGet(`https://chat${String.fromCharCode(103, 112, 116)}.com/backend-api/wham/usage`, headersFor, state, options);
-  return parseCodexUsage(payload, { plan: credential.subscriptionType, subscriptionExpiresAt: credential.subscriptionExpires });
+  const view = describeOAuthCredential("openai-codex", credential);
+  return parseCodexUsage(payload, { plan: credential.subscriptionType ?? view.plan, planMultiplier: view.planMultiplier, subscriptionExpiresAt: credential.subscriptionExpires });
 }
 
 export type UsageProvider = "anthropic" | "openai-codex";

@@ -1146,7 +1146,8 @@ const CODEX_PLAN_ALIASES: Readonly<Record<string, { plan: string; multiplier: nu
   pro_lite: { plan: "pro", multiplier: 5 },
   "pro-lite": { plan: "pro", multiplier: 5 },
   "pro lite": { plan: "pro", multiplier: 5 },
-  pro: { plan: "pro", multiplier: null },
+  pro: { plan: "pro", multiplier: 10 },
+  promax: { plan: "pro", multiplier: 25 },
   team: { plan: "business", multiplier: null },
   teams: { plan: "business", multiplier: null },
   business: { plan: "business", multiplier: null },
@@ -1166,10 +1167,15 @@ export function normalizeCodexPlan(value: unknown): { plan: string | null; multi
   const alias = CODEX_PLAN_ALIASES[raw.toLowerCase()];
   if (!alias && /^pro(?![a-z0-9])/i.test(raw)) {
     const sized = planMultiplierFromTier(raw);
-    if (sized !== null && sized >= 1 && sized <= 100) return { plan: "pro", multiplier: sized, tier: "pro" };
+    if (sized !== null && sized >= 1 && sized <= 100) return { plan: "pro", multiplier: sized, tier: codexProTier(sized) };
   }
   const plan = alias?.plan ?? raw;
-  return { plan, multiplier: alias?.multiplier ?? null, tier: plan };
+  const multiplier = alias?.multiplier ?? null;
+  return { plan, multiplier, tier: plan === "pro" && multiplier !== null ? codexProTier(multiplier) : plan };
+}
+
+function codexProTier(multiplier: number): string {
+  return ({ 5: "prolite", 10: "pro", 25: "promax" } as Record<number, string>)[multiplier] ?? `pro_${multiplier}x`;
 }
 
 export type OAuthCredentialStatus = "active" | "refresh-needed" | "reauth" | "unknown";
@@ -1253,9 +1259,10 @@ export function describeOAuthCredential(provider: string, credential: unknown, n
     return undefined;
   };
   const claims = provider === "openai-codex" ? jwtClaims(source.access) : {};
-  const profileClaims = (claims["https://api.openai.com/profile"] ?? {}) as Record<string, unknown>;
-  const authClaims = (claims["https://api.openai.com/auth"] ?? {}) as Record<string, unknown>;
-  const account = (pick(fields.account) ?? text(profileClaims.email)) as string | undefined;
+  const idClaims = provider === "openai-codex" ? jwtClaims(source.idToken ?? source.id_token) : {};
+  const profileClaims = { ...(claims["https://api.openai.com/profile"] as Record<string, unknown>), ...(idClaims["https://api.openai.com/profile"] as Record<string, unknown>) };
+  const authClaims = { ...(claims["https://api.openai.com/auth"] as Record<string, unknown>), ...(idClaims["https://api.openai.com/auth"] as Record<string, unknown>) };
+  const account = (pick(fields.account) ?? text(idClaims.email) ?? text(profileClaims.email)) as string | undefined;
   const organization = pick(fields.organization) as string | undefined;
   let plan = (pick(fields.plan) ?? text(authClaims.chatgpt_plan_type)) as string | undefined;
   let planMultiplier: number | undefined;

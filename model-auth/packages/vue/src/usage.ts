@@ -1,4 +1,11 @@
-import type { CredentialUsageWindow, CredentialUsageWindowStatus, ProviderCredential } from "./types";
+import type { CredentialUsage, CredentialUsageWindow, CredentialUsageWindowStatus, ProviderCredential } from "./types";
+
+export function usagePlanLabel(usage: Pick<CredentialUsage, "plan" | "planMultiplier">): string | null {
+  if (!usage.plan) return null;
+  const names: Record<string, string> = { free: "Free", go: "Go", plus: "Plus", pro: "Pro", business: "Business", enterprise: "Enterprise", edu: "Edu" };
+  const plan = names[usage.plan] ?? usage.plan;
+  return typeof usage.planMultiplier === "number" && usage.planMultiplier > 1 ? `${plan} ${usage.planMultiplier}x` : plan;
+}
 
 export function windowRemaining(w: CredentialUsageWindow): number | null {
   return w.remainingPercent ?? (w.usedPercent === null ? null : Math.max(0, 100 - w.usedPercent));
