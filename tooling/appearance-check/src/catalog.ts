@@ -26,7 +26,22 @@ export const checks: ReadonlyArray<CheckInfo> = [
   { id: "AP021", name: "prose-leading", description: "Multi-line body text has line spacing of at least 1.2", dimensions: ["typography"], severity: "advisory", confidence: "measured", scope: "viewport", source: "https://practicaltypography.com/line-spacing.html" },
   { id: "AP022", name: "line-length", description: "Lines stay within the recommended reading measure", dimensions: ["typography"], severity: "advisory", confidence: "measured", scope: "viewport", source: wcag("visual-presentation"), criterion: "WCAG 2.2 1.4.8 (AAA)" },
   { id: "AP023", name: "font-load-failure", description: "Declared web fonts load instead of falling back", dimensions: ["typography"], severity: "advisory", confidence: "measured", scope: "document", source: "https://www.w3.org/TR/css-font-loading-3/#dom-fontface-status" },
+  { id: "AP024", name: "type-scale-drift", description: "Font sizes within 1 px of a more common size; likely off the type scale", dimensions: ["typography"], severity: "advisory", confidence: "heuristic", scope: "scheme", source: "https://m3.material.io/styles/typography/type-scale-tokens" },
+  { id: "AP025", name: "radius-drift", description: "Corner radii close to a more common radius of the same kind of element", dimensions: ["layout"], severity: "advisory", confidence: "heuristic", scope: "scheme", source: "https://fluent2.microsoft.design/shapes" },
+  { id: "AP026", name: "control-size-drift", description: "Control heights close to a more common control height", dimensions: ["layout"], severity: "advisory", confidence: "heuristic", scope: "scheme", source: "https://fluent2.microsoft.design/layout" },
+  { id: "AP027", name: "spacing-grid", description: "Padding, margin and gap values off the spacing grid the rest of the page follows", dimensions: ["layout"], severity: "advisory", confidence: "heuristic", scope: "scheme", source: "https://m3.material.io/foundations/layout/understanding-layout/spacing" },
+  { id: "AP028", name: "pill-radius", description: "Near-pill corners that stop short of half the element height", dimensions: ["layout"], severity: "advisory", confidence: "measured", scope: "viewport", source: "https://m3.material.io/styles/shape/corner-radius-scale" },
+  { id: "AP029", name: "overlay-radius", description: "Open dialogs with smaller corners than the page's cards", dimensions: ["layout"], severity: "advisory", confidence: "heuristic", scope: "viewport", source: "https://fluent2.microsoft.design/shapes" },
+  { id: "AP030", name: "row-alignment", description: "Side-by-side controls with different heights or offset edges", dimensions: ["layout"], severity: "advisory", confidence: "measured", scope: "viewport", source: "https://fluent2.microsoft.design/layout" },
+  { id: "AP031", name: "icon-text-alignment", description: "Inline icons vertically off-center from their single-line label", dimensions: ["layout"], severity: "advisory", confidence: "heuristic", scope: "viewport", source: "https://fluent2.microsoft.design/iconography" },
+  { id: "AP032", name: "tabular-numbers", description: "Numeric table columns rendered with proportional digits", dimensions: ["typography"], severity: "advisory", confidence: "measured", scope: "viewport", source: "https://www.w3.org/TR/css-fonts-4/#font-variant-numeric-prop" },
+  { id: "AP033", name: "design-tokens", description: "Rendered colors, sizes, weights, radii and spacing outside a supplied DESIGN.md baseline", dimensions: ["color", "layout", "typography"], severity: "advisory", confidence: "measured", scope: "scheme", source: "https://stitch.withgoogle.com/docs/design-md/overview/", requires: "design" },
 ];
+
+/** Checks enabled when none are named: every check whose prerequisite option is present. */
+export function defaultCheckIds(options: { design?: unknown }): CheckId[] {
+  return checks.filter(check => check.requires !== "design" || options.design !== undefined).map(check => check.id);
+}
 
 export function isCheckId(value: string): value is CheckId {
   return checks.some(check => check.id === value);

@@ -1,6 +1,7 @@
+import { readFile } from "node:fs/promises";
 import { chromium } from "playwright";
 import type { BrowserContext, Page } from "playwright";
-import { checkInfo, checks, isCheckId } from "./catalog.js";
+import { checkInfo, defaultCheckIds, isCheckId } from "./catalog.js";
 import { summarize } from "./summary.js";
 import { scanSurfaces } from "./surfaces.js";
 import { inspectLayout } from "./layout.js";
@@ -11,11 +12,15 @@ import { inspectRhythm } from "./rhythm.js";
 import { inspectFonts, inspectTypography } from "./typography.js";
 import { checkTextSpacing } from "./text-spacing.js";
 import { collectDesign } from "./design.js";
-import { analyzeDesign } from "./metrics.js";
+import { analyzeDesign, DESIGN_CHECKS } from "./metrics.js";
+import { inspectShapes } from "./shapes.js";
+import { inspectAlignment } from "./alignment.js";
+import { designBaseline, parseDesignMarkdown } from "./tokens.js";
+import type { DesignBaseline } from "./tokens.js";
 import { installKit } from "./kit.js";
 import { probeReflow, settlePage } from "./reflow.js";
 import { probeMotion } from "./motion.js";
-import type { AuditOptions, BrowserResult, CheckId, ColorScheme, Dimension, Finding, GapLevel, Ignore, Report, State, Viewport } from "./types.js";
+import type { AuditOptions, BrowserResult, CheckId, ColorScheme, DesignTokens, Dimension, Finding, GapLevel, Ignore, Report, State, Viewport } from "./types.js";
 
 export function validateOptions(options: AuditOptions): void {
   if (!Array.isArray(options.urls) || !options.urls.length) throw new Error("At least one URL is required");
@@ -24,6 +29,8 @@ export function validateOptions(options: AuditOptions): void {
     if (!['http:', 'https:'].includes(url.protocol)) throw new Error("Only HTTP(S) URLs can be audited");
   }
   if (options.checks?.some(id => !isCheckId(id))) throw new Error("Unknown check ID");
+  if (options.design !== undefined && (typeof options.design === "string" ? !options.design.trim() : !options.design || typeof options.design !== "object" || Array.isArray(options.design))) throw new Error("Design must be a file path or a token object");
+  if (options.checks?.includes("AP033") && options.design === undefined) throw new Error("AP033 requires a design baseline (design option or --design)");
   if (options.viewports && (!options.viewports.length || options.viewports.some(v => !Number.isInteger(v.width) || !Number.isInteger(v.height) || v.width < 1 || v.height < 1))) throw new Error("Invalid viewport");
   if (options.colorSchemes !== undefined && (!Array.isArray(options.colorSchemes) || !options.colorSchemes.length || options.colorSchemes.some(scheme => scheme !== "light" && scheme !== "dark"))) throw new Error("Color schemes must be a non-empty array of light or dark");
   for (const ignore of options.ignores ?? []) {
@@ -51,9 +58,17 @@ async function matchesIgnore(getPage: () => Promise<Page>, finding: Finding, ign
 
 const DEFAULT_VIEWPORTS: Viewport[] = [{ width: 1280, height: 800 }, { width: 390, height: 844 }];
 
+/** Reads a DESIGN.md front matter or a JSON token file; token objects pass through. */
+export async function loadDesign(design: string | DesignTokens): Promise<DesignBaseline> {
+  if (typeof design !== "string") return designBaseline(design);
+  const text = await readFile(design, "utf8");
+  return designBaseline(/\.json$/i.test(design) ? JSON.parse(text) as DesignTokens : parseDesignMarkdown(text));
+}
+
 export async function auditAppearance(options: AuditOptions): Promise<Report> {
   validateOptions(options);
-  const enabled = options.checks ?? checks.map(check => check.id);
+  const enabled = options.checks ?? defaultCheckIds(options);
+  const baseline = options.design === undefined ? undefined : await loadDesign(options.design);
   const viewports = options.viewports ?? DEFAULT_VIEWPORTS, schemes = options.colorSchemes ?? ["light" as const];
   const timeout = options.timeoutMs ?? 15000;
   const firstVp = viewports[0]!, firstScheme = schemes[0]!;
@@ -152,15 +167,19 @@ export async function auditAppearance(options: AuditOptions): Promise<Report> {
             await step(["AP020"], async () => add(await page.evaluate(inspectRhythm, enabled), "default"));
             await step(["AP021", "AP022"], async () => add(await page.evaluate(inspectTypography, enabled), "default"));
             await step(["AP015"], async () => add(await checkTextSpacing(page), "default"));
+            await step(["AP028", "AP029"], async () => add(await page.evaluate(inspectShapes, enabled), "default"));
+            await step(["AP030", "AP031", "AP032"], async () => add(await page.evaluate(inspectAlignment, enabled), "default"));
           }
           if (firstViewportScan) {
             try {
-              const design = analyzeDesign(await page.evaluate(collectDesign));
+              const design = analyzeDesign(await page.evaluate(collectDesign), baseline);
               report.metrics.push({ page: url, viewport, colorScheme, ...design.metrics });
               for (const [dimension, list] of Object.entries(design.notes) as Array<[Dimension, string[]]>) for (const note of list) (notes[dimension] ??= new Set()).add(note);
               await add(design.drift, "default");
             } catch (error) {
-              report.coverage.push({ page: url, viewport, colorScheme, state: "default", target: "document", ...(enabled.includes("AP019") ? { checkId: "AP019" as const, reason: String(error), level: "check" as const } : { reason: "Design metrics unavailable: " + String(error), level: "info" as const }) });
+              const ids = DESIGN_CHECKS.filter(id => enabled.includes(id));
+              if (!ids.length) report.coverage.push({ page: url, viewport, colorScheme, state: "default", target: "document", reason: "Design metrics unavailable: " + String(error), level: "info" });
+              for (const checkId of ids) report.coverage.push({ page: url, viewport, colorScheme, state: "default", target: "document", checkId, reason: String(error), level: "check" });
             }
           }
           if (firstSchemeScan && firstViewportScan) {

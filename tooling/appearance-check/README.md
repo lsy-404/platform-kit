@@ -31,8 +31,18 @@
 | AP021 | 正文行距 | 排版 | 建议 | 多行正文行距低于 1.2 | https://practicaltypography.com/line-spacing.html |
 | AP022 | 行长 | 排版 | 建议 | 每行字符数超过推荐阅读宽度（拉丁文 80，中日韩 40；1.4.8 AAA） | https://www.w3.org/WAI/WCAG22/Understanding/visual-presentation.html |
 | AP023 | 字体加载失败 | 排版 | 建议 | 声明的 Web 字体加载失败并退回备用字体 | https://www.w3.org/TR/css-font-loading-3/#dom-fontface-status |
+| AP024 | 字号漂移 | 排版 | 建议 | 与更常用字号相差不超过 1 px 的少数字号，疑似未进入字阶 | https://m3.material.io/styles/typography/type-scale-tokens |
+| AP025 | 圆角漂移 | 布局 | 建议 | 同类元素（控件、小元素、卡片等表面）中与更常用圆角接近的少数圆角 | https://fluent2.microsoft.design/shapes |
+| AP026 | 控件尺寸漂移 | 布局 | 建议 | 与更常用控件高度接近的少数按钮、输入框、选择器高度 | https://fluent2.microsoft.design/layout |
+| AP027 | 间距网格 | 布局 | 建议 | 页面其余间距符合 2/4/8 px 网格时，偏离网格的内边距、外边距和 gap | https://m3.material.io/foundations/layout/understanding-layout/spacing |
+| AP028 | 胶囊圆角 | 布局 | 建议 | 圆角接近但未达到高度一半，两端留下短直边的“假胶囊” | https://m3.material.io/styles/shape/corner-radius-scale |
+| AP029 | 浮层圆角 | 布局 | 建议 | 已打开的对话框圆角小于页面卡片常用圆角，层级颠倒；贴边抽屉与全屏对话框除外 | https://fluent2.microsoft.design/shapes |
+| AP030 | 同行对齐 | 布局 | 建议 | 并排的按钮、输入框、选择器高度不同，或同高但上下错位 | https://fluent2.microsoft.design/layout |
+| AP031 | 图文对齐 | 布局 | 建议 | 行内图标与单行标签文字的垂直中心偏移 | https://fluent2.microsoft.design/iconography |
+| AP032 | 等宽数字 | 排版 | 建议 | 表格数字列按实际渲染使用比例数字，数值无法对齐、变化时宽度跳动 | https://www.w3.org/TR/css-fonts-4/#font-variant-numeric-prop |
+| AP033 | 设计令牌 | 颜色、布局、排版 | 建议 | 渲染出的颜色、字号、字重、圆角、间距不在提供的 DESIGN.md 基线中；仅在提供基线时运行 | https://stitch.withgoogle.com/docs/design-md/overview/ |
 
-性质为“规范”的检查对应 WCAG 2.2 A/AA 要求，发现问题使其所在维度失败；“建议”是美学规则、AAA 准则或最佳实践，最多使所在维度给出警告。AP003–AP008 与 AP017–AP023 根据渲染证据推断设计意图。AP007 测量绘制边界中心，不能等同于人眼的知觉中心。颜色检查关注可读性；品牌配色是否合适、内容是否美观不属于确定性判断。工具无法可靠测量时记录覆盖缺口，而不是猜测。不使用 APCA：`apca-w3` 的许可与 Apache-2.0 不兼容。
+性质为“规范”的检查对应 WCAG 2.2 A/AA 要求，发现问题使其所在维度失败；“建议”是美学规则、AAA 准则或最佳实践，最多使所在维度给出警告。AP003–AP008、AP017–AP023 与 AP024–AP032 根据渲染证据推断设计意图；AP033 只与使用者提供的令牌比较。AP007 测量绘制边界中心，不能等同于人眼的知觉中心。颜色检查关注可读性；品牌配色是否合适、内容是否美观不属于确定性判断。工具无法可靠测量时记录覆盖缺口，而不是猜测。不使用 APCA：`apca-w3` 的许可与 Apache-2.0 不兼容。
 
 ## 维度结论与退出码
 
@@ -51,7 +61,85 @@
 
 ## 度量备注
 
-报告在每个主题的首个视口采集设计度量（调色板、字号、字体、字重、间距网格），写入 `metrics`，并把明显的观察放入对应维度的 `notes`，例如色相族数量、深色主题下的纯黑表面、字号种类、间距不符合 2/4/8 px 网格。备注只是观察，从不产生 finding，也不改变判定。
+报告在每个主题的首个视口采集设计度量（调色板、字号、字体、字重、间距网格），写入 `metrics`，并把明显的观察放入对应维度的 `notes`，例如色相族数量、深色主题下的纯黑表面、字号种类、奇数字号、间距不符合 2/4/8 px 网格。带边框的内边距从外沿量起（边框 + 内边距），只含内边距的值也算在网格上，因此 `1px` 边框配 `16px` 内边距不算离格。备注只是观察，从不产生 finding，也不改变判定。
+
+AP019 与 AP024–AP027、AP033 使用同一次采样，带出现次数和最多三个示例选择器。漂移类检查（AP019、AP024–AP026）只在常用值至少出现 3 次、且至少是少数值的 3 倍时报告；AP024–AP027 每项最多报告 20 个值，AP033 最多 40 个，超出时记录覆盖缺口。
+
+## 设计基线（DESIGN.md）
+
+[DESIGN.md](https://stitch.withgoogle.com/docs/design-md/overview/) 用 Markdown 文件头部的 YAML 描述设计令牌。提供基线后，AP033 把页面实际渲染的值与令牌比较，并报告不在基线中的值：
+
+| 令牌段 | 读取内容 | 判定 |
+| --- | --- | --- |
+| `colors` | 名称与颜色值（十六进制、`rgb()` 等 CSS 颜色） | 文字、背景、边框的不透明颜色与最近令牌的 OKLab 距离不小于 0.02 |
+| `typography` | 各层级的 `fontSize`、`fontWeight` | 字号与任一令牌相差超过 0.5 px；字重不等于任一令牌 |
+| `rounded` | 圆角档位 | 统一圆角与任一档位相差超过 0.5 px；胶囊与圆形需要不小于 100 px 的档位（如 `pill: 9999px`） |
+| `spacing` | 间距档位 | 内边距、外边距、gap 与任一档位相差超过 0.5 px；带边框时外沿或内边距任一命中即可 |
+
+长度可写 `px`、`rem`、`em`（按 16 px 换算）或纯数字。只解析这四段，`description`、`components` 等其他字段原样跳过；令牌段内需每行一个键，不支持 `{}` / `[]` 行内写法。未声明的段不检查。
+
+```sh
+pnpm exec appearance-check --url http://localhost:5173 --design DESIGN.md
+```
+
+配置文件与 Vite 插件使用 `design` 字段：配置文件中的相对路径相对于配置文件，Vite 中相对于项目根目录；Node API 也可直接传入令牌对象。未提供基线时 AP033 不在默认检查中，显式指定 AP033 而没有基线属于输入错误。
+
+示例：主色、中性色、功能色分组，偶数字阶，8 pt 间距网格，四档圆角加胶囊。
+
+```markdown
+---
+name: product-ui
+colors:
+  primary: "#2563eb"      # 按钮、选中态、品牌标识
+  ink: "#1f2937"          # 中性色：文字
+  muted: "#6b7280"
+  canvas: "#ffffff"       # 中性色：背景
+  surface: "#f3f4f6"
+  hairline: "#e5e7eb"     # 中性色：边框
+  success: "#16a34a"      # 功能色
+  warning: "#d97706"
+  error: "#dc2626"
+  info: "#0284c7"
+typography:
+  title-lg:
+    fontSize: 32px
+    fontWeight: 700
+  title-md:
+    fontSize: 24px
+    fontWeight: 600
+  title-sm:
+    fontSize: 20px
+    fontWeight: 600
+  body:
+    fontSize: 16px
+    fontWeight: 400
+  body-strong:
+    fontSize: 16px
+    fontWeight: 500
+  caption:
+    fontSize: 14px
+    fontWeight: 400
+  min:
+    fontSize: 12px
+    fontWeight: 400
+rounded:
+  tag: 4px                # 标签、徽标
+  input: 8px              # 输入框
+  card: 12px              # 卡片
+  dialog: 16px            # 弹窗
+  pill: 9999px            # 胶囊按钮
+spacing:
+  xxs: 4px
+  xs: 8px
+  sm: 12px
+  md: 16px
+  lg: 24px
+  xl: 32px
+  xxl: 48px
+---
+```
+
+[awesome-design-md](https://github.com/VoltAgent/awesome-design-md) 收录了按同一格式整理的网站分析，可作为编写基线的参考；这些文件是第三方对公开页面（多为宣传页）的分析，不是相应品牌的官方规范。AP033 只判断页面是否使用了声明的值，不判断令牌本身是否合理；同心圆角（AP003）、浮层与卡片的圆角层级（AP029）和胶囊圆角（AP028）在没有基线时同样检查。
 
 ## 安装与参数模式
 
@@ -66,7 +154,7 @@ pnpm exec appearance-check --config appearance-check.json --output appearance-re
 pnpm exec appearance-check --list
 ```
 
-默认以浅色主题检查指定页面的桌面 1280×800 和移动 390×844 视口；重复传入 `--color-scheme light --color-scheme dark` 检查两种主题。每个视口最多检查 40 个控件的 hover / focus。使用 `--max-controls` 修改上限，`--ignore-check AP003` 关闭某项检查，`--executable-path` 指定已安装的 Chromium。退出码见上节；`--fail-on warn` 让建议问题也返回 2，`--warn-only` 让报告不改变退出码，输入或启动错误仍返回 1。
+默认以浅色主题检查指定页面的桌面 1280×800 和移动 390×844 视口；重复传入 `--color-scheme light --color-scheme dark` 检查两种主题。每个视口最多检查 40 个控件的 hover / focus。使用 `--max-controls` 修改上限，`--ignore-check AP003` 关闭某项检查，`--design DESIGN.md` 启用设计基线（AP033），`--executable-path` 指定已安装的 Chromium。退出码见上节；`--fail-on warn` 让建议问题也返回 2，`--warn-only` 让报告不改变退出码，输入或启动错误仍返回 1。
 
 配置文件使用 Node API 的 JSON 参数：
 
@@ -129,6 +217,9 @@ const report = await auditAppearance({
 - 自带横向滚动容器的内容不算 AP014 的重排问题；图片、表格、媒体、代码等二维内容的溢出记为缺口，需人工确认。
 - 文本输入框仅靠插入符指示焦点时，AP012 记为缺口，不判定。
 - 不使用 APCA，原因见检查项一节。
+- AP024–AP027 与 AP033 只采样每个主题首个视口中可见的元素；AP029 只检查加载后已经打开的对话框，不会主动打开弹窗。
+- AP031 只检查 8–32 px、非绝对定位的图标与单行标签；AP032 只检查表格（`table`、`role=table/grid/treegrid`）中的数字列。
+- 漂移与网格检查根据页面自身的常用值推断刻度，页面样本很少时可能不报告；需要固定刻度时使用 DESIGN.md 基线。
 
 ## 在仓库中构建
 
