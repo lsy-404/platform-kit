@@ -17,11 +17,23 @@ const markup = `<!doctype html><style>
   .adaptive .inner { border-radius:20px }
   @media (prefers-color-scheme:dark) { .adaptive .inner { border-radius:24px } }
 </style>`;
+// Each variant flips the page to light-on-dark in the dark theme and adjusts the text differently.
+const parityDark = {
+  plain: "",
+  size: "p{font-size:15.5px} h2{font-size:23.5px}",
+  weight: "p{font-weight:350} h2{font-weight:600}",
+  grade: "p,h2{font-variation-settings:'GRAD' -50}",
+  heavier: "p{font-weight:700}",
+  shrunk: "p{font-size:13px}",
+};
+const parity = variant => `<!doctype html><style>body{margin:16px;font:16px/24px Arial;background:#fff;color:#1f2937} h2{font-size:24px;font-weight:700;margin:0 0 8px} p{margin:0}
+  @media (prefers-color-scheme:dark){${variant === "static" ? "" : "body{background:#111827;color:#e5e7eb}"} ${parityDark[variant] ?? ""}}</style><h2>Title</h2><p>Body text that flips to light on dark.</p>`;
 before(async () => {
   temporary = await mkdtemp(join(tmpdir(), "appearance-themes-"));
   server = createServer((request, response) => {
     if (request.url === "/missing") { response.writeHead(404); response.end(); return; }
     response.setHeader("Content-Type", "text/html");
+    if (request.url.startsWith("/parity/")) { response.end(parity(request.url.slice(8))); return; }
     const adaptive = request.url === "/adaptive";
     response.end(markup + `<section class="outer ${adaptive ? "adaptive" : ""}"><div class="inner" id="inner">Surface</div></section>` + (request.url === "/coverage" ? '<iframe title="Embedded content" srcdoc="Embedded"></iframe>' : ""));
   });
@@ -82,4 +94,28 @@ test("CLI text and JSON identify themes and invalid config exits with an input e
   const invalid = await cli(["--config",config,"--warn-only"]);
   assert.equal(invalid.code, 1);
   assert.match(invalid.stderr, /color scheme/i);
+});
+
+test("AP034 asks for slightly smaller, lighter or lower-grade light-on-dark text in the dark theme", async () => {
+  const audit = (variant, extra = {}) => auditAppearance({ urls:[url + "/parity/" + variant], checks:["AP034"], viewports:[{width:800,height:600}], colorSchemes:["light","dark"], executablePath, ...extra });
+  const kinds = report => report.findings.filter(f => f.checkId === "AP034").map(f => [f.target, f.evidence.kind]).sort();
+  const plain = await audit("plain");
+  assert.deepEqual(kinds(plain), [["body > h2:nth-child(1)", "uncompensated"], ["body > p:nth-child(2)", "uncompensated"]]);
+  assert(plain.findings.every(f => f.colorScheme === "dark" && f.viewport.width === 800));
+  assert.deepEqual(plain.findings.find(f => f.target.includes("p:")).evidence.light, { fontSize: 16, fontWeight: 400 });
+  for (const variant of ["size", "weight", "grade", "static"]) assert.deepEqual(kinds(await audit(variant)), [], variant + " passes");
+  assert.deepEqual(kinds(await audit("heavier")), [["body > h2:nth-child(1)", "uncompensated"], ["body > p:nth-child(2)", "heavier"]]);
+  assert.deepEqual(kinds(await audit("shrunk")), [["body > h2:nth-child(1)", "uncompensated"], ["body > p:nth-child(2)", "overcompensated"]]);
+  const ignored = await audit("plain", { ignores:[{ checkId:"AP034", selector:"p", reason:"Reading text keeps its size" }] });
+  assert.deepEqual(kinds(ignored), [["body > h2:nth-child(1)", "uncompensated"]]);
+  assert.equal(ignored.suppressed.length, 1);
+});
+
+test("AP034 runs by default only when both themes are scanned", async () => {
+  const dimension = report => report.summary.find(row => row.dimension === "typography").checks;
+  assert(dimension(await auditAppearance({ urls:[url + "/parity/plain"], viewports:[{width:800,height:600}], colorSchemes:["light","dark"], executablePath, maxControls:1 })).includes("AP034"));
+  assert(!dimension(await auditAppearance({ urls:[url + "/parity/plain"], viewports:[{width:800,height:600}], executablePath, maxControls:1 })).includes("AP034"));
+  assert.throws(() => validateOptions({ urls:[url], checks:["AP034"] }), /both light and dark/);
+  const cliRun = await cli(["--url", url + "/parity/plain", "--viewport", "800x600", "--color-scheme", "light", "--color-scheme", "dark", "--ignore-check", "AP001", "--json", "--warn-only", ...(executablePath ? ["--executable-path", executablePath] : [])]);
+  assert(JSON.parse(cliRun.stdout).findings.some(f => f.checkId === "AP034"), "--ignore-check keeps theme-dependent defaults");
 });

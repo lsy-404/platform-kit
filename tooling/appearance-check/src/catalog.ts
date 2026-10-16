@@ -36,11 +36,19 @@ export const checks: ReadonlyArray<CheckInfo> = [
   { id: "AP031", name: "icon-text-alignment", description: "Inline icons vertically off-center from their single-line label", dimensions: ["layout"], severity: "advisory", confidence: "heuristic", scope: "viewport", source: "https://fluent2.microsoft.design/iconography" },
   { id: "AP032", name: "tabular-numbers", description: "Numeric table columns rendered with proportional digits", dimensions: ["typography"], severity: "advisory", confidence: "measured", scope: "viewport", source: "https://www.w3.org/TR/css-fonts-4/#font-variant-numeric-prop" },
   { id: "AP033", name: "design-tokens", description: "Rendered colors, sizes, weights, radii and spacing outside a supplied DESIGN.md baseline", dimensions: ["color", "layout", "typography"], severity: "advisory", confidence: "measured", scope: "scheme", source: "https://stitch.withgoogle.com/docs/design-md/overview/", requires: "design" },
+  { id: "AP034", name: "theme-text-parity", description: "Light-on-dark text in the dark theme without the slight size, weight or grade reduction that keeps it visually equal to the light theme", dimensions: ["typography"], severity: "advisory", confidence: "heuristic", scope: "viewport", source: "https://fonts.google.com/knowledge/glossary/grade", requires: "both-schemes" },
 ];
 
-/** Checks enabled when none are named: every check whose prerequisite option is present. */
-export function defaultCheckIds(options: { design?: unknown }): CheckId[] {
-  return checks.filter(check => check.requires !== "design" || options.design !== undefined).map(check => check.id);
+/** True when the options supply what a check's `requires` names. */
+export function prerequisiteMet(check: CheckInfo, options: { design?: unknown; colorSchemes?: readonly string[] }): boolean {
+  if (check.requires === "design") return options.design !== undefined;
+  if (check.requires === "both-schemes") return Boolean(options.colorSchemes?.includes("light") && options.colorSchemes.includes("dark"));
+  return true;
+}
+
+/** Checks enabled when none are named: every check whose prerequisite is present. */
+export function defaultCheckIds(options: { design?: unknown; colorSchemes?: readonly string[] }): CheckId[] {
+  return checks.filter(check => prerequisiteMet(check, options)).map(check => check.id);
 }
 
 export function isCheckId(value: string): value is CheckId {

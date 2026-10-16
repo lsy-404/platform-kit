@@ -3,7 +3,7 @@ export type CheckId =
   | "AP009" | "AP010" | "AP011" | "AP012" | "AP013" | "AP014" | "AP015" | "AP016"
   | "AP017" | "AP018" | "AP019" | "AP020" | "AP021" | "AP022" | "AP023" | "AP024"
   | "AP025" | "AP026" | "AP027" | "AP028" | "AP029" | "AP030" | "AP031" | "AP032"
-  | "AP033";
+  | "AP033" | "AP034";
 export type Dimension = "accessibility" | "color" | "layout" | "typography";
 export type Severity = "normative" | "advisory";
 export type Verdict = "fail" | "warn" | "incomplete" | "pass" | "not-run";
@@ -21,8 +21,8 @@ export interface CheckInfo {
   scope: Scope;
   source: string;
   criterion?: string;
-  /** Runs only when its prerequisite option is supplied (AP033 needs a design baseline). */
-  requires?: "design";
+  /** Runs only when its prerequisite is supplied: a design baseline (AP033) or both light and dark scans (AP034). */
+  requires?: "design" | "both-schemes";
 }
 export interface RawFinding {
   checkId: CheckId;
