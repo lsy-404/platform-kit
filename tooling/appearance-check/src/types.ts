@@ -1,7 +1,9 @@
 export type CheckId =
   | "AP001" | "AP002" | "AP003" | "AP004" | "AP005" | "AP006" | "AP007" | "AP008"
   | "AP009" | "AP010" | "AP011" | "AP012" | "AP013" | "AP014" | "AP015" | "AP016"
-  | "AP017" | "AP018" | "AP019" | "AP020" | "AP021" | "AP022" | "AP023";
+  | "AP017" | "AP018" | "AP019" | "AP020" | "AP021" | "AP022" | "AP023" | "AP024"
+  | "AP025" | "AP026" | "AP027" | "AP028" | "AP029" | "AP030" | "AP031" | "AP032"
+  | "AP033";
 export type Dimension = "accessibility" | "color" | "layout" | "typography";
 export type Severity = "normative" | "advisory";
 export type Verdict = "fail" | "warn" | "incomplete" | "pass" | "not-run";
@@ -19,6 +21,8 @@ export interface CheckInfo {
   scope: Scope;
   source: string;
   criterion?: string;
+  /** Runs only when its prerequisite option is supplied (AP033 needs a design baseline). */
+  requires?: "design";
 }
 export interface RawFinding {
   checkId: CheckId;
@@ -104,8 +108,17 @@ export interface Ignore {
   colorScheme?: ColorScheme;
   reason: string;
 }
+/** Token values a DESIGN.md front matter (or equivalent JSON) declares; lengths may be px, rem/em (16 px) or bare numbers. */
+export interface DesignTokens {
+  colors?: Record<string, string>;
+  typography?: Record<string, { fontSize?: string | number; fontWeight?: string | number; [key: string]: unknown }>;
+  rounded?: Record<string, string | number>;
+  spacing?: Record<string, string | number>;
+}
 export interface AuditOptions {
   urls: string[];
+  /** DESIGN.md / JSON file path or parsed tokens; enables AP033. */
+  design?: string | DesignTokens;
   checks?: CheckId[];
   viewports?: Viewport[];
   colorSchemes?: ColorScheme[];

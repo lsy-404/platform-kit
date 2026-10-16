@@ -1,3 +1,4 @@
+import { isAbsolute, resolve } from "node:path";
 import { preview } from "vite";
 import type { Plugin, ResolvedConfig } from "vite";
 import { auditAppearance } from "./runner.js";
@@ -32,7 +33,8 @@ export function appearanceCheck(options: AppearanceCheckOptions = {}): Plugin {
           if (/^[a-z]+:/i.test(path) || path.startsWith("//")) throw new Error("Build audit paths must be local routes");
           return origin + base.replace(/\/$/, "") + "/" + path.replace(/^\//, "");
         });
-        const report = await auditAppearance({ ...options, urls });
+        const design = typeof options.design === "string" && !isAbsolute(options.design) ? resolve(config.root, options.design) : options.design;
+        const report = await auditAppearance({ ...options, ...(design === undefined ? {} : { design }), urls });
         if (report.verdict === "fail" || report.verdict === "warn" || report.verdict === "incomplete" || report.coverage.some(gap => gap.level === "info")) config.logger.warn(formatReport(report));
         if (options.onReport) await options.onReport(report);
       } catch (error) {

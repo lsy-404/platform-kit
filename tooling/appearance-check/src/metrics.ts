@@ -1,6 +1,7 @@
 import { differenceEuclidean, oklch, parse } from "culori";
-import type { DesignColor, DesignSample } from "./design.js";
-import type { BrowserResult, Dimension, PageMetrics, RawFinding, Skipped } from "./types.js";
+import type { DesignColor, DesignSample, DesignUse } from "./design.js";
+import type { DesignBaseline, DesignToken } from "./tokens.js";
+import type { BrowserResult, CheckId, Dimension, PageMetrics, RawFinding, Skipped } from "./types.js";
 
 const deltaOK = differenceEuclidean("oklab");
 const round3 = (value: number): number => Math.round(value * 1000) / 1000;
@@ -50,6 +51,144 @@ function detectDrift(colors: DesignColor[]): { findings: RawFinding[]; capped: b
     }
   }
   return { findings, capped: false };
+}
+
+const FINDING_LIMIT = 20;
+
+/**
+ * A rarely used value that sits next to a much more common one reads as an untokenized copy of it:
+ * the common value is used at least three times and at least three times as often as the minor one.
+ */
+function detectUseDrift(
+  checkId: CheckId, entries: DesignUse[], near: (minor: number, major: number) => boolean,
+  message: string, evidence: (minor: DesignUse, major: DesignUse) => Record<string, unknown>,
+): { findings: RawFinding[]; capped: boolean } {
+  const findings: RawFinding[] = [];
+  const sorted = [...entries].sort((a, b) => b.count - a.count || a.px - b.px);
+  for (const minor of sorted) {
+    let best: DesignUse | null = null;
+    for (const major of sorted) {
+      if (major === minor || major.px === minor.px || major.count < 3 || minor.count > major.count / 3 || !near(minor.px, major.px)) continue;
+      if (!best || Math.abs(major.px - minor.px) < Math.abs(best.px - minor.px)) best = major;
+    }
+    if (!best) continue;
+    if (findings.length >= FINDING_LIMIT) return { findings, capped: true };
+    findings.push({
+      checkId,
+      target: minor.examples[0] ?? "body",
+      ...(best.examples[0] ? { related: best.examples[0] } : {}),
+      message,
+      confidence: "heuristic",
+      evidence: { ...evidence(minor, best), usage: { value: minor.count, nearest: best.count }, examples: minor.examples },
+    });
+  }
+  return { findings, capped: false };
+}
+
+function detectScaleDrift(sample: DesignSample): { findings: RawFinding[]; capped: CheckId[] } {
+  const findings: RawFinding[] = [], capped: CheckId[] = [];
+  const collect = (checkId: CheckId, result: { findings: RawFinding[]; capped: boolean }) => {
+    findings.push(...result.findings);
+    if (result.capped && !capped.includes(checkId)) capped.push(checkId);
+  };
+  collect("AP024", detectUseDrift("AP024", sample.fontSizes, (a, b) => Math.abs(a - b) <= 1,
+    "Font size is within 1 px of a more common size; likely off the type scale.",
+    (minor, major) => ({ fontSize: minor.px, nearest: major.px })));
+  const radius = (["control", "small", "surface"] as const).map(kind => detectUseDrift("AP025", sample.radii.filter(r => r.kind === kind && r.shape === "radius"), (a, b) => Math.abs(a - b) <= Math.max(1, 0.25 * b),
+    "Corner radius is close to a more common radius of the same kind of element; likely off the radius scale.",
+    (minor, major) => ({ kind, radius: minor.px, nearest: major.px })));
+  const radiusFindings = radius.flatMap(result => result.findings);
+  collect("AP025", { findings: radiusFindings.slice(0, FINDING_LIMIT), capped: radiusFindings.length > FINDING_LIMIT || radius.some(result => result.capped) });
+  collect("AP026", detectUseDrift("AP026", sample.controls, (a, b) => Math.abs(a - b) <= Math.max(2, 0.08 * b),
+    "Control height is close to a more common control height; likely off the size scale.",
+    (minor, major) => ({ height: minor.px, nearest: major.px })));
+  return { findings, capped };
+}
+
+function detectOffGrid(sample: DesignSample, spacing: PageMetrics["spacing"]): { findings: RawFinding[]; capped: boolean } {
+  const findings: RawFinding[] = [];
+  const unit = spacing.baseUnit;
+  if (unit === null) return { findings, capped: false };
+  const off = sample.spacingUse.filter(use => !fitsGrid(use, unit)).sort((a, b) => a.px - b.px || b.count - a.count);
+  for (const use of off) {
+    if (findings.length >= FINDING_LIMIT) return { findings, capped: true };
+    findings.push({
+      checkId: "AP027",
+      target: use.examples[0] ?? "body",
+      message: `Spacing of ${use.px} px is off the ${unit} px grid the rest of the page follows.`,
+      confidence: "heuristic",
+      evidence: { px: use.px, ...(use.alt === undefined ? {} : { padding: use.alt }), grid: unit, fit: spacing.fit[unit], count: use.count, properties: use.properties, examples: use.examples },
+    });
+  }
+  return { findings, capped: false };
+}
+
+const DESIGN_LIMIT = 40;
+
+function detectOffToken(sample: DesignSample, baseline: DesignBaseline): { findings: RawFinding[]; capped: boolean } {
+  const findings: RawFinding[] = [];
+  let capped = false;
+  const add = (kind: string, value: number | string, nearest: { name: string; value: number | string; delta: number } | null, use: { count: number; examples: string[] }, extra: Record<string, unknown> = {}) => {
+    if (findings.length >= DESIGN_LIMIT) { capped = true; return; }
+    findings.push({
+      checkId: "AP033",
+      target: use.examples[0] ?? "body",
+      message: `Rendered ${kind} ${typeof value === "number" ? value + (kind === "font-weight" ? "" : " px") : value} is not a design baseline token.`,
+      confidence: "measured",
+      evidence: { kind, value, nearest, count: use.count, examples: use.examples, ...extra },
+    });
+  };
+  const nearestOf = (tokens: DesignToken[], value: number) => tokens.reduce<{ name: string; value: number; delta: number } | null>((best, token) => {
+    const delta = Math.abs(token.value - value);
+    return !best || delta < best.delta ? { name: token.name, value: token.value, delta } : best;
+  }, null);
+  if (baseline.colors.length) {
+    const merged = new Map<string, { roles: string[]; count: number; examples: string[] }>();
+    for (const color of sample.colors) {
+      const entry = merged.get(color.value) ?? { roles: [], count: 0, examples: [] };
+      if (!entry.roles.includes(color.role)) entry.roles.push(color.role);
+      entry.count += color.count;
+      for (const example of color.examples) if (entry.examples.length < 3 && !entry.examples.includes(example)) entry.examples.push(example);
+      merged.set(color.value, entry);
+    }
+    for (const [value, use] of [...merged].sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))) {
+      const nearest = baseline.colors.reduce<{ name: string; value: string; delta: number } | null>((best, token) => {
+        const delta = deltaOK(parseHex(value), parseHex(token.value));
+        return !best || delta < best.delta ? { name: token.name, value: token.value, delta: round3(delta) } : best;
+      }, null);
+      if (nearest && nearest.delta >= 0.02) add("color", value, nearest, use, { roles: use.roles });
+    }
+  }
+  if (baseline.fontSizes.length) {
+    for (const use of [...sample.fontSizes].sort((a, b) => a.px - b.px)) {
+      const nearest = nearestOf(baseline.fontSizes, use.px);
+      if (nearest && nearest.delta > 0.5) add("font-size", use.px, nearest, use);
+    }
+  }
+  if (baseline.fontWeights.length) {
+    for (const use of [...sample.fontWeights].sort((a, b) => a.px - b.px)) {
+      const nearest = nearestOf(baseline.fontWeights, use.px);
+      if (nearest && nearest.delta > 0) add("font-weight", use.px, nearest, use);
+    }
+  }
+  if (baseline.radii.length) {
+    const full = baseline.radii.find(token => token.value >= 100);
+    for (const use of [...sample.radii].sort((a, b) => a.px - b.px)) {
+      if (use.shape !== "radius") {
+        if (!full) add("radius", use.shape, null, use, { shape: use.shape, elementKind: use.kind });
+        continue;
+      }
+      const nearest = nearestOf(baseline.radii, use.px);
+      if (nearest && nearest.delta > 0.5) add("radius", use.px, nearest, use, { shape: use.shape, elementKind: use.kind });
+    }
+  }
+  if (baseline.spacing.length) {
+    for (const use of [...sample.spacingUse].sort((a, b) => a.px - b.px)) {
+      const nearest = nearestOf(baseline.spacing, use.px), bare = use.alt === undefined ? null : nearestOf(baseline.spacing, use.alt);
+      if (nearest && nearest.delta > 0.5 && (!bare || bare.delta > 0.5)) add("spacing", use.px, nearest, use, { properties: use.properties, ...(use.alt === undefined ? {} : { padding: use.alt }) });
+    }
+  }
+  return { findings, capped };
 }
 
 function paletteMetrics(sample: DesignSample): PageMetrics["palette"] {
@@ -138,34 +277,48 @@ function typeMetrics(sample: DesignSample): PageMetrics["type"] {
   };
 }
 
+const onGrid = (px: number, unit: number): boolean => Math.min(px % unit, unit - px % unit) <= 0.5;
+/** A bordered inset fits when either its outer measure or its bare padding does. */
+const fitsGrid = (use: { px: number; alt?: number }, unit: number): boolean => onGrid(use.px, unit) || use.alt !== undefined && onGrid(use.alt, unit);
+
 function spacingMetrics(sample: DesignSample): PageMetrics["spacing"] {
-  const values = sample.spacing.map(v => half(Math.abs(v))).filter(v => v > 1);
-  const fitOf = (unit: number) => {
-    if (!values.length) return 0;
-    const near = values.filter(v => { const r = v % unit; return Math.min(r, unit - r) <= 0.5; }).length;
-    return near / values.length;
-  };
+  const uses = sample.spacingUse;
+  const samples = uses.reduce((sum, use) => sum + use.count, 0);
+  const fitOf = (unit: number) => samples ? uses.filter(use => fitsGrid(use, unit)).reduce((sum, use) => sum + use.count, 0) / samples : 0;
   const fit = { 2: round3(fitOf(2)), 4: round3(fitOf(4)), 8: round3(fitOf(8)) };
   const baseUnit = ([8, 4, 2] as const).find(unit => fitOf(unit) >= 0.85) ?? null;
   const counts = new Map<number, number>();
-  for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1);
+  for (const use of uses) counts.set(use.px, (counts.get(use.px) ?? 0) + use.count);
   const sorted = [...counts.keys()].sort((a, b) => a - b);
   let distinct = 0, previous = -Infinity;
   for (const v of sorted) { if (v - previous > 1) distinct++; previous = v; }
   const unit = baseUnit ?? 4;
-  const offGrid = [...counts].filter(([v, count]) => count >= 3 && Math.min(v % unit, unit - v % unit) > 0.5).map(([px, count]) => ({ px, count })).sort((a, b) => b.count - a.count || a.px - b.px);
-  return { samples: values.length, fit, baseUnit, distinct, offGrid };
+  const off = new Map<number, number>();
+  for (const use of uses) if (!fitsGrid(use, unit)) off.set(use.px, (off.get(use.px) ?? 0) + use.count);
+  const offGrid = [...off].filter(([, count]) => count >= 3).map(([px, count]) => ({ px, count })).sort((a, b) => b.count - a.count || a.px - b.px);
+  return { samples, fit, baseUnit, distinct, offGrid };
 }
 
-export function analyzeDesign(sample: DesignSample): {
+/** Checks whose findings come from the sampled design; a sampling gap applies to each of them. */
+export const DESIGN_CHECKS: readonly CheckId[] = ["AP019", "AP024", "AP025", "AP026", "AP027", "AP033"];
+
+export function analyzeDesign(sample: DesignSample, baseline?: DesignBaseline): {
   drift: BrowserResult;
   metrics: Omit<PageMetrics, "page" | "viewport" | "colorScheme">;
   notes: Partial<Record<Dimension, string[]>>;
 } {
-  const skipped: Skipped[] = sample.skipped.map(entry => ({ checkId: "AP019", target: entry.target, reason: entry.reason }));
+  const ids = DESIGN_CHECKS.filter(id => id !== "AP033" || baseline);
+  const skipped: Skipped[] = sample.skipped.flatMap(entry => ids.map(checkId => ({ checkId, target: entry.target, reason: entry.reason })));
+  const limit = (checkId: CheckId, limit: number) => skipped.push({ checkId, target: "body", reason: `Finding limit (${limit}) reached; further values not reported` });
   const drift = detectDrift(sample.colors);
   if (drift.capped) skipped.push({ checkId: "AP019", target: "body", reason: "Color drift finding limit (20) reached; further drift not reported" });
   const palette = paletteMetrics(sample), type = typeMetrics(sample), spacing = spacingMetrics(sample);
+  const scale = detectScaleDrift(sample);
+  for (const checkId of scale.capped) limit(checkId, FINDING_LIMIT);
+  const grid = detectOffGrid(sample, spacing);
+  if (grid.capped) limit("AP027", FINDING_LIMIT);
+  const tokens = baseline ? detectOffToken(sample, baseline) : { findings: [], capped: false };
+  if (tokens.capped) limit("AP033", DESIGN_LIMIT);
 
   const color: string[] = [], typography: string[] = [], layout: string[] = [];
   if (palette.hueFamilies.length > 5) color.push(`${palette.hueFamilies.length} hue families in use`);
@@ -174,6 +327,8 @@ export function analyzeDesign(sample: DesignSample): {
     if (palette.text[0]?.color === "#ffffff" && palette.text[0].share > 0.5) color.push("Pure white body text in dark theme");
   }
   if (type.sizes.length > 8) typography.push(`${type.sizes.length} distinct font sizes`);
+  const odd = type.sizes.filter(size => Number.isInteger(size.px) && size.px % 2 === 1).map(size => size.px);
+  if (odd.length) typography.push(`Odd font sizes ${odd.join("/")} px`);
   for (const [a, b] of type.nearDuplicateSizes) typography.push(`Near-duplicate sizes ${a}/${b} px`);
   const proportional = type.families.filter(f => !f.code).length;
   if (proportional > 3) typography.push(`${proportional} font families`);
@@ -189,5 +344,5 @@ export function analyzeDesign(sample: DesignSample): {
   if (color.length) notes.color = color;
   if (layout.length) notes.layout = layout;
   if (typography.length) notes.typography = typography;
-  return { drift: { findings: drift.findings, skipped }, metrics: { palette, type, spacing }, notes };
+  return { drift: { findings: [...drift.findings, ...scale.findings, ...grid.findings, ...tokens.findings], skipped }, metrics: { palette, type, spacing }, notes };
 }
