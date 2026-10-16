@@ -15,6 +15,19 @@ export interface DesignTextRun {
   color: string | null;
 }
 
+/** One text owner as rendered in one theme, keyed by its DOM path so the other theme's scan can find it. */
+export interface ThemeText {
+  key: string;
+  text: string;
+  size: number;
+  /** Effective weight: the variable-font wght axis when set, else font-weight. */
+  weight: number;
+  grade: number | null;
+  polarity: "dark-on-light" | "light-on-dark";
+  contrast: number;
+  chars: number;
+}
+
 /** One rendered value with how many elements use it and up to three example selectors. */
 export interface DesignUse {
   /** CSS px, or the numeric weight for font weights. */
@@ -40,6 +53,8 @@ export interface DesignSample {
    * from the outer edge (padding + border) and keeps the bare padding as `alt`, so either may sit on a grid.
    */
   spacingUse: Array<DesignUse & { properties: string[]; alt?: number }>;
+  /** Up to 800 visible text owners with their polarity against the painted background. */
+  themeText: ThemeText[];
   skipped: Array<{ target: string; reason: string }>;
 }
 
@@ -73,6 +88,24 @@ export function collectDesign(): DesignSample {
   const used = <T>(group: string): T[] => [...uses].filter(([key]) => key.startsWith(group + "|")).map(([, value]) => value as T);
 
   const text: DesignTextRun[] = [];
+  const themeText: ThemeText[] = [];
+  const MAX_THEME_TEXT = 800;
+  const luminance = (color: number[]): number => {
+    const channel = (value: number) => { const c = value / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+    return 0.2126 * channel(color[0] ?? 0) + 0.7152 * channel(color[1] ?? 0) + 0.0722 * channel(color[2] ?? 0);
+  };
+  // A full nth-child path is unique without querying the document, and matches across theme scans of the same DOM.
+  const path = (element: Element): string => {
+    const parts: string[] = [];
+    for (let node: Element | null = element; node && node !== document.body && node !== document.documentElement; node = node.parentElement) {
+      parts.unshift(`${node.tagName.toLowerCase()}:nth-child(${Array.prototype.indexOf.call(node.parentElement?.children ?? [], node) + 1})`);
+    }
+    return ["body", ...parts].join(" > ");
+  };
+  const axis = (settings: string, tag: string): number | null => {
+    const match = new RegExp(`["']${tag}["']\\s+(-?[\\d.]+)`).exec(settings);
+    return match ? Number(match[1]) : null;
+  };
   const owners = new Map<Element, number>();
   const walker = document.createTreeWalker(document.body ?? document.documentElement, NodeFilter.SHOW_TEXT);
   while (walker.nextNode()) {
@@ -92,6 +125,19 @@ export function collectDesign(): DesignSample {
     text.push({ size: parseFloat(style.fontSize), weight: parseInt(style.fontWeight, 10) || 400, family, code, chars, color: color[3] >= 0.999 ? hex(color) : null });
     use("size", half(parseFloat(style.fontSize)), owner);
     use("weight", parseInt(style.fontWeight, 10) || 400, owner);
+    if (themeText.length < MAX_THEME_TEXT) {
+      const box = kit.clippedRect(owner, owner.getBoundingClientRect());
+      const behind = box.width > 0 && box.height > 0 ? kit.paintBehind(box.left + box.width / 2, box.top + box.height / 2) : null;
+      if (behind && color[3] > 0) {
+        const ink = kit.composite(color, behind), light = luminance(ink) > luminance(behind);
+        themeText.push({
+          key: path(owner), text: (owner.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 40),
+          size: parseFloat(style.fontSize), weight: axis(style.fontVariationSettings, "wght") ?? (parseInt(style.fontWeight, 10) || 400),
+          grade: axis(style.fontVariationSettings, "GRAD"), polarity: light ? "light-on-dark" : "dark-on-light",
+          contrast: Math.round(kit.contrast(ink, behind) * 100) / 100, chars,
+        });
+      }
+    }
     if (color[3] >= 0.999 && !code && !owner.closest("[contenteditable]") && !kit.disabled(owner)) addColor("text", hex(color), chars, owner);
   }
 
@@ -171,6 +217,7 @@ export function collectDesign(): DesignSample {
     controls: used("control"),
     surfaces: Array.from(surfaces, ([color, count]) => ({ color, count })),
     spacingUse: used("spacing"),
+    themeText,
     skipped,
   };
 }

@@ -37,7 +37,7 @@ const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE;
 const options = { urls: [url + "/bad"], checks: ["AP002", "AP003"], viewports: [{ width: 800, height: 600 }], executablePath };
 const run = (args) => promisify(execFile)(process.execPath, [cli, ...args], { timeout: 120000 }).then(r => ({ ...r, code: 0 }), error => error);
 try {
-  assert.deepEqual(checks.map(c => c.id), Array.from({ length: 33 }, (_, i) => "AP" + String(i + 1).padStart(3, "0")));
+  assert.deepEqual(checks.map(c => c.id), Array.from({ length: 34 }, (_, i) => "AP" + String(i + 1).padStart(3, "0")));
   const report = await auditAppearance(options);
   assert(report.findings.some(f => f.checkId === "AP003" && f.target === "#inner"));
   assert(report.findings.some(f => f.checkId === "AP002" && f.state === "hover"));
@@ -72,8 +72,9 @@ try {
   assert.equal(JSON.parse(disabled.stdout).findings.length, 0);
   assert.equal(disabled.code, 0);
   const listed = (await run(["--list"])).stdout.trim().split("\n");
-  assert.equal(listed.length, 33);
+  assert.equal(listed.length, 34);
   assert(listed.some(line => line.startsWith("AP033 design-tokens") && line.endsWith("(requires --design)")));
+  assert(listed.some(line => line.startsWith("AP034 theme-text-parity") && line.endsWith("(requires --color-scheme light --color-scheme dark)")));
   for (const line of listed) assert.match(line, /^AP\d{3} \S+ \[[a-z,]+; (normative|advisory)\] — /);
   const normativeConfig = join(dir, "normative.json");
   await writeFile(normativeConfig, JSON.stringify({ ...options, checks: ["AP002"] }));

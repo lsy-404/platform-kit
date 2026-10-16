@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { chromium } from "playwright";
 import type { BrowserContext, Page } from "playwright";
-import { checkInfo, defaultCheckIds, isCheckId } from "./catalog.js";
+import { checkInfo, defaultCheckIds, isCheckId, prerequisiteMet } from "./catalog.js";
 import { summarize } from "./summary.js";
 import { scanSurfaces } from "./surfaces.js";
 import { inspectLayout } from "./layout.js";
@@ -16,6 +16,8 @@ import { analyzeDesign, DESIGN_CHECKS } from "./metrics.js";
 import { inspectShapes } from "./shapes.js";
 import { inspectAlignment } from "./alignment.js";
 import { designBaseline, parseDesignMarkdown } from "./tokens.js";
+import { compareThemes } from "./theme.js";
+import type { ThemeText } from "./design.js";
 import type { DesignBaseline } from "./tokens.js";
 import { installKit } from "./kit.js";
 import { probeReflow, settlePage } from "./reflow.js";
@@ -30,7 +32,8 @@ export function validateOptions(options: AuditOptions): void {
   }
   if (options.checks?.some(id => !isCheckId(id))) throw new Error("Unknown check ID");
   if (options.design !== undefined && (typeof options.design === "string" ? !options.design.trim() : !options.design || typeof options.design !== "object" || Array.isArray(options.design))) throw new Error("Design must be a file path or a token object");
-  if (options.checks?.includes("AP033") && options.design === undefined) throw new Error("AP033 requires a design baseline (design option or --design)");
+  if (options.checks?.includes("AP033") && !prerequisiteMet(checkInfo("AP033"), options)) throw new Error("AP033 requires a design baseline (design option or --design)");
+  if (options.checks?.includes("AP034") && !prerequisiteMet(checkInfo("AP034"), options)) throw new Error("AP034 compares themes and requires both light and dark color schemes");
   if (options.viewports && (!options.viewports.length || options.viewports.some(v => !Number.isInteger(v.width) || !Number.isInteger(v.height) || v.width < 1 || v.height < 1))) throw new Error("Invalid viewport");
   if (options.colorSchemes !== undefined && (!Array.isArray(options.colorSchemes) || !options.colorSchemes.length || options.colorSchemes.some(scheme => scheme !== "light" && scheme !== "dark"))) throw new Error("Color schemes must be a non-empty array of light or dark");
   for (const ignore of options.ignores ?? []) {
@@ -77,6 +80,20 @@ export async function auditAppearance(options: AuditOptions): Promise<Report> {
   const browser = await chromium.launch({ headless: true, executablePath: options.executablePath });
   try {
     for (const url of options.urls) {
+      const themeText: Partial<Record<ColorScheme, ThemeText[]>> = {};
+      // Findings that come from a closed scan open a page on demand when an ignore needs its selector.
+      const onDemand = (viewport: Viewport, colorScheme: ColorScheme, extra: { reducedMotion?: "reduce" } = {}) => {
+        let context: BrowserContext | undefined;
+        let pagePromise: Promise<Page> | undefined;
+        const getPage = () => pagePromise ??= (async () => {
+          context = await browser.newContext({ viewport, colorScheme, ...extra, deviceScaleFactor: 1 });
+          const page = await context.newPage();
+          page.setDefaultTimeout(timeout);
+          await page.goto(url, { waitUntil: "load" });
+          return page;
+        })();
+        return { getPage, close: async () => { await context?.close(); } };
+      };
       // Ignore selectors are resolved on the page the finding came from; probes open one on demand.
       const adder = (viewport: Viewport, colorScheme: ColorScheme, getPage: () => Promise<Page>) => async (result: BrowserResult, state: State) => {
         for (const skipped of result.skipped) if (enabled.includes(skipped.checkId)) report.coverage.push({ ...skipped, page: url, viewport, colorScheme, state, level: "check" });
@@ -95,15 +112,7 @@ export async function auditAppearance(options: AuditOptions): Promise<Report> {
       };
       const runProbe = async (kind: "reflow" | "motion") => {
         const viewport = kind === "reflow" ? { width: 320, height: 640 } : firstVp;
-        let context: BrowserContext | undefined;
-        let pagePromise: Promise<Page> | undefined;
-        const getPage = () => pagePromise ??= (async () => {
-          context = await browser.newContext({ viewport, colorScheme: firstScheme, ...(kind === "motion" ? { reducedMotion: "reduce" as const } : {}), deviceScaleFactor: 1 });
-          const page = await context.newPage();
-          page.setDefaultTimeout(timeout);
-          await page.goto(url, { waitUntil: "load" });
-          return page;
-        })();
+        const { getPage, close } = onDemand(viewport, firstScheme, kind === "motion" ? { reducedMotion: "reduce" } : {});
         try {
           const { result, page } = kind === "reflow"
             ? await probeReflow(browser, url, firstScheme, { timeoutMs: timeout })
@@ -114,7 +123,7 @@ export async function auditAppearance(options: AuditOptions): Promise<Report> {
           } catch (error) {
             report.coverage.push({ page: url, viewport: page.viewport, colorScheme: firstScheme, state: "default", target: "document", checkId: kind === "reflow" ? "AP014" : "AP017", reason: String(error), level: "check" });
           }
-        } finally { await context?.close(); }
+        } finally { await close(); }
       };
       for (const viewport of viewports) for (const colorScheme of schemes) {
         const context = await browser.newContext({ viewport, colorScheme, deviceScaleFactor: 1 });
@@ -172,12 +181,14 @@ export async function auditAppearance(options: AuditOptions): Promise<Report> {
           }
           if (firstViewportScan) {
             try {
-              const design = analyzeDesign(await page.evaluate(collectDesign), baseline);
+              const sample = await page.evaluate(collectDesign);
+              themeText[colorScheme] = sample.themeText;
+              const design = analyzeDesign(sample, baseline);
               report.metrics.push({ page: url, viewport, colorScheme, ...design.metrics });
               for (const [dimension, list] of Object.entries(design.notes) as Array<[Dimension, string[]]>) for (const note of list) (notes[dimension] ??= new Set()).add(note);
               await add(design.drift, "default");
             } catch (error) {
-              const ids = DESIGN_CHECKS.filter(id => enabled.includes(id));
+              const ids = [...DESIGN_CHECKS, "AP034" as const].filter(id => enabled.includes(id));
               if (!ids.length) report.coverage.push({ page: url, viewport, colorScheme, state: "default", target: "document", reason: "Design metrics unavailable: " + String(error), level: "info" });
               for (const checkId of ids) report.coverage.push({ page: url, viewport, colorScheme, state: "default", target: "document", checkId, reason: String(error), level: "check" });
             }
@@ -196,6 +207,14 @@ export async function auditAppearance(options: AuditOptions): Promise<Report> {
         } finally {
           for (const { reason, level } of errors) report.coverage.push({ page: url, viewport, colorScheme, state: "default", target: "document", reason, level });
           await context.close();
+        }
+      }
+      if (enabled.includes("AP034")) {
+        if (themeText.light && themeText.dark) {
+          const { getPage, close } = onDemand(firstVp, "dark");
+          try { await adder(firstVp, "dark", getPage)(compareThemes(themeText.light, themeText.dark), "default"); } finally { await close(); }
+        } else if (themeText.light || themeText.dark) {
+          report.coverage.push({ page: url, viewport: firstVp, colorScheme: "dark", state: "default", target: "document", checkId: "AP034", reason: "Light and dark samples of the first viewport are both needed to compare themes", level: "check" });
         }
       }
       if (enabled.includes("AP014")) await runProbe("reflow");

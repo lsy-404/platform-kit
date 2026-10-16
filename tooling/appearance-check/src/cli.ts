@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { auditAppearance } from "./runner.js";
 import { checks, defaultCheckIds, isCheckId } from "./catalog.js";
+import type { CheckInfo } from "./types.js";
 import { formatReport } from "./format.js";
 import type { AuditOptions, CheckId } from "./types.js";
 
@@ -13,7 +14,7 @@ const help = `appearance-check --url http://localhost:5173 [options]
   --ignore-check AP003   Disable a check (repeatable)
   --design FILE         DESIGN.md (YAML front matter) or JSON tokens; enables AP033
   --viewport 390x844     Viewport (repeatable; default desktop + mobile)
-  --color-scheme light|dark  Emulate prefers-color-scheme (repeatable; default light)
+  --color-scheme light|dark  Emulate prefers-color-scheme (repeatable; default light; both enable AP034)
   --executable-path FILE Chromium executable; default Playwright Chromium
   --max-controls N      Hover/focus limit per page (default 40)
   --timeout N           Page timeout in milliseconds (default 15000)
@@ -24,6 +25,8 @@ const help = `appearance-check --url http://localhost:5173 [options]
   --list                List stable check IDs
 Exit: 0 clean or advisory-only, 1 invalid input or incomplete coverage, 2 normative findings (or warnings with --fail-on warn).`;
 
+const requirement: Record<NonNullable<CheckInfo["requires"]>, string> = { design: "--design", "both-schemes": "--color-scheme light --color-scheme dark" };
+
 try {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
     url: { type: "string", multiple: true }, config: { type: "string" }, checks: { type: "string" },
@@ -32,7 +35,7 @@ try {
     json: { type: "boolean" }, output: { type: "string" }, "warn-only": { type: "boolean" }, "fail-on": { type: "string" }, list: { type: "boolean" }, help: { type: "boolean", short: "h" },
   } });
   if (values.help) console.log(help);
-  else if (values.list) console.log(checks.map(check => `${check.id} ${check.name} [${check.dimensions.join(",")}; ${check.severity}] — ${check.description}${check.requires ? ` (requires --${check.requires})` : ""}`).join("\n"));
+  else if (values.list) console.log(checks.map(check => `${check.id} ${check.name} [${check.dimensions.join(",")}; ${check.severity}] — ${check.description}${check.requires ? ` (requires ${requirement[check.requires]})` : ""}`).join("\n"));
   else {
     if (values["fail-on"] !== undefined && values["fail-on"] !== "fail" && values["fail-on"] !== "warn") throw new Error("--fail-on must be fail or warn");
     const options: AuditOptions = values.config ? JSON.parse(await readFile(values.config, "utf8")) : { urls: [] };
@@ -46,10 +49,6 @@ try {
       if (ids.some(id => !isCheckId(id))) throw new Error("Unknown check ID in --checks");
       options.checks = ids as CheckId[];
     }
-    for (const id of values["ignore-check"] ?? []) {
-      if (!isCheckId(id)) throw new Error("Unknown check ID: " + id);
-      options.checks = (options.checks ?? defaultCheckIds(options)).filter(check => check !== id);
-    }
     if (values.viewport) options.viewports = values.viewport.map(value => {
       if (!/^\d+x\d+$/.test(value)) throw new Error("Viewport must be WIDTHxHEIGHT");
       const [width, height] = value.split("x").map(Number);
@@ -59,6 +58,10 @@ try {
       if (value !== "light" && value !== "dark") throw new Error("Color scheme must be light or dark");
       return value;
     });
+    for (const id of values["ignore-check"] ?? []) {
+      if (!isCheckId(id)) throw new Error("Unknown check ID: " + id);
+      options.checks = (options.checks ?? defaultCheckIds(options)).filter(check => check !== id);
+    }
     if (values["executable-path"]) options.executablePath = values["executable-path"];
     if (values["max-controls"]) options.maxControls = Number(values["max-controls"]);
     if (values.timeout) options.timeoutMs = Number(values.timeout);
