@@ -48,12 +48,21 @@ export interface ToastClock {
   clearTimeout(handle: unknown): void;
 }
 
-export interface ToastStoreOptions {
+export interface ToastSettings {
   /** Default display time; errors default to `errorDuration`. */
   duration?: number;
   errorDuration?: number;
   /** Oldest timed toasts are dropped beyond this count. */
   limit?: number;
+  /**
+   * Clock rate while the window is unfocused or hidden: `false` keeps 1,
+   * `true` uses 0.5, a number sets the rate. Focused windows always run at 1.
+   */
+  unfocusedRate?: boolean | number;
+}
+
+export interface ToastStoreOptions extends ToastSettings {
+  /** Replaces the default attention policy, including `unfocusedRate`. */
   rate?: (attention: ToastAttention) => number;
   clock?: ToastClock;
 }
@@ -73,6 +82,8 @@ export interface ToastStore {
   /** Clock rate currently applied to all timed toasts. */
   rate(): number;
   setAttention(patch: Partial<ToastAttention>): void;
+  /** Changes defaults for later toasts and the unfocused rate for all timed ones. */
+  configure(settings: ToastSettings): void;
   runAction(id: number, action: ToastAction): void;
   info(message: string, title?: string): number;
   success(message: string, title?: string): number;
@@ -95,21 +106,30 @@ const systemClock: ToastClock = {
   clearTimeout: (handle) => globalThis.clearTimeout(handle as ReturnType<typeof setTimeout>),
 };
 
+export function unfocusedRateOf(setting: boolean | number | undefined): number {
+  if (setting === true) return 0.5;
+  if (typeof setting === "number" && Number.isFinite(setting) && setting >= 0) return setting;
+  return 1;
+}
+
 /**
- * Attentive viewers burn through display time faster; unattended toasts linger
- * so they are still there when the viewer returns.
+ * Engaged stacks pause. With `unfocusedRate` enabled, toasts left in a
+ * background window run slower so they are still there when the viewer returns.
  */
-export function defaultToastRate(attention: ToastAttention): number {
+export function defaultToastRate(attention: ToastAttention, unfocusedRate: boolean | number = false): number {
   if (attention.engaged) return 0;
-  return attention.focused ? 2 : 1;
+  return attention.focused ? 1 : unfocusedRateOf(unfocusedRate);
 }
 
 export function createToastStore(options: ToastStoreOptions = {}): ToastStore {
   const clock = options.clock ?? systemClock;
-  const rateOf = options.rate ?? defaultToastRate;
-  const baseDuration = options.duration ?? 3000;
-  const errorDuration = options.errorDuration ?? 5000;
-  const limit = Math.max(1, options.limit ?? 5);
+  const settings: Required<ToastSettings> = {
+    duration: options.duration ?? 3000,
+    errorDuration: options.errorDuration ?? 5000,
+    limit: Math.max(1, options.limit ?? 5),
+    unfocusedRate: options.unfocusedRate ?? false,
+  };
+  const rateOf = options.rate ?? ((state: ToastAttention) => defaultToastRate(state, settings.unfocusedRate));
   const listeners = new Set<() => void>();
   let entries: Entry[] = [];
   let view: readonly Toast[] = [];
@@ -144,7 +164,7 @@ export function createToastStore(options: ToastStoreOptions = {}): ToastStore {
 
   // The newest toast always survives; older timed toasts go before sticky ones.
   const trim = () => {
-    while (entries.length > limit) {
+    while (entries.length > settings.limit) {
       const older = entries.slice(0, -1);
       const victim = older.find((entry) => entry.toast.duration > 0) ?? older[0];
       if (!victim) return;
@@ -162,7 +182,7 @@ export function createToastStore(options: ToastStoreOptions = {}): ToastStore {
         createdAt: now,
         message,
         kind,
-        duration: input.duration ?? (kind === "error" ? errorDuration : baseDuration),
+        duration: input.duration ?? (kind === "error" ? settings.errorDuration : settings.duration),
         actions: input.actions ?? [],
         ...(input.title === undefined ? {} : { title: input.title }),
       },
@@ -201,6 +221,24 @@ export function createToastStore(options: ToastStoreOptions = {}): ToastStore {
 
   function setAttention(patch: Partial<ToastAttention>): void {
     attention = { ...attention, ...patch };
+    applyRate();
+  }
+
+  function configure(patch: ToastSettings): void {
+    if (patch.duration !== undefined) settings.duration = patch.duration;
+    if (patch.errorDuration !== undefined) settings.errorDuration = patch.errorDuration;
+    if (patch.unfocusedRate !== undefined) settings.unfocusedRate = patch.unfocusedRate;
+    if (patch.limit !== undefined) {
+      settings.limit = Math.max(1, patch.limit);
+      const before = entries.length;
+      trim();
+      if (entries.length !== before) emit();
+    }
+    applyRate();
+  }
+
+  // A rate change banks each toast's elapsed time before the new rate applies.
+  function applyRate(): void {
     const rate = Math.max(0, rateOf(attention));
     if (rate === currentRate) return;
     const now = clock.now();
@@ -239,6 +277,7 @@ export function createToastStore(options: ToastStoreOptions = {}): ToastStore {
     progress,
     rate: () => currentRate,
     setAttention,
+    configure,
     runAction,
     info: (message, title) => push(message, { kind: "info", ...(title === undefined ? {} : { title }) }),
     success: (message, title) => push(message, { kind: "success", ...(title === undefined ? {} : { title }) }),

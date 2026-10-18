@@ -4,6 +4,7 @@ import {
   createToastStore,
   defaultToastRate,
   toastAnnouncement,
+  unfocusedRateOf,
   type ToastAttention,
   type ToastClock,
 } from "../styles/toast/src/core.js";
@@ -149,20 +150,62 @@ describe("toast store", () => {
 
 describe("default toast rate", () => {
   it("never runs backwards", () => {
-    for (const focused of [true, false])
-      for (const engaged of [true, false])
-        expect(defaultToastRate({ focused, engaged })).toBeGreaterThanOrEqual(0);
+    for (const setting of [false, true, 0.25, -1, Number.NaN])
+      for (const focused of [true, false])
+        for (const engaged of [true, false])
+          expect(defaultToastRate({ focused, engaged }, setting)).toBeGreaterThanOrEqual(0);
   });
 
   it("pauses while the stack is engaged", () => {
     expect(defaultToastRate({ focused: true, engaged: true })).toBe(0);
-    expect(defaultToastRate({ focused: false, engaged: true })).toBe(0);
+    expect(defaultToastRate({ focused: false, engaged: true }, true)).toBe(0);
   });
 
-  it("runs faster for an attentive viewer than for an absent one", () => {
-    expect(defaultToastRate({ focused: true, engaged: false })).toBeGreaterThan(
-      defaultToastRate({ focused: false, engaged: false }),
-    );
+  it("ignores focus by default", () => {
+    expect(defaultToastRate({ focused: true, engaged: false })).toBe(1);
+    expect(defaultToastRate({ focused: false, engaged: false })).toBe(1);
+  });
+
+  it("halves the unfocused rate when enabled and accepts a custom rate", () => {
+    expect(defaultToastRate({ focused: true, engaged: false }, true)).toBe(1);
+    expect(defaultToastRate({ focused: false, engaged: false }, true)).toBe(0.5);
+    expect(defaultToastRate({ focused: false, engaged: false }, 0.25)).toBe(0.25);
+    expect(unfocusedRateOf(-1)).toBe(1);
+    expect(unfocusedRateOf(Number.NaN)).toBe(1);
+  });
+
+  it("stretches display time in a background window when configured", () => {
+    const { clock, advance } = manualClock();
+    const store = createToastStore({ clock, unfocusedRate: true });
+    store.info("Away");
+    advance(3000);
+    expect(store.snapshot()).toHaveLength(1);
+    advance(3000);
+    expect(store.snapshot()).toHaveLength(0);
+  });
+
+  it("reconfigures a live store without losing elapsed time", () => {
+    const { clock, advance } = manualClock();
+    const store = createToastStore({ clock });
+    const id = store.info("Shared");
+    advance(1500);
+    store.configure({ unfocusedRate: 0.25, duration: 1000 });
+    expect(store.rate()).toBe(0.25);
+    expect(store.progress(id)).toBeCloseTo(0.5);
+    advance(5999);
+    expect(store.snapshot()).toHaveLength(1);
+    advance(1);
+    expect(store.snapshot()).toHaveLength(0);
+    store.info("Shorter");
+    expect(store.snapshot()[0]?.duration).toBe(1000);
+  });
+
+  it("trims immediately when the limit shrinks", () => {
+    const { clock } = manualClock();
+    const store = createToastStore({ clock });
+    for (const message of ["A", "B", "C"]) store.info(message);
+    store.configure({ limit: 1 });
+    expect(store.snapshot().map((toast) => toast.message)).toEqual(["C"]);
   });
 });
 

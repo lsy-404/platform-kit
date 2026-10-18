@@ -43,7 +43,11 @@ const id = toast.push("Restarting in 10 s", {
 toast.update(id, { message: "Restarting in 9 s" });
 ```
 
-Inside components `useToast()` returns the injected store (or the shared one).
+Inside components `useToast()` returns the injected store (or the shared one). To let toasts in a background window linger, enable the unfocused rate once at startup:
+
+```ts
+toast.configure({ unfocusedRate: true }); // 0.5× while unfocused; or a number such as 0.25
+```
 
 ## Without Vue
 
@@ -75,8 +79,10 @@ Copy `dist/toast.browser.js` and `dist/toast.css` from the release archive into 
 
 ## Behavior
 
-- `duration` is the display time in milliseconds at the idle rate. It defaults to 3000, 5000 for `error`; `0` keeps the toast until it is closed.
-- The clock rate follows attention through `rate(attention)`. `focused` tracks page visibility and window focus; `engaged` is true while the pointer or keyboard focus is inside the stack. A rate change keeps elapsed time and reschedules every timer. Replace the policy with `createToastStore({ rate })`.
+- `duration` is the display time in milliseconds at rate 1. It defaults to 3000, 5000 for `error`; `0` keeps the toast until it is closed.
+- Timers pause while the pointer or keyboard focus is inside the stack.
+- `unfocusedRate` sets the clock rate while the window is unfocused or hidden: `false` (default) keeps 1, `true` uses 0.5, and a number sets the rate. Focused windows always run at 1. A rate change keeps elapsed time and reschedules every timer.
+- `createToastStore({ unfocusedRate, duration, errorDuration, limit })` sets these per store; `toast.configure({ ... })` changes the shared store at runtime. `createToastStore({ rate })` replaces the whole attention policy.
 - Past `limit` (default 5) the oldest timed toast goes first, then the oldest sticky one; the newest toast always stays.
 - An action dismisses its toast after running unless it sets `keepOpen: true`.
 - `error` toasts use `role="alert"` and `aria-live="assertive"`; other kinds use `role="status"` and `aria-live="polite"`.
@@ -94,7 +100,7 @@ Copy `dist/toast.browser.js` and `dist/toast.css` from the release archive into 
 | `theme` | `"system"` | `light`, `dark`, `system` |
 | `label`, `closeLabel` | English | Pass localized text from the host app |
 | `timestamp` | `true` | Shows the creation time |
-| `observeWindow` | `true` | Tracks window focus and page visibility |
+| `observeWindow` | `true` | Tracks window focus and page visibility for `unfocusedRate` |
 
 ## Theming
 
