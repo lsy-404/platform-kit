@@ -5,6 +5,7 @@ on:
     tags:
       - 'fluent-v*'
       - 'ui-tokens-v*'
+      - 'toast-v*'
       - 'appearance-check-v*'
       - 'visual-center-v*'
       - 'model-auth-core-v*'
@@ -44,6 +45,7 @@ jobs:
       - run: node test/fluent-catalog.browser.mjs
       - run: node test/fluent-dark.browser.mjs
       - run: node test/connection-panel.browser.mjs
+      - run: node test/toast-dom.browser.mjs
       - run: pnpm run pack:release
       - run: node test/release-consumer.mjs
       - run: node --test test/appearance-consumer.mjs
@@ -78,6 +80,7 @@ jobs:
             visual-center-v*) PACKAGE_DIR="platform-kit-visual-center"; PACKAGE_LABEL="@platform-kit/visual-center" ;;
             appearance-check-v*) PACKAGE_DIR="platform-kit-appearance-check"; PACKAGE_LABEL="@platform-kit/appearance-check" ;;
             ui-tokens-v*) PACKAGE_DIR="platform-kit-ui-tokens"; PACKAGE_LABEL="@platform-kit/ui-tokens" ;;
+            toast-v*) PACKAGE_DIR="platform-kit-toast"; PACKAGE_LABEL="@platform-kit/toast" ;;
             model-auth-core-v*) PACKAGE_DIR="model-auth-core"; PACKAGE_LABEL="@model-auth/core" ;;
             model-auth-providers-v*) PACKAGE_DIR="model-auth-providers"; PACKAGE_LABEL="@model-auth/providers" ;;
             model-auth-vue-v*) PACKAGE_DIR="model-auth-vue"; PACKAGE_LABEL="@model-auth/vue" ;;

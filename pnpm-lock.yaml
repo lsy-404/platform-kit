@@ -56,6 +56,16 @@ importers:
         specifier: 0.28.2
         version: 0.28.2
 
+  styles/toast:
+    dependencies:
+      vue:
+        specifier: ^3.5.0
+        version: 3.5.42(typescript@5.9.3)
+    devDependencies:
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
+
   styles/ui-tokens: {}
 
   tooling/appearance-check:

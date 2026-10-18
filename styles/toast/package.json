@@ -1,0 +1,50 @@
+{
+  "name": "@platform-kit/toast",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Apache-2.0 toast store with focus-aware timing, a Vue host and a framework-free host.",
+  "license": "Apache-2.0",
+  "files": [
+    "dist",
+    "README.md",
+    "NOTICE",
+    "LICENSE"
+  ],
+  "sideEffects": [
+    "**/*.css",
+    "./dist/browser.js",
+    "./dist/toast.browser.js"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./vue": {
+      "types": "./dist/vue.d.ts",
+      "import": "./dist/vue.js"
+    },
+    "./dom": {
+      "types": "./dist/dom.d.ts",
+      "import": "./dist/dom.js"
+    },
+    "./browser": "./dist/toast.browser.js",
+    "./style.css": "./dist/toast.css"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node build.mjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.0"
+  },
+  "peerDependenciesMeta": {
+    "vue": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

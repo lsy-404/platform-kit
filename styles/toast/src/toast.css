@@ -1,0 +1,221 @@
+/* Override any --pk-toast-* variable on .pk-toast-host; defaults have zero specificity. */
+:where(.pk-toast-host) {
+  color-scheme: dark;
+  --pk-toast-surface: #1b1b19;
+  --pk-toast-border: rgba(250, 249, 245, 0.14);
+  --pk-toast-border-hover: rgba(250, 249, 245, 0.22);
+  --pk-toast-text: rgba(250, 249, 245, 0.9);
+  --pk-toast-text-strong: #faf9f5;
+  --pk-toast-text-mute: rgba(250, 249, 245, 0.74);
+  --pk-toast-text-faint: rgba(250, 249, 245, 0.54);
+  --pk-toast-hover-fill: rgba(250, 249, 245, 0.06);
+  --pk-toast-info: #7dd3fc;
+  --pk-toast-success: #86efac;
+  --pk-toast-warning: #fbbf24;
+  --pk-toast-error: #f87171;
+  --pk-toast-accent: #4cc2ff;
+  --pk-toast-accent-text: #003544;
+  --pk-toast-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.24);
+  --pk-toast-radius: 6px;
+  --pk-toast-width: 280px;
+  --pk-toast-offset: 18px;
+  --pk-toast-gap: 10px;
+  --pk-toast-z: 300;
+  --pk-toast-font: "Segoe UI Variable", "Segoe UI", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --pk-toast-font-mono: "JetBrains Mono", Consolas, "PingFang SC", "Microsoft YaHei", "Courier New", monospace;
+  --pk-toast-enter: 250ms cubic-bezier(0, 0, 0, 1);
+  --pk-toast-leave: 150ms cubic-bezier(1, 0, 1, 1);
+  --pk-toast-move: 200ms cubic-bezier(0.55, 0, 0, 1);
+}
+
+:where(.pk-toast-host[data-pk-toast-theme="light"]) {
+  color-scheme: light;
+  --pk-toast-surface: #fdfcfa;
+  --pk-toast-border: rgba(20, 20, 19, 0.15);
+  --pk-toast-border-hover: rgba(20, 20, 19, 0.24);
+  --pk-toast-text: rgba(20, 20, 19, 0.92);
+  --pk-toast-text-strong: #141413;
+  --pk-toast-text-mute: rgba(20, 20, 19, 0.72);
+  --pk-toast-text-faint: rgba(20, 20, 19, 0.6);
+  --pk-toast-hover-fill: rgba(20, 20, 19, 0.05);
+  --pk-toast-info: #0369a1;
+  --pk-toast-success: #067647;
+  --pk-toast-warning: #a15c07;
+  --pk-toast-error: #b42318;
+  --pk-toast-accent: #0067c0;
+  --pk-toast-accent-text: #ffffff;
+  --pk-toast-shadow: 0 1px 2px rgba(20, 20, 19, 0.05), 0 2px 8px rgba(20, 20, 19, 0.06);
+}
+
+@media (prefers-color-scheme: light) {
+  :where(.pk-toast-host[data-pk-toast-theme="system"]) {
+    color-scheme: light;
+    --pk-toast-surface: #fdfcfa;
+    --pk-toast-border: rgba(20, 20, 19, 0.15);
+    --pk-toast-border-hover: rgba(20, 20, 19, 0.24);
+    --pk-toast-text: rgba(20, 20, 19, 0.92);
+    --pk-toast-text-strong: #141413;
+    --pk-toast-text-mute: rgba(20, 20, 19, 0.72);
+    --pk-toast-text-faint: rgba(20, 20, 19, 0.6);
+    --pk-toast-hover-fill: rgba(20, 20, 19, 0.05);
+    --pk-toast-info: #0369a1;
+    --pk-toast-success: #067647;
+    --pk-toast-warning: #a15c07;
+    --pk-toast-error: #b42318;
+    --pk-toast-accent: #0067c0;
+    --pk-toast-accent-text: #ffffff;
+    --pk-toast-shadow: 0 1px 2px rgba(20, 20, 19, 0.05), 0 2px 8px rgba(20, 20, 19, 0.06);
+  }
+}
+
+.pk-toast-host {
+  -webkit-app-region: no-drag;
+  position: fixed;
+  z-index: var(--pk-toast-z);
+  display: flex;
+  flex-direction: column;
+  gap: var(--pk-toast-gap);
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+}
+.pk-toast-host > * { pointer-events: auto; }
+.pk-toast-host[data-placement^="bottom"] { bottom: var(--pk-toast-offset); }
+.pk-toast-host[data-placement^="top"] { top: var(--pk-toast-offset); flex-direction: column-reverse; }
+.pk-toast-host[data-placement$="end"] { right: var(--pk-toast-offset); align-items: flex-end; }
+.pk-toast-host[data-placement$="start"] { left: var(--pk-toast-offset); align-items: flex-start; }
+.pk-toast-host[data-placement$="center"] { left: 50%; transform: translateX(-50%); align-items: center; }
+
+.pk-toast {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: min(var(--pk-toast-width), calc(100vw - 2 * var(--pk-toast-offset)));
+  min-height: 72px;
+  max-height: 220px;
+  overflow: hidden;
+  padding: 14px 16px 18px;
+  border: 1px solid var(--pk-toast-border);
+  border-radius: var(--pk-toast-radius);
+  color: var(--pk-toast-text);
+  background: var(--pk-toast-surface);
+  /* The left wedge carries the status colour. */
+  box-shadow: var(--pk-toast-shadow), inset 3px 0 0 var(--pk-toast-tone);
+  font-family: var(--pk-toast-font);
+  --pk-toast-tone: var(--pk-toast-info);
+}
+.pk-toast--success { --pk-toast-tone: var(--pk-toast-success); }
+.pk-toast--warning { --pk-toast-tone: var(--pk-toast-warning); }
+.pk-toast--error { --pk-toast-tone: var(--pk-toast-error); }
+
+.pk-toast__close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--pk-toast-radius);
+  color: var(--pk-toast-text-faint);
+  background: transparent;
+  cursor: pointer;
+}
+.pk-toast__close:hover { color: var(--pk-toast-text-strong); background: var(--pk-toast-hover-fill); }
+.pk-toast__close:focus-visible,
+.pk-toast__action:focus-visible { outline: 2px solid var(--pk-toast-accent); outline-offset: 1px; }
+
+.pk-toast__title {
+  margin-bottom: 6px;
+  padding-right: 18px;
+  color: var(--pk-toast-text-strong);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.012em;
+  text-transform: uppercase;
+}
+.pk-toast:not(.pk-toast--info) .pk-toast__title { color: var(--pk-toast-tone); }
+
+.pk-toast__message {
+  display: -webkit-box;
+  flex: 1;
+  overflow: hidden;
+  padding-right: 18px;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+.pk-toast__title + .pk-toast__message { padding-right: 0; }
+
+.pk-toast__actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.pk-toast__action {
+  padding: 3px 10px;
+  border: 1px solid var(--pk-toast-border);
+  border-radius: var(--pk-toast-radius);
+  color: var(--pk-toast-text-mute);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.pk-toast__action:hover { border-color: var(--pk-toast-border-hover); color: var(--pk-toast-text); }
+.pk-toast__action--primary {
+  border-color: var(--pk-toast-accent);
+  color: var(--pk-toast-accent-text);
+  background: var(--pk-toast-accent);
+  font-weight: 500;
+}
+.pk-toast__action--primary:hover { color: var(--pk-toast-accent-text); opacity: 0.85; }
+
+.pk-toast__stamp {
+  align-self: flex-end;
+  margin-top: 4px;
+  color: var(--pk-toast-text-faint);
+  font-family: var(--pk-toast-font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.012em;
+}
+
+.pk-toast__bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--pk-toast-tone);
+  transform-origin: left;
+  transition: transform 100ms linear;
+}
+.pk-toast--info .pk-toast__bar { background: var(--pk-toast-text-strong); }
+
+.pk-toast-enter-active {
+  transition: transform var(--pk-toast-enter), opacity 167ms linear;
+}
+.pk-toast-leave-active {
+  position: absolute;
+  pointer-events: none;
+  transition: transform var(--pk-toast-leave), opacity var(--pk-toast-leave);
+}
+.pk-toast-move { transition: transform var(--pk-toast-move); }
+.pk-toast-enter-from,
+.pk-toast-leave-to { opacity: 0; transform: translateX(32px); }
+.pk-toast-host[data-placement$="start"] :is(.pk-toast-enter-from, .pk-toast-leave-to) { transform: translateX(-32px); }
+.pk-toast-host[data-placement="top-center"] :is(.pk-toast-enter-from, .pk-toast-leave-to) { transform: translateY(-16px); }
+.pk-toast-host[data-placement="bottom-center"] :is(.pk-toast-enter-from, .pk-toast-leave-to) { transform: translateY(16px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .pk-toast-enter-active,
+  .pk-toast-leave-active,
+  .pk-toast-move { transition: opacity 120ms linear; }
+  .pk-toast-host .pk-toast-enter-from,
+  .pk-toast-host .pk-toast-leave-to { transform: none; }
+  .pk-toast__bar { transition: none; }
+}

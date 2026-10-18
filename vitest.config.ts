@@ -1,2 +1,2 @@
 import { defineConfig } from "vitest/config";
-export default defineConfig({ test: { include: ["test/fluent-*.test.ts", "test/visual-center.test.ts"] } });
+export default defineConfig({ test: { include: ["test/fluent-*.test.ts", "test/visual-center.test.ts", "test/toast.test.ts"] } });

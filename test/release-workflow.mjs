@@ -11,5 +11,7 @@ assert.match(workflow, /awk -v package_dir="\$PACKAGE_DIR"/);
 assert.match(workflow, /sha256sum "\$archive"/);
 
 assert.match(workflow, /appearance-check-v\*\) PACKAGE_DIR="platform-kit-appearance-check"/);
+assert.match(workflow, /- 'toast-v\*'/);
+assert.match(workflow, /toast-v\*\) PACKAGE_DIR="platform-kit-toast"/);
 
 console.log('Package release workflow locates and validates artifacts independent of download layout.');
