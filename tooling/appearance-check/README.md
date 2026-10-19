@@ -42,7 +42,7 @@
 | AP032 | 等宽数字 | 排版 | 建议 | 表格数字列按实际渲染使用比例数字，数值无法对齐、变化时宽度跳动 | https://www.w3.org/TR/css-fonts-4/#font-variant-numeric-prop |
 | AP033 | 设计令牌 | 颜色、布局、排版 | 建议 | 渲染出的颜色、字号、字重、圆角、间距不在提供的 DESIGN.md 基线中；仅在提供基线时运行 | https://stitch.withgoogle.com/docs/design-md/overview/ |
 | AP034 | 明暗字形补偿 | 排版 | 建议 | 深色主题中变为浅字深底的文字没有略微缩小字号、降低字重或 grade，看起来比浅色主题更大更粗；仅在同时检查浅色与深色时运行 | https://fonts.google.com/knowledge/glossary/grade |
-| AP035 | 界面 emoji | 可访问性、排版 | 建议 | 控件、链接、标题、标签、页签、菜单项、选项、表头与状态提示的文字或 `aria-label` 中的 emoji（含关闭的菜单与对话框，`aria-hidden` 除外）；正文与普通容器不检查（1.1.1） | https://www.w3.org/WAI/WCAG22/Understanding/non-text-content.html |
+| AP035 | emoji 与图形符号 | 可访问性、排版 | 建议 | 页面任何位置（界面、正文、美术、属性、生成内容、标题）的 emoji 与图形符号，各平台绘制不同；唯一豁免是 ©、®、™ 的文本用法 | https://www.unicode.org/reports/tr51/ |
 
 性质为“规范”的检查对应 WCAG 2.2 A/AA 要求，发现问题使其所在维度失败；“建议”是美学规则、AAA 准则或最佳实践，最多使所在维度给出警告。AP003–AP008、AP017–AP023、AP024–AP032 与 AP034 根据渲染证据推断设计意图；AP033 只与使用者提供的令牌比较。AP007 测量绘制边界中心，不能等同于人眼的知觉中心。颜色检查关注可读性；品牌配色是否合适、内容是否美观不属于确定性判断。工具无法可靠测量时记录覆盖缺口，而不是猜测。不使用 APCA：`apca-w3` 的许可与 Apache-2.0 不兼容。
 
@@ -158,19 +158,19 @@ spacing:
 
 AP034 需要 `--color-scheme light --color-scheme dark`（或 `colorSchemes: ["light", "dark"]`）。同时检查两种主题时默认启用，只检查一种主题时显式指定 AP034 属于输入错误。
 
-## 界面 emoji（AP035）
+## emoji 与图形符号（AP035）
 
-按钮、菜单、标题里的装饰 emoji 会被读屏软件念出名称（“软盘 存档”“购物车 商店”），各平台的 emoji 字体也让同一界面的字形、颜色和基线不一致。AP035 在首个视口与首个主题检查整份文档（不限于首屏），每个元素最多报告一次，全页最多 40 条：
+emoji 和图形符号由各平台自己的字体绘制：同一个字符在 Windows、macOS、Android、iOS 上形状、颜色、粗细和基线都不同，部分设备还会显示成方框；放在按钮、菜单、标题里还会被读屏软件念出名称（“软盘 存档”）。因此 AP035 不区分界面文字、正文还是美术，整份文档里出现的都报告，需要图形时改用 SVG 或图片。在首个视口与首个主题检查整份文档（不限于首屏），每个元素最多报告一次，全页最多 40 条：
 
 | 项目 | 规则 |
 | --- | --- |
-| 检查的文字 | `button`、`a[href]`、`summary`、`label`、`legend`、`caption`、`th`、`option`、`h1`–`h6`，以及 `role` 为 button、link、tab、menuitem（含 checkbox / radio）、option、heading、switch、checkbox、radio、treeitem、columnheader、rowheader、status、alert、tooltip 的元素；这些元素的 `aria-label` 与按钮型 `input` 的 `value` |
-| 归属 | 文字归最近的上述元素，嵌套控件只算一次 |
-| emoji | 按 Unicode UTS #51 的呈现方式：默认 emoji 呈现的字符、带 VS16（U+FE0F）的序列、ZWJ 组合、肤色、国旗与键帽；©、™、→、✓、★、⚙ 等默认文本呈现的符号不计，VS15（U+FE0E）始终按文本处理 |
-| 当前不可见 | 关闭的菜单与对话框、`hidden` 或 `display:none` 的控件同样检查（打开后会显示、会被朗读），证据中 `rendered: false`；可见控件里被单独隐藏的片段不计 |
-| 不报告 | `aria-hidden="true"` 或 `inert` 内的文字、带名称的 `role="img"`（`aria-label` / `aria-labelledby`），以及正文段落、列表、普通容器里的 emoji（内容或美术） |
+| 字符 | emoji（`\p{Extended_Pictographic}`、国旗、键帽，含 VS16、肤色与 ZWJ 组合），以及字体常当作图画绘制的符号区块：箭头（U+2190–21FF、27F0–27FF、2900–297F、2B00–2BFF、1F800–1F8FF）、杂项技术符号（U+2300–23FF）、几何图形、杂项符号与装饰符号（U+25A0–27BF）。→、⚙、✓、★、●、▶、⌘ 都计入，VS15（U+FE0E）不豁免 |
+| 唯一豁免 | ©、®、™ 作为普通文本标记（不带 VS16）。×、°、·、引号与省略号等标点和数学符号不在上述区块内，不报告 |
+| 来源 | 文本、`aria-label`、`placeholder`、`title`、按钮型 `input` 的 `value`、`::before` / `::after` 生成内容，以及文档标题 |
+| 归属 | 文字归最近的界面元素（按钮、链接、标题、标签、页签、菜单项、选项、状态等），否则归文字所在元素；嵌套控件只算一次 |
+| 可见性 | 关闭的菜单与对话框、`hidden`、`display:none` 的内容同样检查，证据 `rendered` 表示当前是否显示；`aria-hidden`、`inert` 与带名称的 `role="img"` 不豁免——对读屏隐藏不改变字形在各设备上的差异 |
 
-修复方式：装饰性的 emoji 用 `<span aria-hidden="true">` 包住或直接去掉，需要图形时换成带 `aria-hidden` 的 SVG 图标；确实承载含义的 emoji 写成 `<span role="img" aria-label="…">`。游戏或内容区域把 emoji 当作美术时不在检查范围内；需要在控件里保留时，用忽略配置按选择器排除。
+修复方式：界面图形换成 SVG 图标（装饰性的加 `aria-hidden`），美术换成图片或 SVG；纯装饰的符号直接去掉。确实需要保留时，用忽略配置按选择器排除。
 
 ## 安装与参数模式
 
@@ -252,7 +252,7 @@ const report = await auditAppearance({
 - AP031 只检查 8–32 px、非绝对定位的图标与单行标签；AP032 只检查表格（`table`、`role=table/grid/treegrid`）中的数字列。
 - 漂移与网格检查根据页面自身的常用值推断刻度，页面样本很少时可能不报告；需要固定刻度时使用 DESIGN.md 基线。
 - AP034 只比较首个视口中两种主题都可见、DOM 路径与文字相同的元素，每种主题最多 800 个；主题间增删节点的页面只比较能配对的部分。
-- AP035 按字符属性判断 emoji，不检查字体实际怎样绘制：默认文本呈现的符号在缺字形时可能由 emoji 字体代绘，这种情况不会报告；`::before` / `::after` 生成的内容与 `title`、`placeholder` 属性不在检查范围内。
+- AP035 按字符与 Unicode 区块判断，不检查实际选中的字体：区块外的字符即使由 emoji 字体代绘也不会报告；`::before` / `::after` 只读取引号内的字面内容，`attr()`、计数器与图片不在范围内；Shadow DOM 与 iframe 内的文字不检查。
 
 ## 在仓库中构建
 

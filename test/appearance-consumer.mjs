@@ -27,7 +27,7 @@ test("current appearance archive installs with CLI, typed reports and Vite 8 bui
     assert.match(list, /AP008 surface-layering/);
     assert.match(list, /AP023 font-load-failure \[typography; advisory\] — /);
     assert.match(list, /AP033 design-tokens \[color,layout,typography; advisory\] — .*\(requires --design\)/);
-    assert.match(list, /AP035 interface-emoji \[accessibility,typography; advisory\] — /);
+    assert.match(list, /AP035 emoji-symbols \[accessibility,typography; advisory\] — /);
     await writeFile(join(root, "consumer.ts"), `import {defineConfig} from 'vite';
       import {appearanceCheck} from '@platform-kit/appearance-check/vite';
       import {summarize} from '@platform-kit/appearance-check';
