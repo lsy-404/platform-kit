@@ -3,7 +3,7 @@ export type CheckId =
   | "AP009" | "AP010" | "AP011" | "AP012" | "AP013" | "AP014" | "AP015" | "AP016"
   | "AP017" | "AP018" | "AP019" | "AP020" | "AP021" | "AP022" | "AP023" | "AP024"
   | "AP025" | "AP026" | "AP027" | "AP028" | "AP029" | "AP030" | "AP031" | "AP032"
-  | "AP033" | "AP034";
+  | "AP033" | "AP034" | "AP035";
 export type Dimension = "accessibility" | "color" | "layout" | "typography";
 export type Severity = "normative" | "advisory";
 export type Verdict = "fail" | "warn" | "incomplete" | "pass" | "not-run";

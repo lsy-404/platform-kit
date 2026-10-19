@@ -27,6 +27,7 @@ test("current appearance archive installs with CLI, typed reports and Vite 8 bui
     assert.match(list, /AP008 surface-layering/);
     assert.match(list, /AP023 font-load-failure \[typography; advisory\] — /);
     assert.match(list, /AP033 design-tokens \[color,layout,typography; advisory\] — .*\(requires --design\)/);
+    assert.match(list, /AP035 interface-emoji \[accessibility,typography; advisory\] — /);
     await writeFile(join(root, "consumer.ts"), `import {defineConfig} from 'vite';
       import {appearanceCheck} from '@platform-kit/appearance-check/vite';
       import {summarize} from '@platform-kit/appearance-check';
@@ -49,7 +50,7 @@ test("current appearance archive installs with CLI, typed reports and Vite 8 bui
       import {checks,summarize} from '@platform-kit/appearance-check';
       import {appearanceCheck} from '@platform-kit/appearance-check/vite';
       import {build,createLogger} from 'vite';
-      assert.equal(checks.length,34);
+      assert.equal(checks.length,35);
       assert.equal(typeof summarize,'function');
       const messages=[]; const logger=createLogger('silent'); logger.warn=m=>messages.push(m); let report;
       await build({root:process.cwd(),configFile:false,customLogger:logger,plugins:[appearanceCheck({checks:['AP001','AP003'],colorSchemes:['light','dark'],viewports:[{width:800,height:600}],executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE,onReport(value){report=value;}})]});

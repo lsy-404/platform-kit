@@ -10,6 +10,7 @@ import { discoverControls, runInteractions } from "./interaction.js";
 import { inspectNonText } from "./nontext.js";
 import { inspectRhythm } from "./rhythm.js";
 import { inspectFonts, inspectTypography } from "./typography.js";
+import { inspectEmoji } from "./emoji.js";
 import { checkTextSpacing } from "./text-spacing.js";
 import { collectDesign } from "./design.js";
 import { analyzeDesign, DESIGN_CHECKS } from "./metrics.js";
@@ -196,6 +197,7 @@ export async function auditAppearance(options: AuditOptions): Promise<Report> {
           if (firstSchemeScan && firstViewportScan) {
             await step(["AP011", "AP018"], async () => add(await inspectDocumentAxe(page, enabled), "default"));
             await step(["AP023"], async () => add(await page.evaluate(inspectFonts), "default"));
+            await step(["AP035"], async () => add(await page.evaluate(inspectEmoji, enabled), "default"));
           }
           const controls = await page.evaluate(discoverControls);
           entry.controls = controls.length;
