@@ -244,6 +244,30 @@ describe("UsageGate scheduler", () => {
     expect(await manual).toMatchObject({ ran: false, retryAt: 1000 });
   });
 
+  it("cleans a provider wait after sleep throws synchronously", async () => {
+    let time = 10;
+    let throwOnce = true;
+    const gate = createUsageGate({
+      ...basePolicy,
+      now: () => time,
+      sleep: (ms) => {
+        if (throwOnce) { throwOnce = false; throw new Error("sleep failed"); }
+        time += ms;
+        return Promise.resolve();
+      },
+      lane: () => ({ concurrency: 1, minSpacingMs: 50 }),
+    });
+    await gate.run("first", { providerId: "p", reason: "manual" }, async () => "first");
+    await expect(gate.run("second", { providerId: "p", reason: "timer" }, async () => "second")).rejects.toThrow("sleep failed");
+    expect(await gate.run("third", { providerId: "p", reason: "manual" }, async () => "third")).toMatchObject({ ran: true, value: "third" });
+  });
+
+  it("preserves undefined as a rejected task reason and frees the slot", async () => {
+    const gate = createUsageGate({ ...basePolicy, maxConcurrent: 1 });
+    await expect(gate.run("a", { providerId: "p", reason: "manual" }, async () => { throw undefined; })).rejects.toBeUndefined();
+    expect(await gate.run("b", { providerId: "p", reason: "manual" }, async () => "continued")).toMatchObject({ ran: true, value: "continued" });
+  });
+
   it("spaces starts within a provider lane", async () => {
     let time = 1000;
     const starts: number[] = [];

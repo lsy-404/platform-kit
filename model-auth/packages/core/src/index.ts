@@ -1179,6 +1179,10 @@ interface UsageFailureSignal {
   readonly retryAfterMs: number | null;
 }
 
+interface UsageGateFailure {
+  readonly reason: unknown;
+}
+
 interface UsageGateSubscriber<T> {
   resolve(result: UsageGateResult<T>): void;
   reject(error: unknown): void;
@@ -1264,17 +1268,17 @@ export function createUsageGate(policy: UsageGatePolicy): UsageGate {
     lane.retryNotBefore = Math.max(lane.retryNotBefore, now() + delay + random() * BACKOFF_JITTER_MS);
   };
   const priority = (job: UsageGateJob) => USAGE_REASON_PRIORITY[job.request.reason];
-  const settleSubscriber = <T>(subscriber: UsageGateSubscriber<T>, result: UsageGateResult<T>, error?: unknown) => {
+  const settleSubscriber = <T>(subscriber: UsageGateSubscriber<T>, result: UsageGateResult<T>, failure?: UsageGateFailure) => {
     if (subscriber.settled) return;
     subscriber.settled = true;
     if (subscriber.abort && subscriber.signal) subscriber.signal.removeEventListener("abort", subscriber.abort);
-    if (error !== undefined) subscriber.reject(error);
+    if (failure) subscriber.reject(failure.reason);
     else subscriber.resolve(result);
   };
-  const settleJob = <T>(job: UsageGateJob<T>, result: UsageGateResult<T>, error?: unknown) => {
+  const settleJob = <T>(job: UsageGateJob<T>, result: UsageGateResult<T>, failure?: UsageGateFailure) => {
     if (job.queueTimer) clearTimeout(job.queueTimer);
     if (job.timeoutTimer) clearTimeout(job.timeoutTimer);
-    for (const subscriber of job.subscribers) settleSubscriber(subscriber, result, error);
+    for (const subscriber of job.subscribers) settleSubscriber(subscriber, result, failure);
     job.subscribers.length = 0;
     if (job.state === "queued") {
       const index = queue.indexOf(job);
@@ -1292,23 +1296,31 @@ export function createUsageGate(policy: UsageGatePolicy): UsageGate {
     if (!policy.sleep || waitingProviders.has(providerId)) return;
     const waitToken = {};
     waitingProviders.set(providerId, waitToken);
-    void policy.sleep(delay).then(() => {
+    const rejectWait = (error: unknown) => {
+      if (waitingProviders.get(providerId) !== waitToken) return;
+      waitingProviders.delete(providerId);
+      for (const job of [...queue]) if (job.request.providerId === providerId) settleJob(job, { ran: false, retryAt: null }, { reason: error });
+      pump();
+    };
+    let waiting: Promise<void>;
+    try {
+      waiting = policy.sleep(delay);
+    } catch (error) {
+      rejectWait(error);
+      return;
+    }
+    void Promise.resolve(waiting).then(() => {
       if (waitingProviders.get(providerId) !== waitToken) return;
       waitingProviders.delete(providerId);
       pump();
-    }, (error) => {
-      if (waitingProviders.get(providerId) !== waitToken) return;
-      waitingProviders.delete(providerId);
-      for (const job of [...queue]) if (job.request.providerId === providerId) settleJob(job, { ran: false, retryAt: null }, error);
-      pump();
-    });
+    }, rejectWait);
   };
-  const finish = <T>(job: UsageGateJob<T>, result: UsageGateResult<T>, error?: unknown) => {
+  const finish = <T>(job: UsageGateJob<T>, result: UsageGateResult<T>, failure?: UsageGateFailure) => {
     if (active.get(job.credentialId) === job) active.delete(job.credentialId);
     const lane = laneOf(job.request.providerId);
     lane.running -= 1;
     running -= 1;
-    settleJob(job, result, error);
+    settleJob(job, result, failure);
     pump();
   };
 
@@ -1367,7 +1379,7 @@ export function createUsageGate(policy: UsageGatePolicy): UsageGate {
     }, (error) => {
       const signal = usageFailureSignal(error);
       if (signal) recordFailure(lane, signal, startedAt);
-      finish(job, { ran: false, retryAt: backingOffUntil(lane) }, error);
+      finish(job, { ran: false, retryAt: backingOffUntil(lane) }, { reason: error });
     });
   };
 
@@ -1387,7 +1399,7 @@ export function createUsageGate(policy: UsageGatePolicy): UsageGate {
         finiteNonNegative(limits.minSpacingMs, "lane minSpacingMs");
         finiteNonNegative(interval, "minIntervalMs");
       } catch (error) {
-        settleJob(job, { ran: false, retryAt: null }, error);
+        settleJob(job, { ran: false, retryAt: null }, { reason: error });
         continue;
       }
       const blockedUntil = backingOffUntil(lane);
@@ -1407,7 +1419,7 @@ export function createUsageGate(policy: UsageGatePolicy): UsageGate {
         continue;
       }
       delete job.notBefore;
-      try { start(job); } catch (error) { settleJob(job, { ran: false, retryAt: null }, error); }
+      try { start(job); } catch (error) { settleJob(job, { ran: false, retryAt: null }, { reason: error }); }
       if (running >= maxConcurrent) break;
     }
     if (queue.length && Number.isFinite(nextDelay) && !policy.sleep) schedulePump(nextDelay);
