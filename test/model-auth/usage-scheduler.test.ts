@@ -160,6 +160,21 @@ describe("UsageGate scheduler", () => {
     expect(await gate.run("b", { providerId: "p", reason: "manual" }, async () => "second")).toMatchObject({ ran: true, value: "second" });
   });
 
+  it("keeps a queued credential bound to its provider when a conflicting request arrives", async () => {
+    const gate = createUsageGate({ ...basePolicy, maxConcurrent: 1 });
+    const release = deferred();
+    const started = deferred();
+    const holder = gate.run("holder", { providerId: "p", reason: "manual" }, async () => { started.resolve(); await release.promise; });
+    await started.promise;
+    let queuedCalls = 0;
+    const queued = gate.run("shared", { providerId: "p", reason: "timer" }, async () => { queuedCalls += 1; return "p"; });
+    await expect(gate.run("shared", { providerId: "q", reason: "manual" }, async () => "q")).rejects.toThrow("another provider");
+    release.resolve();
+    await Promise.all([holder, queued]);
+    expect(queuedCalls).toBe(1);
+    expect(await queued).toMatchObject({ ran: true, value: "p" });
+  });
+
   it("rejects the same credential being scheduled for a different provider", async () => {
     const gate = createUsageGate(basePolicy);
     const started = deferred();

@@ -1425,7 +1425,7 @@ export function createUsageGate(policy: UsageGatePolicy): UsageGate {
     const queuedJob = pending.get(credentialId);
     const reusableActive = activeJob && !activeJob.controller?.signal.aborted ? activeJob : undefined;
     const existing = queuedJob ?? reusableActive;
-    if (activeJob && activeJob.request.providerId !== normalizedRequest.providerId) return Promise.reject(new Error("credentialId is already scheduled for another provider"));
+    if ((activeJob && activeJob.request.providerId !== normalizedRequest.providerId) || (queuedJob && queuedJob.request.providerId !== normalizedRequest.providerId)) return Promise.reject(new Error("credentialId is already scheduled for another provider"));
     if (activeJob?.timedOut && !queuedJob && normalizedRequest.reason !== "credential-changed") return Promise.resolve({ ran: false, retryAt: null, status: "timed-out" });
     if (existing && normalizedRequest.reason !== "credential-changed") {
       if (existing.state === "queued" && priority({ ...existing, request: normalizedRequest }) > priority(existing)) existing.request = normalizedRequest;
