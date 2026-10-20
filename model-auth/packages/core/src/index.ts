@@ -1126,7 +1126,14 @@ export interface UsageGatePolicy {
   lane?(providerId: string): UsageGateLanePolicy;
   /** Reads that may run at the same time across all providers. */
   readonly maxConcurrent?: number;
+  /** Maximum queued credentials. Defaults to 256. */
+  readonly maxQueueSize?: number;
+  /** Maximum time a request may wait in the queue. Defaults to two minutes. */
+  readonly queueTimeoutMs?: number;
+  /** Maximum task duration. Defaults to two minutes. */
+  readonly executionTimeoutMs?: number;
   readonly now?: () => number;
+  /** Wait function used for provider start spacing, including deterministic clocks. */
   readonly sleep?: (ms: number) => Promise<void>;
   /** Random source in [0, 1) for backoff jitter. */
   readonly random?: () => number;
@@ -1137,18 +1144,28 @@ export interface UsageGateRequest {
   readonly reason: UsageReadReason;
 }
 
+export interface UsageGateRunOptions {
+  readonly signal?: AbortSignal;
+}
+
 export type UsageGateResult<T> =
-  | { readonly ran: true; readonly value: T; /** Set when this read left its provider backing off. */ readonly retryAt: number | null }
-  | { readonly ran: false; readonly retryAt: number | null };
+  | { readonly ran: true; readonly value: T; readonly retryAt: number | null }
+  | { readonly ran: false; readonly retryAt: number | null; readonly status?: "cancelled" | "timed-out" | "queue-full" };
 
 export interface UsageGate {
-  run<T>(credentialId: string, request: UsageGateRequest, task: () => Promise<T>): Promise<UsageGateResult<T>>;
+  run<T>(credentialId: string, request: UsageGateRequest, task: (signal: AbortSignal) => Promise<T>, options?: UsageGateRunOptions): Promise<UsageGateResult<T>>;
+  /** Cancels queued timer/view requests; active reads are left to settle. */
+  cancelPendingBackground(): number;
 }
 
 const BACKOFF_BASE_MS = 60_000;
 const BACKOFF_CAP_MS = 30 * 60_000;
 const RETRY_AFTER_CAP_MS = 60 * 60_000;
 const BACKOFF_JITTER_MS = 5000;
+const USAGE_GATE_DEFAULT_MAX_QUEUE = 256;
+const USAGE_GATE_DEFAULT_QUEUE_TIMEOUT_MS = 2 * 60_000;
+const USAGE_GATE_DEFAULT_EXECUTION_TIMEOUT_MS = 2 * 60_000;
+const USAGE_GATE_MAX_SUBSCRIBERS = 64;
 
 interface UsageLane {
   running: number;
@@ -1162,6 +1179,28 @@ interface UsageFailureSignal {
   readonly retryAfterMs: number | null;
 }
 
+interface UsageGateSubscriber<T> {
+  resolve(result: UsageGateResult<T>): void;
+  reject(error: unknown): void;
+  signal?: AbortSignal;
+  abort?: () => void;
+  settled: boolean;
+}
+
+interface UsageGateJob<T = unknown> {
+  credentialId: string;
+  request: UsageGateRequest;
+  task: (signal: AbortSignal) => Promise<T>;
+  notBefore?: number;
+  sequence: number;
+  subscribers: UsageGateSubscriber<T>[];
+  queueTimer?: ReturnType<typeof setTimeout>;
+  state: "queued" | "running";
+  controller?: AbortController;
+  timeoutTimer?: ReturnType<typeof setTimeout>;
+  timedOut?: boolean;
+}
+
 /** A rate-limit or server failure, thrown as an error with a code or returned as a snapshot with an errorCode. */
 function usageFailureSignal(value: unknown): UsageFailureSignal | null {
   if (!value || typeof value !== "object") return null;
@@ -1172,22 +1211,40 @@ function usageFailureSignal(value: unknown): UsageFailureSignal | null {
   return { retryAfterMs };
 }
 
-/**
- * Decides when a usage read may run; it keeps no readings. One read per credential at a time,
- * a minimum interval per reason, and per-provider lanes with a concurrency cap, start spacing
- * and a backoff that no reason bypasses. A task reports a rate-limit or server failure by
- * throwing an error or returning a value whose code or errorCode says so, with an optional retryAfterMs.
- */
+const USAGE_REASON_PRIORITY: Record<UsageReadReason, number> = {
+  timer: 0,
+  view: 1,
+  manual: 2,
+  "credential-changed": 3,
+};
+
+function finiteNonNegative(value: number, name: string): void {
+  if (!Number.isFinite(value) || value < 0) throw new RangeError(`${name} must be finite and non-negative`);
+}
+
+/** Schedules bounded usage reads with priority, per-provider limits, spacing, and backoff. */
 export function createUsageGate(policy: UsageGatePolicy): UsageGate {
   const now = policy.now ?? Date.now;
-  const sleep = policy.sleep ?? ((ms: number) => new Promise<void>((resolve) => { setTimeout(resolve, ms); }));
   const random = policy.random ?? Math.random;
-  const maxConcurrent = policy.maxConcurrent ?? Infinity;
-  const inflight = new Map<string, Promise<unknown>>();
+  const maxConcurrent = policy.maxConcurrent ?? 8;
+  const maxQueueSize = policy.maxQueueSize ?? USAGE_GATE_DEFAULT_MAX_QUEUE;
+  const queueTimeoutMs = policy.queueTimeoutMs ?? USAGE_GATE_DEFAULT_QUEUE_TIMEOUT_MS;
+  const executionTimeoutMs = policy.executionTimeoutMs ?? USAGE_GATE_DEFAULT_EXECUTION_TIMEOUT_MS;
+  if (!Number.isInteger(maxConcurrent) || maxConcurrent < 1) throw new RangeError("maxConcurrent must be a positive integer");
+  if (!Number.isInteger(maxQueueSize) || maxQueueSize < 1) throw new RangeError("maxQueueSize must be a positive integer");
+  finiteNonNegative(queueTimeoutMs, "queueTimeoutMs");
+  if (!Number.isFinite(executionTimeoutMs) || executionTimeoutMs <= 0) throw new RangeError("executionTimeoutMs must be positive and finite");
+  if (typeof policy.minIntervalMs !== "function") throw new TypeError("minIntervalMs must be a function");
+
+  const queue: UsageGateJob[] = [];
+  const active = new Map<string, UsageGateJob>();
+  const pending = new Map<string, UsageGateJob>();
   const lanes = new Map<string, UsageLane>();
   const lastStart = new Map<string, number>();
   let running = 0;
-  let waiters: Array<() => void> = [];
+  let sequence = 0;
+  let pumpTimer: ReturnType<typeof setTimeout> | undefined;
+  const waitingProviders = new Map<string, object>();
 
   const laneOf = (providerId: string): UsageLane => {
     let lane = lanes.get(providerId);
@@ -1197,14 +1254,8 @@ export function createUsageGate(policy: UsageGatePolicy): UsageGate {
     }
     return lane;
   };
-  const wake = () => {
-    const pending = waiters;
-    waiters = [];
-    for (const resume of pending) resume();
-  };
   const backingOffUntil = (lane: UsageLane): number | null => lane.retryNotBefore > now() ? lane.retryNotBefore : null;
   const recordFailure = (lane: UsageLane, signal: UsageFailureSignal, startedAt: number) => {
-    // Reads that were already in flight together count as one incident; a server-given delay does not feed the exponent.
     if (signal.retryAfterMs === null && startedAt > lane.lastFailureAt) lane.failures += 1;
     lane.lastFailureAt = now();
     const delay = signal.retryAfterMs !== null
@@ -1212,65 +1263,219 @@ export function createUsageGate(policy: UsageGatePolicy): UsageGate {
       : Math.min(BACKOFF_BASE_MS * 2 ** Math.min(Math.max(lane.failures - 1, 0), 16), BACKOFF_CAP_MS);
     lane.retryNotBefore = Math.max(lane.retryNotBefore, now() + delay + random() * BACKOFF_JITTER_MS);
   };
+  const priority = (job: UsageGateJob) => USAGE_REASON_PRIORITY[job.request.reason];
+  const settleSubscriber = <T>(subscriber: UsageGateSubscriber<T>, result: UsageGateResult<T>, error?: unknown) => {
+    if (subscriber.settled) return;
+    subscriber.settled = true;
+    if (subscriber.abort && subscriber.signal) subscriber.signal.removeEventListener("abort", subscriber.abort);
+    if (error !== undefined) subscriber.reject(error);
+    else subscriber.resolve(result);
+  };
+  const settleJob = <T>(job: UsageGateJob<T>, result: UsageGateResult<T>, error?: unknown) => {
+    if (job.queueTimer) clearTimeout(job.queueTimer);
+    if (job.timeoutTimer) clearTimeout(job.timeoutTimer);
+    for (const subscriber of job.subscribers) settleSubscriber(subscriber, result, error);
+    job.subscribers.length = 0;
+    if (job.state === "queued") {
+      const index = queue.indexOf(job);
+      if (index >= 0) queue.splice(index, 1);
+      if (pending.get(job.credentialId) === job) pending.delete(job.credentialId);
+      if (!queue.some((queued) => queued.request.providerId === job.request.providerId)) waitingProviders.delete(job.request.providerId);
+      if (queue.length === 0 && pumpTimer) { clearTimeout(pumpTimer); pumpTimer = undefined; }
+    }
+  };
+  const schedulePump = (delay = 0) => {
+    if (pumpTimer) clearTimeout(pumpTimer);
+    pumpTimer = setTimeout(() => { pumpTimer = undefined; pump(); }, delay);
+  };
+  const waitForProvider = (providerId: string, delay: number) => {
+    if (!policy.sleep || waitingProviders.has(providerId)) return;
+    const waitToken = {};
+    waitingProviders.set(providerId, waitToken);
+    void policy.sleep(delay).then(() => {
+      if (waitingProviders.get(providerId) !== waitToken) return;
+      waitingProviders.delete(providerId);
+      pump();
+    }, (error) => {
+      if (waitingProviders.get(providerId) !== waitToken) return;
+      waitingProviders.delete(providerId);
+      for (const job of [...queue]) if (job.request.providerId === providerId) settleJob(job, { ran: false, retryAt: null }, error);
+      pump();
+    });
+  };
+  const finish = <T>(job: UsageGateJob<T>, result: UsageGateResult<T>, error?: unknown) => {
+    if (active.get(job.credentialId) === job) active.delete(job.credentialId);
+    const lane = laneOf(job.request.providerId);
+    lane.running -= 1;
+    running -= 1;
+    settleJob(job, result, error);
+    pump();
+  };
 
-  async function start<T>(credentialId: string, request: UsageGateRequest, task: () => Promise<T>): Promise<UsageGateResult<T>> {
-    const lane = laneOf(request.providerId);
-    const limits = policy.lane?.(request.providerId) ?? { concurrency: Infinity, minSpacingMs: 0 };
-    while (lane.running >= limits.concurrency || running >= maxConcurrent) await new Promise<void>((resolve) => { waiters.push(resolve); });
+  const start = <T>(job: UsageGateJob<T>) => {
+    const lane = laneOf(job.request.providerId);
+    const limits = policy.lane?.(job.request.providerId) ?? { concurrency: maxConcurrent, minSpacingMs: 0 };
+    if (!Number.isInteger(limits.concurrency) || limits.concurrency < 1) throw new RangeError("lane concurrency must be a positive integer");
+    finiteNonNegative(limits.minSpacingMs, "lane minSpacingMs");
+    const blocked = backingOffUntil(lane);
+    if (blocked !== null) { settleJob(job, { ran: false, retryAt: blocked }); return; }
+    const previous = lastStart.get(job.credentialId);
+    const interval = policy.minIntervalMs(job.request.providerId, job.request.reason);
+    finiteNonNegative(interval, "minIntervalMs");
+    if (previous !== undefined && previous + interval > now()) {
+      settleJob(job, { ran: false, retryAt: previous + interval });
+      return;
+    }
+    const spacingAt = lane.lastStartAt + limits.minSpacingMs;
+    if (spacingAt > now()) {
+      const delay = spacingAt - now();
+      if (policy.sleep) waitForProvider(job.request.providerId, delay);
+      else schedulePump(delay);
+      return;
+    }
+    if (lane.running >= limits.concurrency || running >= maxConcurrent) return;
+
+    job.state = "running";
+    const queueIndex = queue.indexOf(job);
+    if (queueIndex >= 0) queue.splice(queueIndex, 1);
+    if (job.queueTimer) clearTimeout(job.queueTimer);
+    pending.delete(job.credentialId);
+    active.set(job.credentialId, job);
     lane.running += 1;
     running += 1;
-    try {
-      const startAt = Math.max(now(), lane.lastStartAt + limits.minSpacingMs);
-      lane.lastStartAt = startAt;
-      if (startAt > now()) await sleep(startAt - now());
-      const blocked = backingOffUntil(lane);
-      if (blocked !== null) return { ran: false, retryAt: blocked };
-      lastStart.set(credentialId, now());
-      const startedAt = now();
-      let value: T;
-      try {
-        value = await task();
-      } catch (error) {
-        const signal = usageFailureSignal(error);
-        if (signal) recordFailure(lane, signal, startedAt);
-        throw error;
-      }
+    const startedAt = now();
+    lane.lastStartAt = startedAt;
+    lastStart.set(job.credentialId, startedAt);
+    const controller = new AbortController();
+    job.controller = controller;
+    job.timeoutTimer = setTimeout(() => {
+      job.timedOut = true;
+      controller.abort("usage refresh timed out");
+      for (const subscriber of job.subscribers) settleSubscriber(subscriber, { ran: false, retryAt: null, status: "timed-out" });
+      job.subscribers.length = 0;
+      // Keep the slot until the callback settles, even when it ignores abort.
+    }, executionTimeoutMs);
+    Promise.resolve().then(() => job.task(controller.signal)).then((value) => {
       const signal = usageFailureSignal(value);
       if (signal) {
         recordFailure(lane, signal, startedAt);
-        return { ran: true, value, retryAt: backingOffUntil(lane) };
+        finish(job, { ran: true, value, retryAt: backingOffUntil(lane) });
+      } else {
+        if (startedAt > lane.lastFailureAt) { lane.failures = 0; lane.retryNotBefore = 0; }
+        finish(job, { ran: true, value, retryAt: null });
       }
-      if (startedAt > lane.lastFailureAt) {
-        lane.failures = 0;
-        lane.retryNotBefore = 0;
+    }, (error) => {
+      const signal = usageFailureSignal(error);
+      if (signal) recordFailure(lane, signal, startedAt);
+      finish(job, { ran: false, retryAt: backingOffUntil(lane) }, error);
+    });
+  };
+
+  function pump() {
+    if (running >= maxConcurrent || queue.length === 0) return;
+    queue.sort((a, b) => priority(b) - priority(a) || a.sequence - b.sequence);
+    let nextDelay = Infinity;
+    for (const job of [...queue]) {
+      if (active.has(job.credentialId)) continue;
+      const lane = laneOf(job.request.providerId);
+      let limits: UsageGateLanePolicy;
+      let interval: number;
+      try {
+        limits = policy.lane?.(job.request.providerId) ?? { concurrency: maxConcurrent, minSpacingMs: 0 };
+        interval = policy.minIntervalMs(job.request.providerId, job.request.reason);
+        if (!Number.isInteger(limits.concurrency) || limits.concurrency < 1) throw new RangeError("lane concurrency must be a positive integer");
+        finiteNonNegative(limits.minSpacingMs, "lane minSpacingMs");
+        finiteNonNegative(interval, "minIntervalMs");
+      } catch (error) {
+        settleJob(job, { ran: false, retryAt: null }, error);
+        continue;
       }
-      return { ran: true, value, retryAt: null };
-    } finally {
-      lane.running -= 1;
-      running -= 1;
-      wake();
+      const blockedUntil = backingOffUntil(lane);
+      if (blockedUntil !== null) { settleJob(job, { ran: false, retryAt: blockedUntil }); continue; }
+      if (waitingProviders.has(job.request.providerId)) continue;
+      const previous = lastStart.get(job.credentialId);
+      const credentialReady = previous === undefined ? now() : previous + interval;
+      if (credentialReady > now()) { settleJob(job, { ran: false, retryAt: credentialReady }); continue; }
+      if (lane.running >= limits.concurrency || running >= maxConcurrent) continue;
+      const providerReady = Math.max(lane.lastStartAt + limits.minSpacingMs, job.notBefore ?? now());
+      if (providerReady > now()) {
+        job.notBefore = providerReady;
+        nextDelay = Math.min(nextDelay, providerReady - now());
+        if (policy.sleep) {
+          waitForProvider(job.request.providerId, providerReady - now());
+        }
+        continue;
+      }
+      delete job.notBefore;
+      try { start(job); } catch (error) { settleJob(job, { ran: false, retryAt: null }, error); }
+      if (running >= maxConcurrent) break;
     }
+    if (queue.length && Number.isFinite(nextDelay) && !policy.sleep) schedulePump(nextDelay);
   }
 
+  const enqueue = <T>(credentialId: string, request: UsageGateRequest, task: (signal: AbortSignal) => Promise<T>, options?: UsageGateRunOptions): Promise<UsageGateResult<T>> => {
+    if (typeof credentialId !== "string" || !credentialId.trim()) throw new TypeError("credentialId must be a non-empty string");
+    if (!request || typeof request.providerId !== "string" || !request.providerId.trim()) throw new TypeError("providerId must be a non-empty string");
+    if (!Object.hasOwn(USAGE_REASON_PRIORITY, request.reason)) throw new TypeError("invalid usage read reason");
+    if (typeof task !== "function") throw new TypeError("task must be a function");
+    const normalizedRequest: UsageGateRequest = Object.freeze({ providerId: request.providerId, reason: request.reason });
+    if (options?.signal?.aborted) return Promise.resolve({ ran: false, retryAt: null, status: "cancelled" });
+
+    const activeJob = active.get(credentialId);
+    const queuedJob = pending.get(credentialId);
+    const reusableActive = activeJob && !activeJob.controller?.signal.aborted ? activeJob : undefined;
+    const existing = queuedJob ?? reusableActive;
+    if (activeJob && activeJob.request.providerId !== normalizedRequest.providerId) return Promise.reject(new Error("credentialId is already scheduled for another provider"));
+    if (activeJob?.timedOut && !queuedJob && normalizedRequest.reason !== "credential-changed") return Promise.resolve({ ran: false, retryAt: null, status: "timed-out" });
+    if (existing && normalizedRequest.reason !== "credential-changed") {
+      if (existing.state === "queued" && priority({ ...existing, request: normalizedRequest }) > priority(existing)) existing.request = normalizedRequest;
+      return subscribe(existing as UsageGateJob<T>, options?.signal);
+    }
+    if (existing && normalizedRequest.reason === "credential-changed" && existing.state === "queued") {
+      settleJob(existing, { ran: false, retryAt: null, status: "cancelled" });
+    }
+    if (existing && normalizedRequest.reason === "credential-changed" && existing.state === "running") {
+      const queued = pending.get(credentialId);
+      if (queued) {
+        settleJob(queued, { ran: false, retryAt: null, status: "cancelled" });
+      }
+    }
+    const currentQueued = pending.get(credentialId);
+    if (currentQueued && normalizedRequest.reason !== "credential-changed") return subscribe(currentQueued as UsageGateJob<T>, options?.signal);
+    if (queue.length >= maxQueueSize) return Promise.resolve({ ran: false, retryAt: null, status: "queue-full" });
+    const job: UsageGateJob<T> = { credentialId, request: normalizedRequest, task, sequence: sequence++, subscribers: [], state: "queued" };
+    pending.set(credentialId, job);
+    queue.push(job);
+    job.queueTimer = setTimeout(() => settleJob(job, { ran: false, retryAt: null, status: "timed-out" }), queueTimeoutMs);
+    const result = subscribe(job, options?.signal);
+    pump();
+    return result;
+  };
+  const subscribe = <T>(job: UsageGateJob<T>, signal?: AbortSignal): Promise<UsageGateResult<T>> => {
+    if (job.subscribers.length >= USAGE_GATE_MAX_SUBSCRIBERS) return Promise.resolve({ ran: false, retryAt: null, status: "queue-full" });
+    return new Promise((resolve, reject) => {
+    const subscriber: UsageGateSubscriber<T> = { resolve, reject, ...(signal ? { signal } : {}), settled: false };
+    if (signal) {
+      subscriber.abort = () => {
+        settleSubscriber(subscriber, { ran: false, retryAt: null, status: "cancelled" });
+        const index = job.subscribers.indexOf(subscriber);
+        if (index >= 0) job.subscribers.splice(index, 1);
+        if (job.state === "queued" && job.subscribers.length === 0) settleJob(job, { ran: false, retryAt: null, status: "cancelled" });
+        if (job.state === "running" && job.subscribers.length === 0) job.controller?.abort("all callers cancelled");
+      };
+      signal.addEventListener("abort", subscriber.abort, { once: true });
+    }
+    job.subscribers.push(subscriber);
+    if (signal?.aborted) subscriber.abort?.();
+    });
+  };
+
   return {
-    async run<T>(credentialId: string, request: UsageGateRequest, task: () => Promise<T>): Promise<UsageGateResult<T>> {
-      const lane = laneOf(request.providerId);
-      const blocked = backingOffUntil(lane);
-      if (blocked !== null) return { ran: false, retryAt: blocked };
-      const current = inflight.get(credentialId);
-      // A credential change must not take the result of a read that was set up with the old credential.
-      if (current && request.reason !== "credential-changed") return current as Promise<UsageGateResult<T>>;
-      const promise: Promise<UsageGateResult<T>> = (async () => {
-        if (current) await current.catch(() => undefined);
-        const previous = lastStart.get(credentialId);
-        if (previous !== undefined) {
-          const next = previous + policy.minIntervalMs(request.providerId, request.reason);
-          if (next > now()) return { ran: false, retryAt: next } as UsageGateResult<T>;
-        }
-        return start(credentialId, request, task);
-      })().finally(() => { if (inflight.get(credentialId) === promise) inflight.delete(credentialId); });
-      inflight.set(credentialId, promise);
-      return promise;
+    run: enqueue,
+    cancelPendingBackground(): number {
+      const background = queue.filter((job) => job.request.reason === "timer" || job.request.reason === "view");
+      for (const job of background) settleJob(job, { ran: false, retryAt: null, status: "cancelled" });
+      return background.length;
     },
   };
 }

@@ -157,7 +157,7 @@ describe("createUsageGate", () => {
     expect(blocked.retryAt! - before).toBeLessThanOrEqual(65_000);
   });
 
-  it("runs a credential-changed task after a read of that credential that was already queued", async () => {
+  it("cancels queued work when credentials change and runs only the replacement closure", async () => {
     const { gate } = setup({ lane: () => ({ concurrency: 1, minSpacingMs: 0 }) });
     const order: string[] = [];
     let release!: () => void;
@@ -167,9 +167,9 @@ describe("createUsageGate", () => {
     const changed = gate.run("a", { providerId: "p", reason: "credential-changed" }, async () => { order.push("new credential"); return "new"; });
     release();
     await holder;
-    expect(await queued).toMatchObject({ ran: true, value: "old" });
+    expect(await queued).toMatchObject({ ran: false, status: "cancelled" });
     expect(await changed).toMatchObject({ ran: true, value: "new" });
-    expect(order).toEqual(["old credential", "new credential"]);
+    expect(order).toEqual(["new credential"]);
   });
 
   it("caps a long Retry-After at one hour plus jitter", async () => {
