@@ -42,16 +42,17 @@ describe("credential router usage quotas", () => {
   });
 
   it("does not exclude unknown, stale, estimated, low reliability, or expired readings", () => {
-    const router = new CredentialRouter([credential("a")], { now: () => NOW, usageMaxAgeMs: 1000 });
     const exhausted = usageWindow({ status: "exhausted", usedRatio: 1, usedPercent: 100 });
-    for (const reading of [
+    const readings = [
       usage("a", [usageWindow({ status: "unknown", usedRatio: null, usedPercent: null })]),
       usage("a", [exhausted], { stale: true }),
       usage("a", [exhausted], { basis: "estimated" }),
       usage("a", [usageWindow({ ...exhausted, reliability: "low" })]),
       usage("a", [usageWindow({ ...exhausted, resetAt: NOW })]),
       usage("a", [exhausted], { fetchedAtUtc: new Date(NOW - 1001).toISOString() }),
-    ]) {
+    ];
+    for (const reading of readings) {
+      const router = new CredentialRouter([credential("a")], { now: () => NOW, usageMaxAgeMs: 1000 });
       router.setUsage("a", reading);
       expect(router.candidates({ providerId: "p", modelId: "m1" })).toHaveLength(1);
     }
@@ -67,14 +68,22 @@ describe("credential router usage quotas", () => {
     expect(router.candidates({ providerId: "p", modelId: "m1" })).toHaveLength(1);
   });
 
-  it("sorts by the tightest remaining high-confidence window and rotates ties", () => {
+  it("sorts using the tightest remaining high-confidence window", () => {
     const router = new CredentialRouter([credential("a"), credential("b"), credential("c")], { now: () => NOW });
     router.setUsage("a", usage("a", [usageWindow({ usedRatio: 0.8, usedPercent: 80 })]));
     router.setUsage("b", usage("b", [usageWindow({ usedRatio: 0.2, usedPercent: 20 })]));
-    router.setUsage("c", usage("c", [usageWindow({ usedRatio: 0.2, usedPercent: 20 }), usageWindow({ id: "tight", usedRatio: 0.2, usedPercent: 20 })]));
+    router.setUsage("c", usage("c", [usageWindow({ usedRatio: 0.1, usedPercent: 10 }), usageWindow({ id: "tight", usedRatio: 0.6, usedPercent: 60 })]));
     expect(router.candidates({ providerId: "p", modelId: "m1" }).map((item) => item.id)).toEqual(["b", "c", "a"]);
+  });
+
+  it("rotates equal quota groups independently of lower quota candidates", () => {
+    const router = new CredentialRouter([credential("a"), credential("b"), credential("c")], { now: () => NOW });
+    router.setUsage("a", usage("a", [usageWindow({ usedRatio: 0.8, usedPercent: 80 })]));
+    router.setUsage("b", usage("b", [usageWindow({ usedRatio: 0.2, usedPercent: 20 })]));
+    router.setUsage("c", usage("c", [usageWindow({ usedRatio: 0.2, usedPercent: 20 })]));
     expect(router.candidates({ providerId: "p", modelId: "m1" }).map((item) => item.id)).toEqual(["b", "c", "a"]);
     expect(router.candidates({ providerId: "p", modelId: "m1" }).map((item) => item.id)).toEqual(["c", "b", "a"]);
+    expect(router.candidates({ providerId: "p", modelId: "m1" }).map((item) => item.id)).toEqual(["b", "c", "a"]);
   });
 
   it("retains ordinary round-robin behavior when usage is missing or mixed with unknown", () => {
@@ -113,8 +122,17 @@ describe("credential router usage quotas", () => {
 
   it("rejects future readings without poisoning timestamp ordering", () => {
     const router = new CredentialRouter([credential("a")], { now: () => NOW });
-    expect(() => router.setUsage("a", usage("a", [usageWindow()], { fetchedAtUtc: new Date(NOW + 1).toISOString() }))).toThrow(/future/);
-    router.setUsage("a", usage("a", [usageWindow({ status: "exhausted", usedRatio: 1, usedPercent: 100 })]));
-    expect(router.usageDecision({ providerId: "p", modelId: "m1" }, "a").status).toBe("exhausted");
+    const original = usage("a", [usageWindow()], { fetchedAtUtc: new Date(NOW - 300).toISOString(), observedAtUtc: new Date(NOW - 400).toISOString() });
+    router.setUsage("a", original);
+    const mismatchedTimes = [
+      usage("a", [usageWindow({ status: "exhausted", usedRatio: 1, usedPercent: 100 })], { fetchedAtUtc: new Date(NOW + 1).toISOString(), observedAtUtc: new Date(NOW - 1).toISOString() }),
+      usage("a", [usageWindow({ status: "exhausted", usedRatio: 1, usedPercent: 100 })], { fetchedAtUtc: new Date(NOW - 1).toISOString(), observedAtUtc: new Date(NOW + 1).toISOString() }),
+      usage("a", [usageWindow({ status: "exhausted", usedRatio: 1, usedPercent: 100 })], { fetchedAtUtc: new Date(NOW - 100).toISOString(), observedAtUtc: new Date(NOW - 50).toISOString() }),
+      usage("a", [usageWindow({ status: "exhausted", usedRatio: 1, usedPercent: 100 })], { observedAtUtc: "invalid" }),
+    ];
+    for (const reading of mismatchedTimes) {
+      expect(() => router.setUsage("a", reading)).toThrow();
+      expect(router.usageDecision({ providerId: "p", modelId: "m1" }, "a").status).toBe("available");
+    }
   });
 });

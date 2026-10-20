@@ -627,13 +627,12 @@ export class CredentialRouter {
     const strategy = this.providerStrategies.get(providerId) ?? this.strategy;
     if (strategy === "failover" || available.length < 2) return available.map(cloneCredential);
     const key = `${providerId}\u0000${modelId}`;
-    const rotated = this.rotatedOrder(available, key);
     const decisions = available.map((credential) => this.usageDecision(request, credential.id));
     if (decisions.every((decision) => decision.status === "available" && decision.remainingRatio !== null)) {
       const remaining = new Map(available.map((credential, index) => [credential.id, decisions[index]!.remainingRatio!]));
-      return [...rotated].sort((left, right) => remaining.get(right.id)! - remaining.get(left.id)!).map(cloneCredential);
+      return this.quotaOrdered(available, remaining, key).map(cloneCredential);
     }
-    return rotated.map(cloneCredential);
+    return this.rotatedOrder(available, key).map(cloneCredential);
   }
 
   /** Set or clear a host-supplied usage snapshot for one credential. */
@@ -654,12 +653,16 @@ export class CredentialRouter {
       defaultModelId: credential.modelIds[0] ?? "unknown",
       models: credential.modelIds,
     }, credentialId, snapshot);
-    const incomingTime = Date.parse(snapshot.observedAtUtc ?? snapshot.fetchedAtUtc);
-    if (!Number.isFinite(incomingTime)) throw new Error("usage snapshot timestamp is invalid");
-    if (incomingTime > this.now()) throw new Error("usage snapshot timestamp cannot be in the future");
+    const fetchedAt = Date.parse(snapshot.fetchedAtUtc);
+    const observedAt = snapshot.observedAtUtc === undefined ? fetchedAt : typeof snapshot.observedAtUtc === "string" ? Date.parse(snapshot.observedAtUtc) : Number.NaN;
+    const now = this.now();
+    if (!Number.isFinite(fetchedAt) || !Number.isFinite(observedAt)) throw new Error("usage snapshot timestamp is invalid");
+    if (fetchedAt > now || observedAt > now) throw new Error("usage snapshot timestamp cannot be in the future");
+    if (observedAt > fetchedAt) throw new Error("usage observation cannot be later than snapshot fetch");
     if (snapshot.basis !== undefined && snapshot.basis !== "accurate" && snapshot.basis !== "estimated") {
       throw new Error("usage snapshot basis is invalid");
     }
+    const incomingTime = snapshot.observedAtUtc === undefined ? fetchedAt : observedAt;
     const current = this.usage.get(credentialId);
     if (current) {
       const currentTime = Date.parse(current.observedAtUtc ?? current.fetchedAtUtc);
@@ -676,9 +679,11 @@ export class CredentialRouter {
   public usageDecision(request: RouteRequest, credentialId: string): CredentialUsageDecision {
     const snapshot = this.usage.get(credentialId);
     if (!snapshot) return usageDecisionResult("unknown", "missing-usage", null, []);
-    const observedAt = Date.parse(snapshot.observedAtUtc ?? snapshot.fetchedAtUtc);
-    if (snapshot.stale === true || snapshot.basis === "estimated" || !Number.isFinite(observedAt)
-      || observedAt > this.now() || this.now() - observedAt > this.usageMaxAgeMs) {
+    const fetchedAt = Date.parse(snapshot.fetchedAtUtc);
+    const observedAt = snapshot.observedAtUtc === undefined ? fetchedAt : Date.parse(snapshot.observedAtUtc);
+    const now = this.now();
+    if (snapshot.stale === true || snapshot.basis === "estimated" || !Number.isFinite(fetchedAt) || !Number.isFinite(observedAt)
+      || fetchedAt > now || observedAt > now || observedAt > fetchedAt || now - observedAt > this.usageMaxAgeMs) {
       return usageDecisionResult("unknown", "stale-usage", null, []);
     }
     if (snapshot.status !== "ok") return usageDecisionResult("unknown", "unavailable-usage", null, []);
@@ -774,6 +779,22 @@ export class CredentialRouter {
     const start = (this.cursor.get(key) ?? 0) % eligible.length;
     this.cursor.set(key, start + 1);
     return [...eligible.slice(start), ...eligible.slice(0, start)];
+  }
+
+  private quotaOrdered(eligible: CredentialMetadata[], remaining: ReadonlyMap<string, number>, key: string): CredentialMetadata[] {
+    const groups = new Map<number, CredentialMetadata[]>();
+    for (const credential of eligible) {
+      const ratio = remaining.get(credential.id)!;
+      const group = groups.get(ratio) ?? [];
+      group.push(credential);
+      groups.set(ratio, group);
+    }
+    const start = this.cursor.get(key) ?? 0;
+    this.cursor.set(key, start + 1);
+    return [...groups.entries()].sort(([left], [right]) => right - left).flatMap(([, group]) => {
+      const offset = start % group.length;
+      return [...group.slice(offset), ...group.slice(0, offset)];
+    });
   }
 }
 
