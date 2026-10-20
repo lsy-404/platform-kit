@@ -19,6 +19,12 @@ const [candidate] = router.candidates({ providerId: "workbuddy", modelId: "glm-5
 
 The host looks up the secret by `candidate.id`; no secret is passed to this package.
 
+Use `router.setUsage(credentialId, snapshot)` to supply a validated, non-secret usage reading, and `setUsage(credentialId, null)` to clear it after reconnecting an account. `usageDecision(request, credentialId)` reports `available`, `exhausted` or `unknown` with the relevant window IDs and remaining ratio. Snapshots must match the credential and provider, use valid observation/fetch times, and be no older than `usageMaxAgeMs` (five minutes by default). Removing a credential or changing its provider or authentication method clears its reading.
+
+Only a fresh, high-reliability window explicitly marked `exhausted` excludes a candidate. Account windows apply to all models; model windows match exact IDs in `modelFamilies`; family windows require the request's explicit `modelFamily`. A reset or expired reading restores unknown quota. Stale or estimated snapshots and low-reliability windows do not establish exhaustion. The router does not infer exhaustion from a percentage, zero balance or a host estimate.
+
+`failover` preserves credential priority after quota filtering. In `round-robin`, when every remaining candidate has comparable quota, candidates with the most remaining capacity in their tightest applicable window come first and equal-quota candidates rotate. Mixed known/unknown readings retain ordinary rotation. Supplying no readings preserves the existing routing behavior. Querying usage, storing readings and executing or retrying a model request remain host responsibilities.
+
 Provider authentication uses the providers package in the trusted host. API-key validation, secret storage, request transport, and browser/session control remain host responsibilities. See the local integration guides for adapter boundaries.
 
 ## Usage reliability and credential views
@@ -29,11 +35,14 @@ Provider authentication uses the providers package in the trusted host. API-key 
 
 ## Pacing usage reads
 
-`createUsageGate(policy)` decides when a usage read may run and holds no readings. `gate.run(credentialId, { providerId, reason }, task)` runs `task` with these rules and resolves `{ ran: true, value, retryAt }` or `{ ran: false, retryAt }`:
+`createUsageGate(policy)` schedules host-triggered usage reads and holds no readings. `gate.run(credentialId, { providerId, reason }, task, { signal? })` passes an `AbortSignal` to `task` and resolves `{ ran: true, value, retryAt }` or `{ ran: false, retryAt, status? }`:
 
-- Single flight per credential: concurrent calls share one task, except `credential-changed`, which waits for the read in flight and then runs its own task so a read made with the old credential is never taken for the new one.
+- Single flight per credential: concurrent callers share a read. Cancelling one caller leaves other callers subscribed. `credential-changed` replaces a queued old read and waits for any active old read before running its own callback. A credential ID cannot refer to different providers in pending or active reads.
+- Queue priority is `credential-changed`, `manual`, `view`, then `timer`, with arrival order within a priority. A foreground call promotes a queued lower-priority read; `cancelPendingBackground()` removes queued `timer` and `view` reads without cancelling active or promoted manual reads.
+- `maxQueueSize` defaults to 256 queued credentials, with at most 64 callers sharing a read; `queueTimeoutMs` and `executionTimeoutMs` each default to two minutes. Capacity rejection, cancellation and deadline expiry resolve with `ran: false` and `status` of `queue-full`, `cancelled` or `timed-out`. Ordinary minimum-interval or backoff skips have no status and carry `retryAt`.
 - `policy.minIntervalMs(providerId, reason)` is the minimum time since the credential's last read started, for `reason` of `timer`, `view`, `manual` or `credential-changed`.
-- Per-provider lanes: `policy.lane(providerId)` caps concurrency and spaces read starts, and `policy.maxConcurrent` caps all providers together.
+- Per-provider lanes: `policy.lane(providerId)` caps concurrency and spaces read starts, and `policy.maxConcurrent` caps all providers together (eight by default). Priority never bypasses concurrency, spacing or backoff.
+- On execution timeout the gate aborts the callback signal and settles callers. A callback that ignores cancellation keeps its slot until it actually settles, preventing overlapping requests. Propagate the signal to the host transport and discard a result if its credential revision changed while it was running.
 - A task reports a rate-limit or server failure by returning a value whose `errorCode` is `rate-limited` or `server-error`, with an optional `retryAfterMs` (the providers package's `usageErrorSnapshot` produces exactly that, optionally passed through `mergeUsageReading`), and the result then carries `retryAt`. A thrown error with such a `code` and `retryAfterMs` is honoured too, but the call rejects and no `retryAt` is returned. The provider then backs off as a whole: `retryAfterMs` capped at one hour, otherwise exponential from 60 seconds up to 30 minutes, plus up to 5 seconds of jitter. Reads that were already running together when the first one failed count as one step, and a failure that carried `retryAfterMs` does not raise the exponent. While it backs off no reason runs, `credential-changed` included, and `retryAt` says when. A success that started after the last failure resets the lane.
 
 `parseRetryAfter(value, now?)` converts a `Retry-After` header (RFC 9110 delay-seconds or HTTP-date) to milliseconds, `0` for a past date and `null` for anything else. Only the three HTTP-date formats of RFC 9110 section 5.6.7 are accepted (IMF-fixdate, rfc850 and asctime), all read as UTC regardless of the host timezone, and a date that does not exist is rejected.

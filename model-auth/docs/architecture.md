@@ -10,6 +10,10 @@ Usage snapshots expose validated provider windows, balances, and an optional `Pr
 
 Credentials are non-secret metadata: an opaque host-owned ID, provider and authentication method, enabled state, allowed model IDs, health state, and a validated scalar `extend` object for non-sensitive per-key context. `CredentialRouter` selects eligible credentials by provider and model using sequential `round-robin` or stable-order `failover`. Credential order is the priority order and is changed only through `setOrder`; enabled state is independent of order.
 
+Hosts can supply usage snapshots to the router. Fresh, reliable exhaustion excludes only the affected account, model family or model until its reset or reading expiry. Unknown, stale and estimated readings do not establish exhaustion. In round-robin mode, comparable quota readings prefer the account with the most remaining capacity; ties rotate. Failover preserves host priority. The router neither refreshes usage nor retries a model request.
+
+`createUsageGate` coordinates host-triggered usage reads with a bounded priority queue, cancellation, deadlines, provider concurrency, start spacing and backoff. It holds no readings and starts no periodic work. The host supplies the query callback, propagates the gate's abort signal to its transport, and decides whether a returned reading still belongs to the current credential before storing or presenting it.
+
 Neither core nor providers has a notion of a selected model or credential: they supply credentials and routing order, and the consuming layer decides which model to use.
 
 Use an explicit runtime binding when a host provider is not named exactly like its `models.dev` provider. `bindRuntimeProviders` accepts a catalog provider ID and an optional `includeModel` predicate, so one catalog entry can safely serve several host-specific runtime providers.

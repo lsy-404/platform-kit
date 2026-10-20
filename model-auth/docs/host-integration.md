@@ -108,9 +108,45 @@ try {
 
 Use `setEnabled` for an independent on/off control and `setOrder(credentialIds)` to set priority; credentials are ordered by registration unless reordered. `401`/`403` permanently isolate a credential; `429`, server errors, and transport errors use bounded cooling; pass the response's `Retry-After` as `retryAfterMs` on a 429 `RouteError` to cool down for that long, and read `router.health(id).cooldownReason` to tell a rate limit from a transient failure. `failover` always tries eligible credentials in that order, while `round-robin` rotates over them starting from that order.
 
+Supply a non-secret reading with `router.setUsage(credentialId, usageSnapshot)`, or clear it with `router.setUsage(credentialId, null)`. The snapshot must belong to that credential and provider; older observations cannot replace newer ones. Clear the reading when reconnecting the same credential ID to a different account, and discard results from queries started before that reconnect. Removing a credential or changing its provider or authentication method also clears the router's reading.
+
+The router uses snapshots for up to `usageMaxAgeMs` (five minutes by default). Future, stale, failed and estimated readings do not establish available quota or exhaustion. A fresh, high-reliability `exhausted` window excludes a candidate only while its reset is still ahead. A known percentage of 100 by itself does not establish exhaustion. Missing or unknown quota does not exclude a credential.
+
+Account windows apply to every model. Model windows match exact model IDs in `modelFamilies`; model-family windows match only an explicit `RouteRequest.modelFamily`, never a label or an inferred model name. With `round-robin`, when every eligible candidate has a comparable reading, the router prefers the highest remaining ratio across each candidate's tightest applicable window and rotates ties. Mixed known and unknown readings retain the usual rotation. `failover` retains explicit credential priority while excluding confirmed exhaustion. `router.usageDecision(request, credentialId)` explains the quota decision; health, enabled state and OAuth policy remain separate eligibility checks.
+
 ## 5. Pace usage reads
 
 Route every usage read through one `createUsageGate` so timers, view refreshes, manual retries and re-authentication cannot stack up against a provider that rate-limits usage endpoints. Give it per-reason minimum intervals and a lane (concurrency and start spacing) for providers that need one, and let tasks return the error snapshot (`usageErrorSnapshot(providerId, credentialId, error, lastIdentity)`, merged with `mergeUsageReading`) after a failed query: it carries `errorCode` and `retryAfterMs` from `Retry-After`, so a 429 backs the whole provider off and the result reports `retryAt`. A call that does not run returns `retryAt`, which a host can show next to the last reading instead of an error.
+
+```ts
+import { createUsageGate } from "@model-auth/core";
+
+const gate = createUsageGate({
+  minIntervalMs: (_providerId, reason) => reason === "credential-changed" ? 0 : 60_000,
+  maxConcurrent: 4,
+  maxQueueSize: 64,
+  queueTimeoutMs: 30_000,
+  executionTimeoutMs: 30_000,
+  lane: () => ({ concurrency: 1, minSpacingMs: 1000 }),
+});
+
+const revision = hostCredentialRevision(credentialId);
+const result = await gate.run(
+  credentialId,
+  { providerId, reason: "manual" },
+  signal => hostQueryUsage(credentialId, signal),
+  { signal: callerSignal },
+);
+if (result.ran && hostCredentialRevision(credentialId) === revision) {
+  router.setUsage(credentialId, result.value);
+}
+```
+
+The `host*` functions and `callerSignal` above belong to the consuming application. The host triggers reads, owns credential revisions and cached readings, propagates the callback signal to its transport, and schedules any retry indicated by `retryAt`. If the host persists readings asynchronously, its write must also reject superseded credential revisions. No timer in the gate starts periodic queries.
+
+The queue prioritizes `credential-changed`, `manual`, `view`, then `timer`, preserving arrival order within a priority. A manual call can promote a queued background read; a credential change replaces a queued old read and waits for any active old read before starting its own callback. `gate.cancelPendingBackground()` cancels queued `timer` and `view` reads and leaves active or promoted manual reads alone. Cancelling one caller does not cancel another caller's shared read. Queue cancellation, deadline expiry and capacity rejection resolve with `ran: false` and `status` of `cancelled`, `timed-out` or `queue-full`; ordinary interval/backoff skips return `retryAt` without those statuses.
+
+Default limits are eight simultaneous reads, 256 queued credentials, 64 callers sharing one read, and two-minute queue and execution deadlines. Execution expiry aborts the callback signal and settles waiting callers, but a callback that ignores cancellation keeps its concurrency slot until it actually settles. Pass cancellation through to the transport to release that slot promptly. Priority and manual actions never bypass a provider's backoff or start spacing.
 
 ## Presentation contract
 

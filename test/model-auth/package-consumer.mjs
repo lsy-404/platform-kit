@@ -8,6 +8,9 @@ import { createContext, runInContext } from "node:vm";
 import { createRequire } from "node:module";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../model-auth");
+const runPnpm = (args) => process.platform === "win32"
+  ? execFileSync(process.execPath, [join(dirname(process.execPath), "node_modules/corepack/dist/corepack.js"), "pnpm@10.17.1", ...args], { stdio: "pipe" })
+  : execFileSync("corepack", ["pnpm@10.17.1", ...args], { stdio: "pipe" });
 const output = mkdtempSync(join(tmpdir(), "platform-kit-model-auth-packages-"));
 const require = createRequire(join(root, "package.json"));
 const { Window } = require("happy-dom");
@@ -15,7 +18,7 @@ const run = mkdtempSync(join(output, "consumer-"));
 const archives = join(run, "archives");
 mkdirSync(archives);
 for (const name of ["core", "vue", "providers"]) {
-  execFileSync("corepack", ["pnpm@10.17.1", "--dir", join(root, "packages", name), "pack", "--pack-destination", archives], { stdio: "pipe" });
+  runPnpm(["--dir", join(root, "packages", name), "pack", "--pack-destination", archives]);
 }
 const files = ["core", "vue", "providers"].map(name => {
   const version = JSON.parse(readFileSync(join(root, "packages", name, "package.json"), "utf8")).version;
@@ -25,7 +28,7 @@ for (const archive of files) assert.ok(existsSync(archive));
 const consumer = join(run, "app");
 mkdirSync(consumer);
 writeFileSync(join(consumer, "package.json"), JSON.stringify({ private: true, type: "module" }));
-execFileSync("corepack", ["pnpm@10.17.1", "add", "--dir", consumer, "--ignore-scripts", ...files, "vue@3.5.42"], { stdio: "pipe" });
+runPnpm(["add", "--dir", consumer, "--ignore-scripts", ...files, "vue@3.5.42"]);
 
 for (const name of ["core", "vue", "providers"]) {
   const folder = join(consumer, "node_modules", "@model-auth", name);
@@ -49,7 +52,7 @@ assert.ok(vueBundle.includes('import "./model-auth.css"'), "Vue entry must load 
 writeFileSync(join(consumer, "entry.ts"), `
 import { ModelAuthDialog, type ModelAuthProvider, type CredentialUsage, type ProviderCredential } from "@model-auth/vue";
 import { registerModelAuthElement } from "@model-auth/vue/custom-element";
-import { CredentialRouter, createCredentialMetadata, createUsageGate, parseRetryAfter, type UsageGate } from "@model-auth/core";
+import { CredentialRouter, createCredentialMetadata, createUsageGate, parseRetryAfter, type UsageGate, type CredentialUsageDecision, type UsageGateResult } from "@model-auth/core";
 import { authorizeWorkBuddy, refreshWorkBuddy } from "@model-auth/providers/workbuddy";
 import { authorizeOpenAI, refreshOpenAI, listOpenAICodexModels, parseOpenAICodexModels, type OpenAICodexModel } from "@model-auth/providers/openai";
 import { latestClientVersion, CLIENT_VERSION_FLOORS, type ClientVersionTarget } from "@model-auth/providers/client-versions";
@@ -73,6 +76,11 @@ const target: ClientVersionTarget = "codex";
 const pending: Promise<string> = latestClientVersion(target);
 const models: readonly OpenAICodexModel[] = parseOpenAICodexModels({ models: [] });
 const router = new CredentialRouter([createCredentialMetadata({ id: "one", providerId: "sample", authMethod: "api-key", modelIds: ["sample"] })]);
+router.setUsage("one", null);
+const decision: CredentialUsageDecision = router.usageDecision({ providerId: "sample", modelId: "sample", modelFamily: "sample-family" }, "one");
+const cancelledCount: number = gate.cancelPendingBackground();
+const scheduledRead: Promise<UsageGateResult<number>> = gate.run("one", { providerId: "sample", reason: "manual" }, async signal => signal.aborted ? 0 : 1, { signal: new AbortController().signal });
+void [decision, cancelledCount, scheduledRead];
 void [gate, retryAfter, throttled, credential, providers, router, ModelAuthDialog, registerModelAuthElement, authorizeWorkBuddy, refreshWorkBuddy, authorizeTrae, refreshTrae, listTraeModels, streamTrae, authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic, authorizeGrok, queryGrokUsage, authorizeOllamaWeb, queryOllamaUsage, parseOllamaSettings, queryOpencodeGoKeyUsage, parseOpencodeGoUsage, queryProviderUsage, queryClaudePrepaidCredits, extraUsage, listOpenAICodexModels, CLIENT_VERSION_FLOORS, pending, models];
 `);
 execFileSync(process.execPath, [join(root, "node_modules/typescript/bin/tsc"), "--noEmit", "--strict", "--skipLibCheck", "--moduleResolution", "bundler", "--module", "esnext", "--target", "es2023", join(consumer, "entry.ts")], { stdio: "pipe", cwd: consumer });
@@ -108,6 +116,37 @@ const gated = await createUsageGate({ minIntervalMs: () => 0 }).run("one", { pro
 if (!gated.ran || gated.value !== "read") throw new Error("Installed usage gate unavailable");
 const router = new CredentialRouter([createCredentialMetadata({ id: "one", providerId: "sample", authMethod: "api-key", modelIds: ["sample"] })]);
 if (router.candidates({ providerId: "sample", modelId: "sample" })[0]?.id !== "one") throw new Error("Installed core cannot route");
+let quotaNow = Date.now();
+const quotaRouter = new CredentialRouter(["one", "two"].map(id => createCredentialMetadata({ id, providerId: "sample", authMethod: "api-key", modelIds: ["sample"] })), { now: () => quotaNow });
+const snapshot = (id, ratio, status = "known") => ({ providerId: "sample", credentialId: id, status: "ok", plan: null, balance: null, fetchedAtUtc: new Date(quotaNow).toISOString(), error: null, windows: [{ id: "account", label: "Account", scope: "account", modelFamilies: [], status, usedRatio: ratio, usedPercent: ratio * 100, reliability: "high", kind: "session", resetAt: quotaNow + 1000 }] });
+quotaRouter.setUsage("one", snapshot("one", 0.8));
+const quotaRead = await createUsageGate({ minIntervalMs: () => 0 }).run("two", { providerId: "sample", reason: "manual" }, async () => snapshot("two", 0.2));
+if (!quotaRead.ran) throw new Error("Installed quota read did not run");
+quotaRouter.setUsage("two", quotaRead.value);
+const quotaRequest = { providerId: "sample", modelId: "sample" };
+if (quotaRouter.candidates(quotaRequest)[0]?.id !== "two") throw new Error("Installed quota routing unavailable");
+quotaRouter.setUsage("two", snapshot("two", 1, "exhausted"));
+if (quotaRouter.usageDecision(quotaRequest, "two").status !== "exhausted" || quotaRouter.candidates(quotaRequest).length !== 1) throw new Error("Installed quota exhaustion unavailable");
+quotaNow += 1000;
+if (quotaRouter.candidates(quotaRequest).length !== 2) throw new Error("Installed quota reset unavailable");
+const schedulingGate = createUsageGate({ minIntervalMs: () => 0, maxConcurrent: 1, maxQueueSize: 4 });
+let releaseRead;
+let enteredRead;
+const entered = new Promise(resolve => { enteredRead = resolve; });
+const activeRead = schedulingGate.run("active", { providerId: "sample", reason: "manual" }, async signal => {
+  if (signal.aborted) throw new Error("Read unexpectedly aborted");
+  enteredRead();
+  await new Promise(resolve => { releaseRead = resolve; });
+  return "active";
+});
+await entered;
+const backgroundRead = schedulingGate.run("background", { providerId: "sample", reason: "timer" }, async () => { throw new Error("Cancelled background read executed"); });
+const manualRead = schedulingGate.run("manual", { providerId: "sample", reason: "manual" }, async () => "manual");
+if (schedulingGate.cancelPendingBackground() !== 1 || (await backgroundRead).status !== "cancelled") throw new Error("Installed queue cancellation unavailable");
+releaseRead();
+await activeRead;
+const manualResult = await manualRead;
+if (!manualResult.ran || manualResult.value !== "manual") throw new Error("Installed manual queue unavailable");
 `], { stdio: "pipe", cwd: consumer });
 const standalone = readFileSync(join(consumer, "node_modules/@model-auth/vue/dist/model-auth-element.js"), "utf8");
 assert.ok(!/from\s+["']vue["']/.test(standalone), "Standalone build must bundle Vue");
