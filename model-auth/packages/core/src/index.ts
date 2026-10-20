@@ -502,6 +502,8 @@ export function serializeCredentialMetadata(credential: CredentialMetadata): str
 export interface RouteRequest {
   readonly providerId: string;
   readonly modelId: string;
+  /** Explicit provider model-family key for matching family-scoped usage windows. */
+  readonly modelFamily?: string;
 }
 
 export type RouteError =
@@ -522,6 +524,14 @@ export interface CredentialRouterOptions {
   readonly now?: () => number;
   readonly transientCooldownMs?: number;
   readonly rateLimitCooldownMs?: number;
+  readonly usageMaxAgeMs?: number;
+}
+
+export interface CredentialUsageDecision {
+  readonly status: "available" | "exhausted" | "unknown";
+  readonly reason: "fresh-usage" | "confirmed-exhaustion" | "missing-usage" | "stale-usage" | "unavailable-usage" | "no-applicable-window" | "unknown-window";
+  readonly remainingRatio: number | null;
+  readonly windowIds: readonly string[];
 }
 
 export class CredentialRouter {
@@ -536,6 +546,8 @@ export class CredentialRouter {
   private readonly providerOAuthEnabled = new Map<string, boolean>();
   private readonly transientCooldownMs: number;
   private readonly rateLimitCooldownMs: number;
+  private readonly usageMaxAgeMs: number;
+  private readonly usage = new Map<string, ProviderUsageSnapshot>();
 
   public constructor(credentials: readonly CredentialMetadata[], options: CredentialRouterOptions = {}) {
     this.now = options.now ?? Date.now;
@@ -543,6 +555,8 @@ export class CredentialRouter {
     validateStrategy(this.strategy);
     this.transientCooldownMs = Math.max(1, options.transientCooldownMs ?? 15_000);
     this.rateLimitCooldownMs = Math.max(this.transientCooldownMs, options.rateLimitCooldownMs ?? 60_000);
+    this.usageMaxAgeMs = options.usageMaxAgeMs ?? 5 * 60_000;
+    if (!Number.isFinite(this.usageMaxAgeMs) || this.usageMaxAgeMs <= 0) throw new Error("usage maximum age must be a positive finite number");
     for (const credential of credentials) this.upsert(credential);
   }
 
@@ -550,6 +564,7 @@ export class CredentialRouter {
     const projected = cloneCredential(credential);
     const current = this.credentials.get(projected.id);
     if (!current) this.order.push(projected.id);
+    if (current && (current.providerId !== projected.providerId || current.authMethod !== projected.authMethod)) this.usage.delete(projected.id);
     this.credentials.set(projected.id, current
       ? { ...projected, health: current.health, cooldownUntilUtc: current.cooldownUntilUtc }
       : projected);
@@ -608,9 +623,86 @@ export class CredentialRouter {
       && this.isEligible(credential);
     const eligible = this.order.map((id) => this.credentials.get(id)).filter((credential): credential is CredentialMetadata => Boolean(credential))
       .filter(matchesRequest);
+    const available = eligible.filter((credential) => this.usageDecision(request, credential.id).status !== "exhausted");
     const strategy = this.providerStrategies.get(providerId) ?? this.strategy;
-    if (strategy === "failover" || eligible.length < 2) return eligible.map(cloneCredential);
-    return this.rotatedOrder(eligible, `${providerId}\u0000${modelId}`).map(cloneCredential);
+    if (strategy === "failover" || available.length < 2) return available.map(cloneCredential);
+    const key = `${providerId}\u0000${modelId}`;
+    const rotated = this.rotatedOrder(available, key);
+    const decisions = available.map((credential) => this.usageDecision(request, credential.id));
+    if (decisions.every((decision) => decision.status === "available" && decision.remainingRatio !== null)) {
+      const remaining = new Map(available.map((credential, index) => [credential.id, decisions[index]!.remainingRatio!]));
+      return [...rotated].sort((left, right) => remaining.get(right.id)! - remaining.get(left.id)!).map(cloneCredential);
+    }
+    return rotated.map(cloneCredential);
+  }
+
+  /** Set or clear a host-supplied usage snapshot for one credential. */
+  public setUsage(credentialId: string, snapshot: ProviderUsageSnapshot | null): void {
+    const credential = this.credentials.get(credentialId);
+    if (snapshot === null) {
+      this.usage.delete(credentialId);
+      return;
+    }
+    if (!credential) throw new Error("usage snapshot references an unknown credential");
+    if (!snapshot || snapshot.credentialId !== credentialId || snapshot.providerId !== credential.providerId) {
+      throw new Error("usage snapshot identity does not match credential");
+    }
+    const validated = validateUsageSnapshot({
+      providerId: credential.providerId,
+      displayName: credential.providerId,
+      authMethods: [],
+      defaultModelId: credential.modelIds[0] ?? "unknown",
+      models: credential.modelIds,
+    }, credentialId, snapshot);
+    const incomingTime = Date.parse(snapshot.observedAtUtc ?? snapshot.fetchedAtUtc);
+    if (!Number.isFinite(incomingTime)) throw new Error("usage snapshot timestamp is invalid");
+    if (incomingTime > this.now()) throw new Error("usage snapshot timestamp cannot be in the future");
+    if (snapshot.basis !== undefined && snapshot.basis !== "accurate" && snapshot.basis !== "estimated") {
+      throw new Error("usage snapshot basis is invalid");
+    }
+    const current = this.usage.get(credentialId);
+    if (current) {
+      const currentTime = Date.parse(current.observedAtUtc ?? current.fetchedAtUtc);
+      if (Number.isFinite(currentTime) && incomingTime < currentTime) return;
+    }
+    this.usage.set(credentialId, cloneUsageSnapshot({
+      ...validated,
+      ...(snapshot.observedAtUtc !== undefined ? { observedAtUtc: snapshot.observedAtUtc } : {}),
+      ...(snapshot.basis !== undefined ? { basis: snapshot.basis } : {}),
+    }));
+  }
+
+  /** Explain whether a credential has usable quota evidence for this request. */
+  public usageDecision(request: RouteRequest, credentialId: string): CredentialUsageDecision {
+    const snapshot = this.usage.get(credentialId);
+    if (!snapshot) return usageDecisionResult("unknown", "missing-usage", null, []);
+    const observedAt = Date.parse(snapshot.observedAtUtc ?? snapshot.fetchedAtUtc);
+    if (snapshot.stale === true || snapshot.basis === "estimated" || !Number.isFinite(observedAt)
+      || observedAt > this.now() || this.now() - observedAt > this.usageMaxAgeMs) {
+      return usageDecisionResult("unknown", "stale-usage", null, []);
+    }
+    if (snapshot.status !== "ok") return usageDecisionResult("unknown", "unavailable-usage", null, []);
+    const providerId = normalizeProviderId(request.providerId);
+    const modelId = normalizeModelId(request.modelId);
+    const modelFamily = request.modelFamily === undefined ? null : normalizeModelId(request.modelFamily);
+    const applicable = snapshot.windows.filter((window) => window.scope === "account"
+      || (window.scope === "model-family" && modelFamily !== null && window.modelFamilies.includes(modelFamily))
+      || (window.scope === "model" && window.modelFamilies.includes(modelId)));
+    const credential = this.credentials.get(credentialId);
+    if (!credential || snapshot.providerId !== providerId || credential.providerId !== providerId || !credential.modelIds.includes(modelId)) {
+      return usageDecisionResult("unknown", "no-applicable-window", null, []);
+    }
+    if (applicable.length === 0) return usageDecisionResult("unknown", "no-applicable-window", null, []);
+    const active = applicable.filter((window) => window.resetAt === null || window.resetAt > this.now());
+    const exhausted = active.filter((window) => window.status === "exhausted" && window.reliability === "high");
+    if (exhausted.length > 0) return usageDecisionResult("exhausted", "confirmed-exhaustion", null, exhausted.map((window) => window.id));
+    const remaining = active.flatMap((window) => {
+      if (window.status !== "known" || window.reliability !== "high") return [];
+      const ratio = usageWindowRemainingRatio(window);
+      return ratio === null ? [] : [ratio];
+    });
+    if (remaining.length === 0) return usageDecisionResult("unknown", "unknown-window", null, applicable.map((window) => window.id));
+    return usageDecisionResult("available", "fresh-usage", Math.min(...remaining), applicable.map((window) => window.id));
   }
 
   public reportSuccess(credentialId: string): void {
@@ -652,6 +744,7 @@ export class CredentialRouter {
 
   public remove(credentialId: string): void {
     this.credentials.delete(credentialId);
+    this.usage.delete(credentialId);
     this.cooldownReasons.delete(credentialId);
     const index = this.order.indexOf(credentialId);
     if (index >= 0) this.order.splice(index, 1);
@@ -682,6 +775,33 @@ export class CredentialRouter {
     this.cursor.set(key, start + 1);
     return [...eligible.slice(start), ...eligible.slice(0, start)];
   }
+}
+
+function usageDecisionResult(
+  status: CredentialUsageDecision["status"],
+  reason: CredentialUsageDecision["reason"],
+  remainingRatio: number | null,
+  windowIds: readonly string[],
+): CredentialUsageDecision {
+  return { status, reason, remainingRatio, windowIds: [...windowIds] };
+}
+
+function cloneUsageSnapshot(snapshot: ProviderUsageSnapshot): ProviderUsageSnapshot {
+  return {
+    ...snapshot,
+    windows: snapshot.windows.map((window) => ({ ...window, modelFamilies: [...window.modelFamilies] })),
+    balance: snapshot.balance ? { ...snapshot.balance } : null,
+    ...(snapshot.extraUsage ? { extraUsage: { ...snapshot.extraUsage } } : {}),
+    ...(snapshot.estimate ? { estimate: { ...snapshot.estimate } } : {}),
+  };
+}
+
+function usageWindowRemainingRatio(window: ProviderUsageWindow): number | null {
+  if (typeof window.remainingPercent === "number") return Math.max(0, Math.min(1, window.remainingPercent / 100));
+  if (typeof window.usedRatio === "number") return Math.max(0, Math.min(1, 1 - window.usedRatio));
+  if (typeof window.remaining === "number" && typeof window.limit === "number" && window.limit > 0) return Math.max(0, Math.min(1, window.remaining / window.limit));
+  if (typeof window.used === "number" && typeof window.limit === "number" && window.limit > 0) return Math.max(0, Math.min(1, 1 - window.used / window.limit));
+  return null;
 }
 
 function validateStrategy(strategy: RouteStrategy): void {
