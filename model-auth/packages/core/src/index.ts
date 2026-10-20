@@ -1388,6 +1388,7 @@ export function createUsageGate(policy: UsageGatePolicy): UsageGate {
     queue.sort((a, b) => priority(b) - priority(a) || a.sequence - b.sequence);
     let nextDelay = Infinity;
     for (const job of [...queue]) {
+      if (pending.get(job.credentialId) !== job) continue;
       if (active.has(job.credentialId)) continue;
       const lane = laneOf(job.request.providerId);
       let limits: UsageGateLanePolicy;

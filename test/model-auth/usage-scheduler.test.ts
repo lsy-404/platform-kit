@@ -268,6 +268,29 @@ describe("UsageGate scheduler", () => {
     expect(await gate.run("b", { providerId: "p", reason: "manual" }, async () => "continued")).toMatchObject({ ran: true, value: "continued" });
   });
 
+  it("does not restart jobs removed while a provider wait fails", async () => {
+    let time = 0;
+    let calls = 0;
+    const gate = createUsageGate({
+      ...basePolicy,
+      maxConcurrent: 1,
+      now: () => time,
+      sleep: (ms) => { time += ms; throw new Error("wait failed"); },
+      lane: () => ({ concurrency: 1, minSpacingMs: 50 }),
+    });
+    const release = deferred();
+    const started = deferred();
+    const holder = gate.run("holder", { providerId: "p", reason: "manual" }, async () => { started.resolve(); await release.promise; });
+    await started.promise;
+    const readings = ["a", "b"].map(id => gate.run(id, { providerId: "p", reason: "timer" }, async () => { calls += 1; }));
+    const outcomes = Promise.allSettled(readings);
+    release.resolve();
+    await holder;
+    expect((await outcomes).map(outcome => outcome.status)).toEqual(["rejected", "rejected"]);
+    await tick();
+    expect(calls).toBe(0);
+  });
+
   it("spaces starts within a provider lane", async () => {
     let time = 1000;
     const starts: number[] = [];
