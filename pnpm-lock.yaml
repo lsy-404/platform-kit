@@ -49,6 +49,9 @@ importers:
       '@fluentui/svg-icons':
         specifier: ^1.1.343
         version: 1.1.343
+      '@oddbird/popover-polyfill':
+        specifier: ^0.7.3
+        version: 0.7.3
       '@platform-kit/visual-center':
         specifier: workspace:*
         version: link:../../tooling/visual-center
@@ -286,6 +289,9 @@ packages:
     engines: {node: ^22.20 || ^24.12 || >=25}
     cpu: [x64]
     os: [linux]
+
+  '@oddbird/popover-polyfill@0.7.3':
+    resolution: {integrity: sha512-uOY7RLqS1M12u+EzZHQ8vPSh3NjwDlb4qwJ1WDzQ0inZ14+47Vv0NNs+1Lh4PtX1nLiiCbfJyIxPRHsgBTvhvg==}
 
   '@playwright/test@1.63.0':
     resolution: {integrity: sha512-oxMK4vllB9RK5NQ2l1pq1IfOf2AvnEuj/vYGDj0H2nMtmtZpKtCwt/l00GEO6xjGfpBNAvjovvYdCm50dRQkpQ==}
@@ -852,6 +858,8 @@ snapshots:
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     optional: true
+
+  '@oddbird/popover-polyfill@0.7.3': {}
 
   '@playwright/test@1.63.0':
     dependencies:

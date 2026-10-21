@@ -1,6 +1,6 @@
 {
   "name": "@platform-kit/fluent",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "type": "module",
   "description": "Apache-2.0 Fluent-style CSS, Vue controls, navigation, and overlays.",
@@ -34,6 +34,7 @@
   },
   "devDependencies": {
     "@fluentui/svg-icons": "^1.1.343",
+    "@oddbird/popover-polyfill": "^0.7.3",
     "@platform-kit/visual-center": "workspace:*",
     "esbuild": "0.28.2"
   }

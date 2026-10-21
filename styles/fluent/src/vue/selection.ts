@@ -173,9 +173,11 @@ export const FluentSelect = defineComponent({
           fluentIcon(open.value ? "chevron-up" : "chevron-down", "fluent-select__chevron"),
         ]),
         h(FluentPopover, {
+          class: "fluent-popover--select",
           open: open.value,
           label: props.label ?? String(attrs["aria-label"] ?? ""),
           anchor: trigger.value,
+          portal: trigger.value?.ownerDocument.body ?? null,
           role: "presentation",
           style: { minWidth: trigger.value ? `${trigger.value.offsetWidth}px` : undefined },
           focusOnOpen: false,
@@ -299,10 +301,11 @@ export const FluentMenu = defineComponent({
       });
     }
     return () => h(FluentPopover, {
+      class: "fluent-popover--menu",
       open: props.open,
       label: props.label,
       anchor: props.anchor,
-      portal: props.portal,
+      portal: props.portal ?? props.anchor?.ownerDocument.body ?? null,
       role: "presentation",
       focusOnOpen: false,
       restoreFocusOnClose: restoreFocus.value,

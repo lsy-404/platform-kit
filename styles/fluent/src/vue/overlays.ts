@@ -3,6 +3,7 @@ import {
   defineComponent,
   h,
   inject,
+  mergeProps,
   nextTick,
   onBeforeUnmount,
   onMounted,
@@ -15,6 +16,7 @@ import {
 import { placeAnchored } from "../behavior/anchorPosition.js";
 import { registerOverlay, requestCloseTop } from "../behavior/overlayStack.js";
 import { fluentThemeKey } from "../theme.js";
+import { ensurePopoverSupport } from "../behavior/popover.js";
 
 type FluentTheme = {
   mode: "light" | "dark";
@@ -120,6 +122,7 @@ export const FluentDialog = defineComponent({
 
 export const FluentPopover = defineComponent({
   name: "FluentPopover",
+  inheritAttrs: false,
   props: {
     open: Boolean,
     restoreFocusOnClose: { type: Boolean, default: true },
@@ -130,7 +133,7 @@ export const FluentPopover = defineComponent({
     focusOnOpen: { type: Boolean, default: true },
   },
   emits: ["update:open", "close"],
-  setup(props, { emit, slots }) {
+  setup(props, { emit, slots, attrs: elementAttrs }) {
     const panel = ref<HTMLElement | null>(null);
     const attrs = themeAttrs(useTheme());
     const position = ref<{
@@ -233,6 +236,7 @@ export const FluentPopover = defineComponent({
       },
     );
     onMounted(() => {
+      ensurePopoverSupport();
       mounted = true;
       if (props.open) activate();
     });
@@ -241,7 +245,7 @@ export const FluentPopover = defineComponent({
       if (!props.open) return null;
       const node = h(
         "div",
-        {
+        mergeProps({
           ref: panel,
           popover: "manual",
           class: "fluent-popover",
@@ -251,7 +255,7 @@ export const FluentPopover = defineComponent({
           "data-side": position.value.side,
           "data-fluent-theme": attrs.value["data-fluent-theme"],
           style: [attrs.value.style, style.value],
-        },
+        }, elementAttrs),
         slots.default?.(),
       );
       return props.portal ? h(Teleport, { to: props.portal }, node) : node;

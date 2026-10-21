@@ -37,3 +37,5 @@ A `ready` event carries the measurement; `data-status` reports `pending`, `estim
 `stops` is an array of `{ value, label?, disabled? }` that supplies the marks, labels under each mark and snap targets for any count of stops (snap defaults to `available`). Disabled stops stay visible but are skipped by dragging and the keyboard. `tone="neutral"` renders the fill and thumb in the text color instead of the accent. When `modelValue` changes outside a drag, the thumb animates to the new value unless reduced motion is requested.
 
 Selection controls use inline SVG affordances for their open, closed, and selected states; they do not use font glyphs for icons. Icon paths come from Microsoft Fluent UI System Icons (16px regular) and are baked in by `icons.mjs` at build time; `@fluentui/svg-icons` is a dev dependency only.
+
+Popover controls initialize bundled standard Popover support on mount when the WebView lacks the native API. Select and menu panels render in the document body to avoid clipping by scroll containers; menus accept an explicit `portal` override. Portaled panels retain Fluent theme tokens and forwarded attributes.
