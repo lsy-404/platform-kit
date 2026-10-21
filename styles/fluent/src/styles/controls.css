@@ -464,15 +464,15 @@ textarea.fluent-field__input {
   background: var(--fluent-control);
 }
 .fluent-field__input[data-invalid],
-.fluent-field__input:invalid,
+.fluent-field__input:user-invalid,
 .fluent-field__input[data-invalid]:focus-visible:not(:disabled),
-.fluent-field__input:invalid:focus-visible:not(:disabled) {
+.fluent-field__input:user-invalid:focus-visible:not(:disabled) {
   border-color: var(--fluent-input-invalid);
   border-bottom-color: var(--fluent-input-invalid);
   box-shadow: inset 0 -1px 0 var(--fluent-input-invalid);
 }
 .fluent-field__input[data-invalid]:focus-visible:not(:disabled),
-.fluent-field__input:invalid:focus-visible:not(:disabled) {
+.fluent-field__input:user-invalid:focus-visible:not(:disabled) {
   outline: 2px solid var(--fluent-focus-outer);
   outline-offset: 1px;
 }
@@ -583,7 +583,7 @@ textarea.fluent-field__input {
   .fluent-checkbox__box--checked,
   .fluent-radio__input:checked { color: HighlightText; background: Highlight; }
   .fluent-field__input[data-invalid],
-  .fluent-field__input:invalid { outline: 2px solid Mark; outline-offset: -3px; }
+  .fluent-field__input:user-invalid { outline: 2px solid Mark; outline-offset: -3px; }
   .fluent-slider__input { forced-color-adjust: none; }
   .fluent-progress-bar { forced-color-adjust: auto; }
 }
