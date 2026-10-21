@@ -179,7 +179,6 @@ export const FluentSelect = defineComponent({
           anchor: trigger.value,
           portal: trigger.value?.closest<HTMLDialogElement>("dialog[open]") ?? trigger.value?.ownerDocument.body ?? null,
           role: "presentation",
-          style: { minWidth: trigger.value ? `${trigger.value.offsetWidth}px` : undefined },
           focusOnOpen: false,
           restoreFocusOnClose: restoreFocus.value,
           "onUpdate:open": (next: boolean) => { if (!next) close(); },

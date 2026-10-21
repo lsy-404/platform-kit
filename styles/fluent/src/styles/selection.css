@@ -30,7 +30,7 @@
 .fluent-icon { display: block; flex: none; width: 16px; height: 16px; }
 .fluent-select__chevron { width: 16px; height: 16px; }
 .fluent-popover--select, .fluent-popover--menu { width: max-content; min-width: min(220px, calc(100vw - 16px)); max-width: min(420px, calc(100vw - 16px)); padding: 4px; }
-.fluent-popover--select { max-width: none; }
+.fluent-popover--select { min-width: min(var(--fluent-anchor-width), calc(100vw - 16px)); max-width: none; }
 .fluent-select__listbox, .fluent-menu { display: grid; gap: 2px; min-width: 100%; }
 .fluent-select__option, .fluent-menu__item {
   display: flex;

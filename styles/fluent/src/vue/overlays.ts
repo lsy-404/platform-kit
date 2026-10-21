@@ -164,9 +164,11 @@ export const FluentPopover = defineComponent({
     };
     const reposition = () => {
       if (!props.anchor || !panel.value) return;
+      const anchor = props.anchor.getBoundingClientRect();
+      panel.value.style.setProperty("--fluent-anchor-width", `${anchor.width}px`);
       position.value = {
         ...placeAnchored(
-          props.anchor.getBoundingClientRect(),
+          anchor,
           { width: panel.value.offsetWidth, height: panel.value.offsetHeight },
           { width: window.innerWidth, height: window.innerHeight },
         ),
@@ -208,6 +210,7 @@ export const FluentPopover = defineComponent({
         if (typeof ResizeObserver !== "undefined") {
           observer = new ResizeObserver(reposition);
           observer.observe(panel.value);
+          if (props.anchor) observer.observe(props.anchor);
         }
       });
     };
@@ -231,7 +234,11 @@ export const FluentPopover = defineComponent({
     );
     watch(
       () => props.anchor,
-      () => {
+      (anchor, previous) => {
+        if (observer) {
+          if (previous) observer.unobserve(previous);
+          if (anchor) observer.observe(anchor);
+        }
         if (props.open && mounted) void nextTick(reposition);
       },
     );
