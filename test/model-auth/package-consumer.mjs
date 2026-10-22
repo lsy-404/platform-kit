@@ -41,6 +41,11 @@ for (const name of ["core", "vue", "providers"]) {
   }
 }
 assert.ok(readFileSync(join(consumer, "node_modules/@model-auth/providers/THIRD-PARTY.md"), "utf8").includes("Salesforce.com"));
+const providersPackage = join(consumer, "node_modules/@model-auth/providers");
+const providersManifest = JSON.parse(readFileSync(join(providersPackage, "package.json"), "utf8"));
+assert.ok(!Object.keys({ ...providersManifest.dependencies, ...providersManifest.peerDependencies }).some(name => /electron/i.test(name)), "Providers must not require Electron");
+const anthropicBrowserEntry = readFileSync(join(providersPackage, "dist/anthropic-browser.js"), "utf8");
+assert.ok(!/(?:from\s*|import\s*\()\s*["']electron(?:\/[^"']*)?["']/.test(anthropicBrowserEntry), "Anthropic browser entry must not import Electron");
 assert.ok(readFileSync(join(consumer, "node_modules/@model-auth/vue/THIRD-PARTY.md"), "utf8").includes("Yuxi (Evan) You"));
 assert.ok(readFileSync(join(consumer, "node_modules/@model-auth/vue/THIRD-PARTY.md"), "utf8").includes("LobeHub"));
 const vueBundle = readFileSync(join(consumer, "node_modules/@model-auth/vue/dist/model-auth-vue.js"), "utf8");
@@ -57,6 +62,7 @@ import { authorizeWorkBuddy, refreshWorkBuddy } from "@model-auth/providers/work
 import { authorizeOpenAI, refreshOpenAI, listOpenAICodexModels, parseOpenAICodexModels, type OpenAICodexModel } from "@model-auth/providers/openai";
 import { latestClientVersion, CLIENT_VERSION_FLOORS, type ClientVersionTarget } from "@model-auth/providers/client-versions";
 import { authorizeAnthropic, refreshAnthropic } from "@model-auth/providers/anthropic";
+import { authorizeAnthropicInBrowser, type AnthropicBrowserAuthorization, type AnthropicSessionCookie } from "@model-auth/providers/anthropic-browser";
 import { authorizeTrae, refreshTrae, listTraeModels, streamTrae } from "@model-auth/providers/trae";
 import { authorizeGrok, queryGrokUsage } from "@model-auth/providers/grok";
 import { authorizeOllamaWeb, queryOllamaUsage, parseOllamaSettings } from "@model-auth/providers/ollama";
@@ -80,6 +86,9 @@ router.setUsage("one", null);
 const decision: CredentialUsageDecision = router.usageDecision({ providerId: "sample", modelId: "sample", modelFamily: "sample-family" }, "one");
 const cancelledCount: number = gate.cancelPendingBackground();
 const scheduledRead: Promise<UsageGateResult<number>> = gate.run("one", { providerId: "sample", reason: "manual" }, async signal => signal.aborted ? 0 : 1, { signal: new AbortController().signal });
+const browserCookies: readonly AnthropicSessionCookie[] = [];
+const browserAuthorization: Promise<AnthropicBrowserAuthorization> = authorizeAnthropicInBrowser({ executablePath: "chrome", browserArgs: [], signal: new AbortController().signal });
+void [browserCookies, browserAuthorization];
 void [decision, cancelledCount, scheduledRead];
 void [gate, retryAfter, throttled, credential, providers, router, ModelAuthDialog, registerModelAuthElement, authorizeWorkBuddy, refreshWorkBuddy, authorizeTrae, refreshTrae, listTraeModels, streamTrae, authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic, authorizeGrok, queryGrokUsage, authorizeOllamaWeb, queryOllamaUsage, parseOllamaSettings, queryOpencodeGoKeyUsage, parseOpencodeGoUsage, queryProviderUsage, queryClaudePrepaidCredits, extraUsage, listOpenAICodexModels, CLIENT_VERSION_FLOORS, pending, models];
 `);
@@ -92,6 +101,7 @@ import { authorizeOpenAI, refreshOpenAI, listOpenAICodexModels, parseOpenAICodex
 import { latestClientVersion, CLIENT_VERSION_FLOORS } from "@model-auth/providers/client-versions";
 import { latestClientVersion as rootLatestClientVersion } from "@model-auth/providers";
 import { authorizeAnthropic, refreshAnthropic } from "@model-auth/providers/anthropic";
+import { authorizeAnthropicInBrowser } from "@model-auth/providers/anthropic-browser";
 import { authorizeGrok, queryGrokUsage } from "@model-auth/providers/grok";
 import { authorizeOllamaWeb, queryOllamaUsage, parseOllamaSettings } from "@model-auth/providers/ollama";
 import { queryOpencodeGoKeyUsage, parseOpencodeGoUsage } from "@model-auth/providers/opencode";
@@ -108,6 +118,17 @@ if (typeof authorizeWorkBuddy !== "function" || typeof refreshWorkBuddy !== "fun
 for (const provider of [authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic, authorizeGrok, queryGrokUsage, authorizeOllamaWeb, queryOllamaUsage, parseOllamaSettings, queryOpencodeGoKeyUsage, parseOpencodeGoUsage]) {
   if (typeof provider !== "function") throw new Error("Installed browser OAuth unavailable");
 }
+if (typeof authorizeAnthropicInBrowser !== "function") throw new Error("Installed Anthropic browser authorization unavailable");
+const alreadyAborted = new AbortController();
+alreadyAborted.abort();
+let browserFetchCalled = false;
+try {
+  await authorizeAnthropicInBrowser({ executablePath: "missing-browser-executable", signal: alreadyAborted.signal, fetchImpl: async () => { browserFetchCalled = true; throw new Error("Pre-aborted browser authorization reached the network"); } });
+  throw new Error("Pre-aborted browser authorization unexpectedly succeeded");
+} catch (error) {
+  if (error?.code !== "aborted") throw error;
+}
+if (browserFetchCalled) throw new Error("Pre-aborted browser authorization started browser setup");
 if (latestClientVersion !== rootLatestClientVersion || typeof listOpenAICodexModels !== "function") throw new Error("Installed client version lookup unavailable");
 if (parseOpenAICodexModels({ models: [{ slug: "sample" }] })[0]?.id !== "sample") throw new Error("Installed Codex catalog parser unavailable");
 if (await latestClientVersion("grok", { fetchImpl: async () => { throw new Error("offline"); } }) !== CLIENT_VERSION_FLOORS.grok) throw new Error("Installed client version floor unavailable");
