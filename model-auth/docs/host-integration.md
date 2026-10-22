@@ -27,6 +27,10 @@ The UI calls host-owned actions. The providers package performs actual authoriza
 
 Use `@model-auth/providers/openai` (`authorizeOpenAI`, `refreshOpenAI`), `@model-auth/providers/anthropic` (`authorizeAnthropic`, `refreshAnthropic`), `@model-auth/providers/workbuddy`, `@model-auth/providers/trae`, `@model-auth/providers/grok`, `@model-auth/providers/ollama`, or `@model-auth/providers/opencode`. The Codex model catalog, Grok usage and Trae authorization requests use the latest official client version automatically (`@model-auth/providers/client-versions`). OpenAI runtime credentials use provider ID `openai-codex`; Anthropic uses `anthropic`. Their metadata adapters receive the same `ProviderAdapterHost` contract shown below.
 
+For one Anthropic login that also acquires the web session required by prepaid credits, use `authorizeAnthropicInBrowser` from `@model-auth/providers/anthropic-browser`. Pass the installed Chrome or Edge `executablePath`, the host's proxy-only `browserArgs`, `fetchImpl` for OAuth transport, and `signal`. The provider owns a temporary browser profile and returns `{ credential, cookies }` after OAuth succeeds; closing the login page cancels the attempt and removes its temporary profile. It never reads an existing browser profile or persists either returned secret.
+
+Keep both values in the trusted host. After a final cancellation check, store them against the same account id as one host operation, restoring the prior account and cookie session if persistence fails. Only then publish account metadata and query subscription usage with the OAuth credential and prepaid credits with a fetch bound to the stored web session. The host owns browser discovery, proxy selection, encrypted storage and quota refresh policy. No Cookie or OAuth token belongs in UI state.
+
 ```ts
 import {
   createCredentialMetadata,
