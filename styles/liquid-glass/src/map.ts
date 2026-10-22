@@ -6,8 +6,15 @@ const DEMO_RIM = 45
 const DEMO_EDGE_SHIFT = 17.5
 const DEMO_FALLOFF = 2.2
 
+export interface LensTuning {
+  /** How far the rim bends the page, as a multiple of the demo's bend (default 1; 0 is flat). */
+  refraction?: number
+  /** How wide the refracting band is, as a multiple of the demo's rim (default 1). */
+  rimWidth?: number
+}
+
 export interface DisplacementMap {
-  /** RGBA pixels, row-major: red shifts x, green shifts y, 128 is neutral. */
+  /** RGBA pixels, row-major: red shifts x, green shifts y, 128 is neutral; blue weighs the rim band (edge blur mask). */
   data: Uint8ClampedArray<ArrayBuffer>
   width: number
   height: number
@@ -26,12 +33,12 @@ export function roundedRectSdf(x: number, y: number, halfW: number, halfH: numbe
  * The rim displacement for a `width`×`height` rounded rectangle. The rim and its shift scale with the short side
  * up to the demo's 200px pane, so a 32px field bends a few pixels and a large card bends like the demo.
  */
-export function displacementMap(width: number, height: number, radius: number): DisplacementMap {
+export function displacementMap(width: number, height: number, radius: number, tuning: LensTuning = {}): DisplacementMap {
   const w = Math.max(1, Math.round(width))
   const h = Math.max(1, Math.round(height))
   const k = Math.min(1, Math.min(w, h) / DEMO_SHORT_SIDE)
-  const rim = DEMO_RIM * k
-  const edgeShift = DEMO_EDGE_SHIFT * k
+  const rim = DEMO_RIM * k * Math.max(0, tuning.rimWidth ?? 1)
+  const edgeShift = DEMO_EDGE_SHIFT * k * Math.max(0, tuning.refraction ?? 1)
   // Twice the largest shift, so every shift fits the 0..1 channel around its neutral 0.5.
   const scale = 2 * edgeShift
   const halfW = w / 2
@@ -47,8 +54,11 @@ export function displacementMap(width: number, height: number, radius: number): 
       data[i + 1] = 128
       data[i + 3] = 255
       const e = -roundedRectSdf(px, py, halfW, halfH, r)
-      if (scale === 0 || e >= rim) continue
-      const shift = edgeShift * (1 - Math.max(0, e) / rim) ** DEMO_FALLOFF
+      if (e >= rim) continue
+      const band = 1 - Math.max(0, e) / rim
+      data[i + 2] = Math.round(band * 255)
+      if (scale === 0) continue
+      const shift = edgeShift * band ** DEMO_FALLOFF
       // The distance field's gradient points outward; sampling against it pulls the page in from the edge.
       const gx = roundedRectSdf(px + 1, py, halfW, halfH, r) - roundedRectSdf(px - 1, py, halfW, halfH, r)
       const gy = roundedRectSdf(px, py + 1, halfW, halfH, r) - roundedRectSdf(px, py - 1, halfW, halfH, r)

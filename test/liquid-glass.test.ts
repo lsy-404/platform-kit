@@ -31,6 +31,25 @@ describe("liquid glass displacement map", () => {
     expect(pixel(field, 120, 16)).toEqual([128, 128, 0, 255]);
   });
 
+  it("weighs the rim band in blue for the edge blur", () => {
+    const map = displacementMap(200, 200, 12);
+    expect(pixel(map, 0, 100)[2]).toBeGreaterThan(250);
+    expect(pixel(map, 30, 100)[2]).toBeGreaterThan(0);
+    expect(pixel(map, 30, 100)[2]).toBeLessThan(pixel(map, 10, 100)[2]!);
+    expect(pixel(map, 100, 100)[2]).toBe(0);
+  });
+
+  it("tunes the bend and the band", () => {
+    expect(displacementMap(200, 200, 12, { refraction: 2 }).scale).toBeCloseTo(70);
+    const flat = displacementMap(200, 200, 12, { refraction: 0 });
+    expect(flat.scale).toBe(0);
+    expect(pixel(flat, 0, 100).slice(0, 2)).toEqual([128, 128]);
+    expect(pixel(flat, 0, 100)[2]).toBeGreaterThan(250);
+    // Half the band: 30px in is past a 22.5px rim.
+    expect(pixel(displacementMap(200, 200, 12, { rimWidth: 0.5 }), 30, 100)).toEqual([128, 128, 0, 255]);
+    expect(pixel(displacementMap(200, 200, 12, { rimWidth: 2 }), 60, 100)[0]).toBeGreaterThan(128);
+  });
+
   it("survives degenerate sizes", () => {
     const tiny = displacementMap(0.2, 0, 40);
     expect([tiny.width, tiny.height]).toEqual([1, 1]);

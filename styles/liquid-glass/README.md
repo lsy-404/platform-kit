@@ -14,7 +14,7 @@ and only the band along its rim refracts the page behind it.
 ## Install
 
 ```json
-"@platform-kit/liquid-glass": "https://github.com/lsy-404/platform-kit/releases/download/liquid-glass-v0.1.0/platform-kit-liquid-glass-0.1.0.tgz"
+"@platform-kit/liquid-glass": "https://github.com/lsy-404/platform-kit/releases/download/liquid-glass-v0.2.0/platform-kit-liquid-glass-0.2.0.tgz"
 ```
 
 ## Use
@@ -46,6 +46,9 @@ liquidGlass(document.body, { selector: '.card, .input, .chart-frame' })
 An element inside another refracting one stays flat (`flatWhenNested`, default true): the outer surface's backdrop
 filter makes it the inner one's backdrop root, so an inner lens would only bend the outer fill.
 
+The lens reads its three properties when it fits an element; after changing them on screen, call
+`refreshLiquidGlass()` to refit what is already lensed. The CSS properties apply at once.
+
 Vue: `import { vLiquidGlass } from '@platform-kit/liquid-glass/vue'`, then `v-liquid-glass` or
 `v-liquid-glass="enabled"` on any element. Pages without a bundler can load `./browser` and use
 `window.PlatformKitLiquidGlass`.
@@ -58,12 +61,17 @@ Dark tokens are the default; `prefers-color-scheme: light` switches `:root` unle
 | Token | Use |
 | --- | --- |
 | `--pk-glass-fill`, `--pk-glass-fill-hover` | Surface fill |
-| `--pk-glass-filter` | Filter after the lens (a hair of blur, brightness, saturation) |
+| `--pk-glass-blur`, `--pk-glass-field-blur` | Background blur behind surfaces and fields (default a hair, 0.25px) |
+| `--pk-glass-tint` | Filters after the blur (brightness, saturation) |
+| `--pk-glass-highlight` | Rim light strength, 0–1 |
+| `--pk-glass-refraction` | Rim bend as a multiple of the demo's (0 flat, 1 demo); read by the lens |
+| `--pk-glass-rim-width` | Refracting band width as a multiple of the demo's; read by the lens |
+| `--pk-glass-edge-blur` | Blur inside the refracting band, in pixels; read by the lens |
 | `--pk-glass-stroke`, `--pk-glass-stroke-hover` | Surface border |
 | `--pk-glass-rim` | Rim light gradient |
 | `--pk-glass-edge`, `--pk-glass-shadow` | Inset edge light and outer shadow |
 | `--pk-glass-radius` | Surface corner radius |
-| `--pk-glass-field-*` | The same for fields: `fill`, `fill-hover`, `stroke`, `stroke-hover`, `edge`, `filter`, `radius` |
+| `--pk-glass-field-*` | The same for fields: `fill`, `fill-hover`, `stroke`, `stroke-hover`, `edge`, `radius` |
 | `--pk-glass-solid`, `--pk-glass-solid-stroke` | Opaque fallback |
 
 ## License

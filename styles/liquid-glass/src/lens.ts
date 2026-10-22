@@ -1,4 +1,4 @@
-import { displacementMap } from "./map.js";
+import { displacementMap, type LensTuning } from "./map.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 /** A resizing element rebuilds its map at most this often; a large surface's map takes tens of milliseconds. */
@@ -9,6 +9,12 @@ const MAP_CACHE = 64;
 export const LIQUID_GLASS_DISABLED_QUERY = "(forced-colors: active), (prefers-contrast: more), (prefers-reduced-transparency: reduce)";
 /** The custom property a lensed element receives: `url(#…)`, ready to lead its `backdrop-filter`. */
 export const LIQUID_GLASS_LENS_PROPERTY = "--pk-lens";
+/**
+ * Per-element tuning, read from inherited custom properties whenever a lens is fitted (set them on :root or any
+ * container, then call refreshLiquidGlass() to refit what is already on screen): `--pk-glass-refraction` and
+ * `--pk-glass-rim-width` scale the demo's bend and rim band, `--pk-glass-edge-blur` blurs the rim band in pixels.
+ */
+export const LIQUID_GLASS_TUNING_PROPERTIES = ["--pk-glass-refraction", "--pk-glass-rim-width", "--pk-glass-edge-blur"] as const;
 /** Elements the default `liquidGlass()` watch refracts. */
 export const LIQUID_GLASS_SELECTOR = ".pk-glass, .pk-glass-field, [data-pk-glass]";
 
@@ -27,8 +33,23 @@ export function liquidGlassSupported(): boolean {
     && typeof ResizeObserver !== "undefined";
 }
 
-function drawMap(w: number, h: number, radius: number): DrawnMap {
-  const map = displacementMap(w, h, radius);
+interface Tuning extends Required<LensTuning> { edgeBlur: number }
+
+function tuningValue(style: CSSStyleDeclaration, property: string, fallback: number): number {
+  const value = parseFloat(style.getPropertyValue(property));
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+function readTuning(style: CSSStyleDeclaration): Tuning {
+  return {
+    refraction: tuningValue(style, "--pk-glass-refraction", 1),
+    rimWidth: tuningValue(style, "--pk-glass-rim-width", 1),
+    edgeBlur: tuningValue(style, "--pk-glass-edge-blur", 0),
+  };
+}
+
+function drawMap(w: number, h: number, radius: number, tuning: Tuning): DrawnMap {
+  const map = displacementMap(w, h, radius, tuning);
   const canvas = document.createElement("canvas");
   canvas.width = map.width;
   canvas.height = map.height;
@@ -36,10 +57,10 @@ function drawMap(w: number, h: number, radius: number): DrawnMap {
   return { url: canvas.toDataURL(), scale: map.scale };
 }
 
-function cachedMap(key: string, w: number, h: number, radius: number): DrawnMap {
+function cachedMap(key: string, w: number, h: number, radius: number, tuning: Tuning): DrawnMap {
   let map = maps.get(key);
   if (map) maps.delete(key);
-  else map = drawMap(w, h, radius);
+  else map = drawMap(w, h, radius, tuning);
   maps.set(key, map);
   if (maps.size > MAP_CACHE) maps.delete(maps.keys().next().value!);
   return map;
@@ -59,9 +80,16 @@ function ensureDefs(): SVGDefsElement {
   return defs;
 }
 
-/** One filter per element size and corner radius, shared by every element of that shape. */
-function acquire(w: number, h: number, radius: number): Lens {
-  const key = `${w}x${h}r${radius}`;
+function svg<K extends keyof SVGElementTagNameMap>(name: K, attributes: Record<string, string | number>): SVGElementTagNameMap[K] {
+  const el = document.createElementNS(SVG_NS, name);
+  for (const [key, value] of Object.entries(attributes)) el.setAttribute(key, String(value));
+  return el;
+}
+
+/** One filter per element size, corner radius and tuning, shared by every element of that shape. */
+function acquire(w: number, h: number, radius: number, tuning: Tuning): Lens {
+  const mapKey = `${w}x${h}r${radius}f${tuning.refraction}w${tuning.rimWidth}`;
+  const key = `${mapKey}b${tuning.edgeBlur}`;
   let lens = lenses.get(key);
   if (!lens) {
     const id = `pk-lens-${nextId++}`;
@@ -73,19 +101,22 @@ function acquire(w: number, h: number, radius: number): Lens {
     filter.setAttribute("y", "0");
     filter.setAttribute("width", String(w));
     filter.setAttribute("height", String(h));
-    const { url, scale } = cachedMap(key, w, h, radius);
-    const image = document.createElementNS(SVG_NS, "feImage");
-    image.setAttribute("href", url);
-    image.setAttribute("width", String(w));
-    image.setAttribute("height", String(h));
-    image.setAttribute("result", "map");
-    const displace = document.createElementNS(SVG_NS, "feDisplacementMap");
-    displace.setAttribute("in", "SourceGraphic");
-    displace.setAttribute("in2", "map");
-    displace.setAttribute("scale", String(scale));
-    displace.setAttribute("xChannelSelector", "R");
-    displace.setAttribute("yChannelSelector", "G");
-    filter.append(image, displace);
+    const { url, scale } = cachedMap(mapKey, w, h, radius, tuning);
+    filter.append(
+      svg("feImage", { href: url, width: w, height: h, result: "map" }),
+      svg("feDisplacementMap", { in: "SourceGraphic", in2: "map", scale, xChannelSelector: "R", yChannelSelector: "G", result: "bent" }),
+    );
+    if (tuning.edgeBlur > 0) {
+      // The map's blue channel weighs the rim band: blur the bent page, keep it only there, lay it over the sharp middle.
+      const merge = svg("feMerge", {});
+      merge.append(svg("feMergeNode", { in: "bent" }), svg("feMergeNode", { in: "rim" }));
+      filter.append(
+        svg("feGaussianBlur", { in: "bent", stdDeviation: tuning.edgeBlur, edgeMode: "duplicate", result: "soft" }),
+        svg("feColorMatrix", { in: "map", type: "matrix", values: "0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 1 0 0", result: "band" }),
+        svg("feComposite", { in: "soft", in2: "band", operator: "in", result: "rim" }),
+        merge,
+      );
+    }
     ensureDefs().appendChild(filter);
     lens = { id, filter, users: 0 };
     lenses.set(key, lens);
@@ -101,7 +132,7 @@ function release(lens: Lens): void {
 }
 
 interface Binding { lens: Lens | null; observer: ResizeObserver; timer: ReturnType<typeof setTimeout> | null }
-const bound = new WeakMap<HTMLElement, Binding>();
+const bound = new Map<HTMLElement, Binding>();
 
 function refit(el: HTMLElement, binding: Binding): void {
   binding.timer = null;
@@ -109,11 +140,20 @@ function refit(el: HTMLElement, binding: Binding): void {
   const h = Math.round(el.offsetHeight);
   // A hidden view (kept alive, collapsed panel) keeps its last lens until it has a size again.
   if (w < 2 || h < 2) return;
-  const radius = Math.round(parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0);
+  const style = getComputedStyle(el);
+  const radius = Math.round(parseFloat(style.borderTopLeftRadius) || 0);
   const previous = binding.lens;
-  binding.lens = acquire(w, h, radius);
+  binding.lens = acquire(w, h, radius, readTuning(style));
   if (previous) release(previous);
   el.style.setProperty(LIQUID_GLASS_LENS_PROPERTY, `url(#${binding.lens.id})`);
+}
+
+/** Refits every refracting element, after its tuning properties (or anything else its lens reads) changed. */
+export function refreshLiquidGlass(): void {
+  for (const [el, binding] of bound) {
+    if (binding.timer !== null) clearTimeout(binding.timer);
+    refit(el, binding);
+  }
 }
 
 /** Whether `el` currently refracts. */

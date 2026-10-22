@@ -85,6 +85,34 @@ try {
     // The border counts: a 140px content box is a 142px lens.
     await tab.waitForFunction(() => document.querySelector('svg[data-pk-liquid-glass] filter[width="142"]'));
 
+    // Tuning comes from inherited properties; a refresh refits what is on screen.
+    const tuned = await tab.evaluate(() => {
+      const root = document.documentElement.style;
+      root.setProperty("--pk-glass-edge-blur", "3px");
+      root.setProperty("--pk-glass-refraction", "2");
+      root.setProperty("--pk-glass-blur", "8px");
+      window.PlatformKitLiquidGlass.refreshLiquidGlass();
+      const late = document.getElementById("late");
+      const filter = document.querySelector(late.style.getPropertyValue("--pk-lens").slice(4, -1));
+      return {
+        blur: filter.querySelector("feGaussianBlur")?.getAttribute("stdDeviation"),
+        merged: filter.querySelectorAll("feMergeNode").length,
+        scale: Number(filter.querySelector("feDisplacementMap").getAttribute("scale")),
+        backdrop: getComputedStyle(late).backdropFilter,
+        filters: document.querySelectorAll("svg[data-pk-liquid-glass] filter").length,
+      };
+    });
+    assert.equal(tuned.blur, "3", "edge blur blurs the rim band");
+    assert.equal(tuned.merged, 2);
+    assert.ok(Math.abs(tuned.scale - 2 * 2 * 17.5 * 0.31) < 0.01, `refraction doubles the bend (${tuned.scale})`);
+    assert.match(tuned.backdrop, /blur\(8px\)/, "background blur follows its token");
+    assert.equal(tuned.filters, 2, "refitting releases the untuned filters");
+    const highlight = await tab.evaluate(() => {
+      document.documentElement.style.setProperty("--pk-glass-highlight", "0.25");
+      return getComputedStyle(document.getElementById("card"), "::before").opacity;
+    });
+    assert.equal(highlight, "0.25", "rim light follows its token");
+
     await tab.evaluate(() => window.stop());
     assert.equal(await tab.locator("[data-liquid-glass]").count(), 0, "stopping lets every surface go flat");
     assert.equal(await tab.locator("svg[data-pk-liquid-glass] filter").count(), 0);
