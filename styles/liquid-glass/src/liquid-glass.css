@@ -7,6 +7,12 @@
  * --pk-glass-highlight scales the rim light, and the lens reads --pk-glass-refraction, --pk-glass-rim-width
  * (multiples of the demo's bend and band) and --pk-glass-edge-blur (pixels of blur in the band) when it fits.
  */
+/* Each lens is sized to its own element: a glass box nested in a lensed one must not inherit the outer lens. */
+@property --pk-lens {
+  syntax: "*";
+  inherits: false;
+}
+
 :where(:root, [data-pk-glass-theme="dark"]) {
   --pk-glass-fill: rgba(34, 34, 32, 0.08);
   --pk-glass-fill-hover: rgba(46, 46, 43, 0.2);

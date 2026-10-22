@@ -53,6 +53,14 @@ try {
     assert.ok(state.card.glass && state.field.glass && state.twin.glass, `${colorScheme}: top-level surfaces refract`);
     assert.equal(state.inner.glass, false, "a field inside a refracting card stays flat");
     assert.equal(state.inner.backdrop, "none", "a nested field drops its backdrop filter");
+    const inherited = await tab.evaluate(() => {
+      const probe = document.createElement("span");
+      document.getElementById("card").append(probe);
+      const value = getComputedStyle(probe).getPropertyValue("--pk-lens");
+      probe.remove();
+      return value;
+    });
+    assert.equal(inherited, "", "a lens never reaches the elements inside it");
     assert.match(state.card.backdrop, /url\(.*#pk-lens-\d+.*\)/, "the card's backdrop filter leads with its lens");
     assert.equal(state.field.lens, state.twin.lens, "same-shaped fields share one filter");
     assert.equal(state.filters.length, 2, "one filter per shape");

@@ -14,7 +14,7 @@ and only the band along its rim refracts the page behind it.
 ## Install
 
 ```json
-"@platform-kit/liquid-glass": "https://github.com/lsy-404/platform-kit/releases/download/liquid-glass-v0.2.0/platform-kit-liquid-glass-0.2.0.tgz"
+"@platform-kit/liquid-glass": "https://github.com/lsy-404/platform-kit/releases/download/liquid-glass-v0.2.1/platform-kit-liquid-glass-0.2.1.tgz"
 ```
 
 ## Use
