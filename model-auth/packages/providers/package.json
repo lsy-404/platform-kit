@@ -1,6 +1,6 @@
 {
   "name": "@model-auth/providers",
-  "version": "0.17.1",
+  "version": "0.18.0",
   "description": "Host-side AI provider access, authentication, requests and usage queries.",
   "type": "module",
   "main": "./dist/index.js",
@@ -36,12 +36,15 @@
       ],
       "client-versions": [
         "dist/client-versions.d.ts"
+      ],
+      "anthropic-browser": [
+        "dist/anthropic-browser.d.ts"
       ]
     }
   },
   "license": "Apache-2.0",
   "engines": {
-    "node": ">=20.19"
+    "node": ">=22.12.0"
   },
   "files": [
     "dist",
@@ -70,6 +73,10 @@
     "./anthropic": {
       "types": "./dist/anthropic.d.ts",
       "import": "./dist/anthropic.js"
+    },
+    "./anthropic-browser": {
+      "types": "./dist/anthropic-browser.d.ts",
+      "import": "./dist/anthropic-browser.js"
     },
     "./grok": {
       "types": "./dist/grok.d.ts",
@@ -101,12 +108,15 @@
     "typecheck": "tsc -p tsconfig.typecheck.json --noEmit"
   },
   "dependencies": {
-    "tough-cookie": "6.0.2"
+    "@puppeteer/browsers": "3.2.5",
+    "tough-cookie": "6.0.2",
+    "ws": "^8.22.0"
   },
   "peerDependencies": {
     "@model-auth/core": "^0.11.1"
   },
   "devDependencies": {
-    "@model-auth/core": "workspace:*"
+    "@model-auth/core": "workspace:*",
+    "@types/ws": "8.18.1"
   }
 }
