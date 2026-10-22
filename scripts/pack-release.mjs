@@ -9,6 +9,7 @@ const targets = [
   "styles/fluent",
   "styles/ui-tokens",
   "styles/toast",
+  "styles/liquid-glass",
   "tooling/appearance-check",
   "tooling/visual-center",
   "model-auth/packages/core",

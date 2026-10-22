@@ -6,6 +6,7 @@ on:
       - 'fluent-v*'
       - 'ui-tokens-v*'
       - 'toast-v*'
+      - 'liquid-glass-v*'
       - 'appearance-check-v*'
       - 'visual-center-v*'
       - 'model-auth-core-v*'
@@ -46,6 +47,7 @@ jobs:
       - run: node test/fluent-dark.browser.mjs
       - run: node test/connection-panel.browser.mjs
       - run: node test/toast-dom.browser.mjs
+      - run: node test/liquid-glass-dom.browser.mjs
       - run: pnpm run pack:release
       - run: node test/release-consumer.mjs
       - run: node --test test/appearance-consumer.mjs
@@ -81,6 +83,7 @@ jobs:
             appearance-check-v*) PACKAGE_DIR="platform-kit-appearance-check"; PACKAGE_LABEL="@platform-kit/appearance-check" ;;
             ui-tokens-v*) PACKAGE_DIR="platform-kit-ui-tokens"; PACKAGE_LABEL="@platform-kit/ui-tokens" ;;
             toast-v*) PACKAGE_DIR="platform-kit-toast"; PACKAGE_LABEL="@platform-kit/toast" ;;
+            liquid-glass-v*) PACKAGE_DIR="platform-kit-liquid-glass"; PACKAGE_LABEL="@platform-kit/liquid-glass" ;;
             model-auth-core-v*) PACKAGE_DIR="model-auth-core"; PACKAGE_LABEL="@model-auth/core" ;;
             model-auth-providers-v*) PACKAGE_DIR="model-auth-providers"; PACKAGE_LABEL="@model-auth/providers" ;;
             model-auth-vue-v*) PACKAGE_DIR="model-auth-vue"; PACKAGE_LABEL="@model-auth/vue" ;;

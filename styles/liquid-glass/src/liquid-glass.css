@@ -1,0 +1,151 @@
+/*
+ * Liquid glass, after Shu Ding's demo: a surface keeps its own edge, its middle stays nearly clear,
+ * and only the band along its rim refracts the page behind it (the lens is drawn by liquidGlass()).
+ * Override any --pk-glass-* variable on :root or a container; defaults have zero specificity.
+ */
+:where(:root, [data-pk-glass-theme="dark"]) {
+  --pk-glass-fill: rgba(34, 34, 32, 0.08);
+  --pk-glass-fill-hover: rgba(46, 46, 43, 0.2);
+  --pk-glass-filter: blur(0.25px) brightness(1.04) saturate(1.1);
+  --pk-glass-stroke: rgba(255, 255, 255, 0.05);
+  --pk-glass-stroke-hover: rgba(250, 249, 245, 0.16);
+  --pk-glass-rim: linear-gradient(140deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.1) 22%, rgba(255, 255, 255, 0.02) 50%, rgba(255, 255, 255, 0.07) 78%, rgba(255, 255, 255, 0.24));
+  --pk-glass-edge:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 1px 0 0 rgba(255, 150, 185, 0.07),
+    inset -1px 0 0 rgba(130, 190, 255, 0.09),
+    inset 0 12px 18px -16px rgba(255, 255, 255, 0.12),
+    inset 0 -14px 22px -18px rgba(255, 255, 255, 0.09),
+    0 10px 30px -16px rgba(0, 0, 0, 0.5);
+  --pk-glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.24);
+  --pk-glass-radius: 12px;
+  --pk-glass-field-fill: rgba(250, 249, 245, 0.045);
+  --pk-glass-field-fill-hover: rgba(250, 249, 245, 0.075);
+  --pk-glass-field-stroke: rgba(250, 249, 245, 0.12);
+  --pk-glass-field-stroke-hover: rgba(250, 249, 245, 0.2);
+  --pk-glass-field-edge:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 1px 0 0 rgba(255, 150, 185, 0.05),
+    inset -1px 0 0 rgba(130, 190, 255, 0.06),
+    inset 0 -6px 10px -9px rgba(255, 255, 255, 0.08);
+  --pk-glass-field-filter: var(--pk-glass-filter);
+  --pk-glass-field-radius: 6px;
+  --pk-glass-solid: #1b1b19;
+  --pk-glass-solid-stroke: rgba(250, 249, 245, 0.32);
+}
+
+:where([data-pk-glass-theme="light"]) {
+  --pk-glass-fill: rgba(255, 255, 255, 0.14);
+  --pk-glass-fill-hover: rgba(255, 255, 255, 0.34);
+  --pk-glass-filter: blur(0.25px) saturate(1.1);
+  --pk-glass-stroke: rgba(20, 20, 19, 0.07);
+  --pk-glass-stroke-hover: rgba(20, 20, 19, 0.16);
+  --pk-glass-rim: linear-gradient(140deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.55) 22%, rgba(255, 255, 255, 0.2) 50%, rgba(255, 255, 255, 0.45) 78%, rgba(255, 255, 255, 0.9));
+  --pk-glass-edge:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 1px 0 0 rgba(255, 170, 195, 0.12),
+    inset -1px 0 0 rgba(140, 190, 255, 0.14),
+    inset 0 12px 18px -16px rgba(255, 255, 255, 0.85),
+    inset 0 -14px 22px -18px rgba(255, 255, 255, 0.6),
+    0 12px 28px -18px rgba(20, 20, 19, 0.2);
+  --pk-glass-shadow: 0 1px 2px rgba(20, 20, 19, 0.05);
+  --pk-glass-field-fill: rgba(255, 255, 255, 0.3);
+  --pk-glass-field-fill-hover: rgba(255, 255, 255, 0.5);
+  --pk-glass-field-stroke: rgba(20, 20, 19, 0.12);
+  --pk-glass-field-stroke-hover: rgba(20, 20, 19, 0.2);
+  --pk-glass-field-edge:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 1px 0 0 rgba(255, 170, 195, 0.1),
+    inset -1px 0 0 rgba(140, 190, 255, 0.12),
+    inset 0 -6px 10px -9px rgba(255, 255, 255, 0.5);
+  --pk-glass-solid: #fdfcfa;
+  --pk-glass-solid-stroke: rgba(20, 20, 19, 0.36);
+}
+
+@media (prefers-color-scheme: light) {
+  :where(:root:not([data-pk-glass-theme="dark"])) {
+    --pk-glass-fill: rgba(255, 255, 255, 0.14);
+    --pk-glass-fill-hover: rgba(255, 255, 255, 0.34);
+    --pk-glass-filter: blur(0.25px) saturate(1.1);
+    --pk-glass-stroke: rgba(20, 20, 19, 0.07);
+    --pk-glass-stroke-hover: rgba(20, 20, 19, 0.16);
+    --pk-glass-rim: linear-gradient(140deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.55) 22%, rgba(255, 255, 255, 0.2) 50%, rgba(255, 255, 255, 0.45) 78%, rgba(255, 255, 255, 0.9));
+    --pk-glass-edge:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 1px 0 0 rgba(255, 170, 195, 0.12),
+      inset -1px 0 0 rgba(140, 190, 255, 0.14),
+      inset 0 12px 18px -16px rgba(255, 255, 255, 0.85),
+      inset 0 -14px 22px -18px rgba(255, 255, 255, 0.6),
+      0 12px 28px -18px rgba(20, 20, 19, 0.2);
+    --pk-glass-shadow: 0 1px 2px rgba(20, 20, 19, 0.05);
+    --pk-glass-field-fill: rgba(255, 255, 255, 0.3);
+    --pk-glass-field-fill-hover: rgba(255, 255, 255, 0.5);
+    --pk-glass-field-stroke: rgba(20, 20, 19, 0.12);
+    --pk-glass-field-stroke-hover: rgba(20, 20, 19, 0.2);
+    --pk-glass-field-edge:
+      inset 0 1px 0 rgba(255, 255, 255, 0.85),
+      inset 1px 0 0 rgba(255, 170, 195, 0.1),
+      inset -1px 0 0 rgba(140, 190, 255, 0.12),
+      inset 0 -6px 10px -9px rgba(255, 255, 255, 0.5);
+    --pk-glass-solid: #fdfcfa;
+    --pk-glass-solid-stroke: rgba(20, 20, 19, 0.36);
+  }
+}
+
+/* --- Surface: cards, panels, chart backgrounds --- */
+:where(.pk-glass) { position: relative; }
+.pk-glass {
+  background-color: var(--pk-glass-fill);
+  border: 1px solid var(--pk-glass-stroke);
+  border-radius: var(--pk-glass-radius);
+  /* `--pk-lens` is set on each refracting element once its rim map is drawn. */
+  backdrop-filter: var(--pk-lens,) var(--pk-glass-filter);
+  box-shadow: var(--pk-glass-edge), var(--pk-glass-shadow);
+}
+/* The rim light: a one-pixel gradient ring masked out of the surface's middle. */
+.pk-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: var(--pk-glass-rim);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+.pk-glass--interactive { transition: background-color 120ms linear, border-color 120ms linear; }
+.pk-glass--interactive:hover { background-color: var(--pk-glass-fill-hover); border-color: var(--pk-glass-stroke-hover); }
+
+/* --- Field: inputs, selects, search boxes. Replaced elements take no pseudo-element, so the rim is all inset light. --- */
+.pk-glass-field {
+  background-color: var(--pk-glass-field-fill);
+  border: 1px solid var(--pk-glass-field-stroke);
+  border-radius: var(--pk-glass-field-radius);
+  backdrop-filter: var(--pk-lens,) var(--pk-glass-field-filter);
+  box-shadow: var(--pk-glass-field-edge);
+}
+.pk-glass-field:hover:not(:disabled):not([readonly]) {
+  background-color: var(--pk-glass-field-fill-hover);
+  border-color: var(--pk-glass-field-stroke-hover);
+}
+
+/* Anything else lensed through attachLiquidGlass() or v-liquid-glass bends with the surface material's filter. */
+[data-liquid-glass]:where(:not(.pk-glass, .pk-glass-field)) { backdrop-filter: var(--pk-lens,) var(--pk-glass-filter); }
+
+/* Glass inside glass: the outer surface is the inner one's backdrop, so the inner one only keeps its material. */
+:is(.pk-glass, .pk-glass-field, [data-liquid-glass]) :is(.pk-glass, .pk-glass-field) { backdrop-filter: none; }
+
+@media (forced-colors: active), (prefers-contrast: more), (prefers-reduced-transparency: reduce) {
+  .pk-glass,
+  .pk-glass-field,
+  [data-liquid-glass] {
+    background-color: var(--pk-glass-solid);
+    border-color: var(--pk-glass-solid-stroke);
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+  .pk-glass::before { content: none; }
+}
