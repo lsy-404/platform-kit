@@ -2,6 +2,8 @@
 
 Real provider authentication, requests and usage queries for trusted desktop host processes. Never import this package into a renderer or send its credentials through renderer IPC.
 
+Requires Node.js 22.12 or later.
+
 ## OpenAI and Anthropic browser authorization
 
 ```ts
