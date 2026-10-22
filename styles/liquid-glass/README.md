@@ -6,6 +6,8 @@ and only the band along its rim refracts the page behind it.
 
 - **Lens** — `liquidGlass()` watches a subtree and gives each matching element an SVG displacement filter sized to
   its box and corner radius (`--pk-lens`). Filters are shared per shape, maps are cached, resizes are throttled.
+  Each map is cut into four corners and four one-pixel edge lines over a neutral fill, so the few kilobytes the
+  compositor receives with every frame behind the glass do not grow with the element.
 - **Materials** — `.pk-glass` for cards, panels and chart backgrounds (fill, stroke, edge light, a masked rim
   gradient) and `.pk-glass-field` for inputs, selects and search boxes (inset rim light, no pseudo-element).
 - **Fallbacks** — forced colors, more contrast and reduced transparency get an opaque surface and no lens; engines
@@ -14,7 +16,7 @@ and only the band along its rim refracts the page behind it.
 ## Install
 
 ```json
-"@platform-kit/liquid-glass": "https://github.com/lsy-404/platform-kit/releases/download/liquid-glass-v0.2.1/platform-kit-liquid-glass-0.2.1.tgz"
+"@platform-kit/liquid-glass": "https://github.com/lsy-404/platform-kit/releases/download/liquid-glass-v0.2.2/platform-kit-liquid-glass-0.2.2.tgz"
 ```
 
 ## Use

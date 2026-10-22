@@ -1,4 +1,4 @@
-import { displacementMap, type LensTuning } from "./map.js";
+import { slicedDisplacementMap, type LensTuning, type MapSlice } from "./map.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 /** A resizing element rebuilds its map at most this often; a large surface's map takes tens of milliseconds. */
@@ -19,7 +19,8 @@ export const LIQUID_GLASS_TUNING_PROPERTIES = ["--pk-glass-refraction", "--pk-gl
 export const LIQUID_GLASS_SELECTOR = ".pk-glass, .pk-glass-field, [data-pk-glass]";
 
 interface Lens { id: string; filter: SVGFilterElement; users: number }
-interface DrawnMap { url: string; scale: number }
+interface DrawnSlice { url: string; x: number; y: number; width: number; height: number }
+interface DrawnMap { slices: DrawnSlice[]; scale: number }
 
 let defs: SVGDefsElement | null = null;
 const lenses = new Map<string, Lens>();
@@ -48,13 +49,17 @@ function readTuning(style: CSSStyleDeclaration): Tuning {
   };
 }
 
-function drawMap(w: number, h: number, radius: number, tuning: Tuning): DrawnMap {
-  const map = displacementMap(w, h, radius, tuning);
+function drawSlice(slice: MapSlice): DrawnSlice {
   const canvas = document.createElement("canvas");
-  canvas.width = map.width;
-  canvas.height = map.height;
-  canvas.getContext("2d")?.putImageData(new ImageData(map.data, map.width, map.height), 0, 0);
-  return { url: canvas.toDataURL(), scale: map.scale };
+  canvas.width = slice.dataWidth;
+  canvas.height = slice.dataHeight;
+  canvas.getContext("2d")?.putImageData(new ImageData(slice.data, slice.dataWidth, slice.dataHeight), 0, 0);
+  return { url: canvas.toDataURL(), x: slice.x, y: slice.y, width: slice.width, height: slice.height };
+}
+
+function drawMap(w: number, h: number, radius: number, tuning: Tuning): DrawnMap {
+  const map = slicedDisplacementMap(w, h, radius, tuning);
+  return { slices: map.slices.map(drawSlice), scale: map.scale };
 }
 
 function cachedMap(key: string, w: number, h: number, radius: number, tuning: Tuning): DrawnMap {
@@ -86,6 +91,22 @@ function svg<K extends keyof SVGElementTagNameMap>(name: K, attributes: Record<s
   return el;
 }
 
+/** Primitives that leave the map in `map`: one image, or the slices laid over a neutral fill. */
+function mapPrimitives(slices: DrawnSlice[], w: number, h: number): SVGElement[] {
+  // Stretching a one-pixel edge line to its length takes ignoring its aspect ratio.
+  const image = (slice: DrawnSlice, result: string) => svg("feImage", {
+    href: slice.url, x: slice.x, y: slice.y, width: slice.width, height: slice.height, preserveAspectRatio: "none", result,
+  });
+  if (slices.length === 1) return [image(slices[0]!, "map")];
+  const merge = svg("feMerge", { result: "map" });
+  merge.append(svg("feMergeNode", { in: "neutral" }), ...slices.map((_, i) => svg("feMergeNode", { in: `slice${i}` })));
+  return [
+    svg("feFlood", { "flood-color": "rgb(128, 128, 0)", "flood-opacity": 1, x: 0, y: 0, width: w, height: h, result: "neutral" }),
+    ...slices.map((slice, i) => image(slice, `slice${i}`)),
+    merge,
+  ];
+}
+
 /** One filter per element size, corner radius and tuning, shared by every element of that shape. */
 function acquire(w: number, h: number, radius: number, tuning: Tuning): Lens {
   const mapKey = `${w}x${h}r${radius}f${tuning.refraction}w${tuning.rimWidth}`;
@@ -101,9 +122,9 @@ function acquire(w: number, h: number, radius: number, tuning: Tuning): Lens {
     filter.setAttribute("y", "0");
     filter.setAttribute("width", String(w));
     filter.setAttribute("height", String(h));
-    const { url, scale } = cachedMap(mapKey, w, h, radius, tuning);
+    const { slices, scale } = cachedMap(mapKey, w, h, radius, tuning);
+    filter.append(...mapPrimitives(slices, w, h));
     filter.append(
-      svg("feImage", { href: url, width: w, height: h, result: "map" }),
       svg("feDisplacementMap", { in: "SourceGraphic", in2: "map", scale, xChannelSelector: "R", yChannelSelector: "G", result: "bent" }),
     );
     if (tuning.edgeBlur > 0) {

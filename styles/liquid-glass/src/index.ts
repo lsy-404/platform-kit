@@ -1,4 +1,12 @@
-export { displacementMap, roundedRectSdf, type DisplacementMap, type LensTuning } from "./map.js";
+export {
+  displacementMap,
+  roundedRectSdf,
+  slicedDisplacementMap,
+  type DisplacementMap,
+  type LensTuning,
+  type MapSlice,
+  type SlicedDisplacementMap,
+} from "./map.js";
 export {
   LIQUID_GLASS_DISABLED_QUERY,
   LIQUID_GLASS_LENS_PROPERTY,
