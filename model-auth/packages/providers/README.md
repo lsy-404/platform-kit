@@ -18,6 +18,20 @@ Use `authorizeAnthropic` and `refreshAnthropic` with the same host contract for 
 
 Credentials contain `type: "oauth"`, `access`, `refresh`, `expires` (Unix milliseconds), and optional `accountId` and `idToken`. Store and renew them only in a trusted host process. Persist rotated tokens before the next request. A successful token exchange is required and service account restrictions still apply.
 
+### One-login Chromium session
+
+```ts
+import { authorizeAnthropicInBrowser } from "@model-auth/providers/anthropic-browser";
+
+const { credential, cookies } = await authorizeAnthropicInBrowser({
+  executablePath: installedChromiumPath,
+  browserArgs: proxyArgs,
+  signal,
+});
+```
+
+This trusted-host API launches an installed Chromium browser with a temporary profile, completes the shared Anthropic OAuth flow, and returns only `claude.ai` cookies alongside the OAuth credential. The host resolves the executable and proxy arguments, then owns secure persistence and use of both results. The temporary profile is removed when authorization finishes; the package does not persist credentials or cookies.
+
 ## WorkBuddy browser authorization
 
 ```ts
