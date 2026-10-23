@@ -31,6 +31,9 @@
       "usage": [
         "dist/usage.d.ts"
       ],
+      "reset-credits": [
+        "dist/reset-credits.d.ts"
+      ],
       "pi": [
         "dist/pi.d.ts"
       ],
@@ -93,6 +96,10 @@
     "./usage": {
       "types": "./dist/usage.d.ts",
       "import": "./dist/usage.js"
+    },
+    "./reset-credits": {
+      "types": "./dist/reset-credits.d.ts",
+      "import": "./dist/reset-credits.js"
     },
     "./pi": {
       "types": "./dist/pi.d.ts",

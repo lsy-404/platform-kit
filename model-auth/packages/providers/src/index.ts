@@ -7,6 +7,7 @@ export * from "./client-versions.js";
 export * from "./ollama.js";
 export * from "./opencode.js";
 export * from "./usage.js";
+export * from "./reset-credits.js";
 export * from "./capabilities.js";
 export * from "./pi.js";
 export { BrowserOAuthError, type BrowserOAuthErrorCode, type BrowserOAuthCredential, type BrowserOAuthAuthorizationOptions, type BrowserOAuthRefreshOptions } from "./browser-oauth.js";
