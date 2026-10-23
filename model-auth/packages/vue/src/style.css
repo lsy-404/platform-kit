@@ -232,3 +232,11 @@
 .model-auth-credential-login small { color: var(--ma-muted, currentColor); }
 
 .model-auth-connections.model-auth-styled { padding: 16px; border: 1px solid var(--ma-line); border-radius: 8px; background: var(--ma-surface); }
+
+.model-auth-reset-vouchers { display: grid; gap: 8px; min-width: 0; flex: 1 1 100%; }
+.model-auth-reset-heading, .model-auth-reset-voucher { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.model-auth-reset-heading > button { margin-left: auto; }
+.model-auth-reset-voucher { width: 100%; padding: 8px; border: 1px solid var(--ma-line, currentColor); border-radius: 6px; }
+.model-auth-reset-voucher-info { display: grid; gap: 3px; min-width: 0; flex: 1 1 220px; }
+.model-auth-reset-status { color: var(--ma-danger, currentColor); }
+.model-auth-reset-confirm { display: grid; gap: 8px; flex: 1 1 100%; padding: 10px; border-inline-start: 3px solid var(--ma-danger, currentColor); }

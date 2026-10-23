@@ -86,6 +86,23 @@ export interface CredentialUsageExtraUsage {
   currency: string | null;
 }
 
+export interface ResetVoucher {
+  id: string;
+  label: string;
+  scope: string;
+  expiresAt: number | null;
+  startsAt: number | null;
+  remaining: number | null;
+  available: boolean;
+}
+
+export interface CredentialResets {
+  status: "unknown" | "ok" | "signed-out" | "error";
+  vouchers: ResetVoucher[];
+  checkedAt: number | null;
+  error: string | null;
+}
+
 export interface CredentialUsage {
   providerId: string;
   credentialId: string;
@@ -131,6 +148,7 @@ export interface ProviderCredential {
   extend?: CredentialExtend;
   secret?: string;
   usage?: CredentialUsage | null;
+  resets?: CredentialResets | null;
   login?: { username: string; passwordSaved: boolean } | null;
 }
 

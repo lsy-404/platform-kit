@@ -14,6 +14,8 @@ export type ModelAuthAction =
   | { type: "authorize-oauth"; providerId: string; credentialId?: string }
   | { type: "logout"; providerId: string; credentialId: string }
   | { type: "query-usage"; providerId: string; credentialId: string }
+  | { type: "query-resets"; providerId: string; credentialId: string }
+  | { type: "redeem-reset"; providerId: string; credentialId: string; resetId: string }
   | { type: "add-api-key"; payload: AddApiKeyPayload }
   | { type: "remove-credential"; providerId: string; credentialId: string; authMethod: AuthMethod }
   | { type: "update-credential"; payload: CredentialUpdatePayload }
@@ -91,6 +93,8 @@ export function useModelAuth(host: ModelAuthHost, options: { errorMessage?: stri
     "reconnect-oauth": (providerId: string, credentialId: string) => run({ type: "authorize-oauth", providerId, credentialId }),
     logout: (providerId: string, credentialId: string) => run({ type: "logout", providerId, credentialId }),
     "query-usage": (providerId: string, credentialId: string) => run({ type: "query-usage", providerId, credentialId }),
+    "query-resets": (providerId: string, credentialId: string) => run({ type: "query-resets", providerId, credentialId }),
+    "redeem-reset": (providerId: string, credentialId: string, resetId: string) => run({ type: "redeem-reset", providerId, credentialId, resetId }),
     "add-api-key": (payload: AddApiKeyPayload) => run({ type: "add-api-key", payload }),
     "remove-oauth": (providerId: string, credentialId: string) => run({ type: "remove-credential", providerId, credentialId, authMethod: "oauth" }),
     "remove-api-key": (providerId: string, credentialId: string) => run({ type: "remove-credential", providerId, credentialId, authMethod: "api-key" }),

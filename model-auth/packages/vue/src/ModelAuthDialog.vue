@@ -6,7 +6,7 @@ import ProviderMark from "./ProviderMark.vue";
 import { formatPercentage } from "./percentage";
 import { credentialReady, fill, formatCooldown, formatExactTimestamp, usagePlanLabel, windowRemaining } from "./usage";
 import type {
-  AddApiKeyPayload, AuthMethod, CredentialExtend, CredentialLoginInput, CredentialReorderPayload, CredentialUpdatePayload, CatalogStatus, 
+  AddApiKeyPayload, AuthMethod, CredentialExtend, CredentialLoginInput, CredentialReorderPayload, CredentialUpdatePayload, CatalogStatus, ResetVoucher,
   ModelAuthProvider, ModelConnectionTarget, ProviderAuthResponseRequest, ProviderAuthState, ProviderCredential, ProviderAuthNotice, ProviderUpdatePayload, Theme, CredentialUsage, CredentialUsageEstimate, CredentialUsageWindow,
 } from "./types";
 
@@ -43,6 +43,8 @@ const emit = defineEmits<{
   "remove-api-key": [providerId: string, credentialId: string];
   "refresh-catalog": [];
   "query-usage": [providerId: string, credentialId: string];
+  "query-resets": [providerId: string, credentialId: string];
+  "redeem-reset": [providerId: string, credentialId: string, resetId: string];
   logout: [providerId: string, credentialId: string];
   "respond-auth": [response: ProviderAuthResponseRequest];
   "cancel-auth": [loginId: string];
@@ -71,6 +73,7 @@ const pendingLoginClear = ref("");
 const hiddenSecrets = reactive<Record<string, boolean>>({});
 const localError = ref("");
 const pendingRemoval = ref("");
+const pendingVoucherUse = ref("");
 const connectionMode = ref(false);
 let awaitingVerification = false;
 const titleId = "model-auth-" + useId();
@@ -152,7 +155,7 @@ function resetState() {
   method.value = props.initialConnection?.method ?? props.initialMethod;
   step.value = props.initialConnection ? "detail" : props.separateAuthMethods ? "method" : "providers";
   selectedProviderId.value = props.initialConnection?.providerId ?? ""; search.value = "";
-  focusedProviderIndex.value = -1; for (const key of Object.keys(expandedGroups)) delete expandedGroups[key]; pendingRemoval.value = ""; localError.value = ""; clearSecret();
+  focusedProviderIndex.value = -1; for (const key of Object.keys(expandedGroups)) delete expandedGroups[key]; pendingRemoval.value = ""; pendingVoucherUse.value = ""; localError.value = ""; clearSecret();
 }
 function reducedMotion() { return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches; }
 async function focusHeading() { await nextTick(); if (props.open && modalState.value !== "closing") heading.value?.focus(); }
@@ -340,6 +343,40 @@ function queryUsage(credential: ProviderCredential) {
   if (!provider || props.busy || (!provider.usageEnabled && !credential.usage)) return;
   emit("query-usage", provider.id, credential.id);
 }
+function queryResets(credential: ProviderCredential) {
+  const provider = selectedProvider.value;
+  if (!provider || props.busy || credential.resets === undefined) return;
+  emit("query-resets", provider.id, credential.id);
+}
+function voucherKey(credential: ProviderCredential, resetId: string): string {
+  return [selectedProviderId.value, credential.id, resetId].join("/");
+}
+function voucherUnavailableReason(voucher: ResetVoucher): string | null {
+  if (!voucher.available) return text.value.resetVoucherUnavailable;
+  if (voucher.expiresAt !== null && voucher.expiresAt <= Date.now()) return text.value.resetVoucherExpired;
+  if (voucher.startsAt !== null && voucher.startsAt > Date.now()) return text.value.resetVoucherNotStarted;
+  return null;
+}
+function voucherUseDisabled(credential: ProviderCredential, voucher: ResetVoucher): boolean {
+  return props.busy || credential.resets?.status !== "ok" || voucherUnavailableReason(voucher) !== null;
+}
+function requestVoucherUse(credential: ProviderCredential, voucher: ResetVoucher) {
+  if (voucherUseDisabled(credential, voucher)) return;
+  pendingVoucherUse.value = voucherKey(credential, voucher.id);
+}
+function cancelVoucherUse() { pendingVoucherUse.value = ""; }
+function confirmVoucherUse(credential: ProviderCredential, voucher: ResetVoucher) {
+  const provider = selectedProvider.value;
+  if (!provider || voucherUseDisabled(credential, voucher) || pendingVoucherUse.value !== voucherKey(credential, voucher.id)) return;
+  pendingVoucherUse.value = "";
+  emit("redeem-reset", provider.id, credential.id, voucher.id);
+}
+function voucherConfirmationText(credential: ProviderCredential, voucher: ResetVoucher): string {
+  return fill(text.value.resetVoucherConfirmation, { account: credential.account || credential.label, label: voucher.label, scope: voucher.scope });
+}
+function voucherTimestamp(value: number | null): string {
+  return formatExactTimestamp(value) ?? text.value.remainingUnknown;
+}
 function usageEstimateText(estimate: CredentialUsageEstimate): string {
   const remaining = estimate.remainingPercent === null ? text.value.remainingUnknown : `${formatPercentage(estimate.remainingPercent, props.percentagePrecision)}%`;
   return text.value.usageEstimate.replace("{tokens}", new Intl.NumberFormat().format(estimate.windowTokens)).replace("{remaining}", remaining);
@@ -415,7 +452,7 @@ function startNewConnection() {
   connectionMode.value = false;
   transitionName.value = "model-auth-step-forward";
   step.value = props.separateAuthMethods ? "method" : "providers"; selectedProviderId.value = ""; search.value = "";
-  pendingRemoval.value = ""; localError.value = ""; clearSecret(); void focusHeading();
+  pendingRemoval.value = ""; pendingVoucherUse.value = ""; localError.value = ""; clearSecret(); void focusHeading();
 }
 function advanceToConfirmation() {
   if (step.value !== "detail" || !authReady.value || props.busy) return;
@@ -600,7 +637,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                     <span class="model-auth-switch-track" aria-hidden="true"></span>{{ text.enable }}
                   </label>
                 </div>
-                <div v-if="credential.usage || selectedProvider.usageEnabled" class="model-auth-usage" data-part="credential-usage">
+                <div v-if="credential.usage || selectedProvider.usageEnabled || credential.resets !== undefined" class="model-auth-usage" data-part="credential-usage">
                   <template v-if="credential.usage">
                     <span v-if="credential.usage.plan">{{ usagePlanLabel(credential.usage) }}</span>
                     <span v-if="credential.usage.balance">{{ credential.usage.balance.amount }} {{ credential.usage.balance.unit }}</span>
@@ -610,8 +647,26 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                     <span v-if="credential.usage.subscriptionExpiresAt !== undefined" data-part="subscription-expiry">{{ subscriptionTimeText(text.usageExpiresAt, credential.usage.subscriptionExpiresAt) }}</span>
                     <span v-if="credential.usage.error">{{ credential.usage.error }}</span>
                   </template>
-                  <button type="button" class="model-auth-subtle" data-part="query-usage" :disabled="busy" @click="queryUsage(credential)">{{ credential.usage ? text.refreshUsage : text.queryUsage }}</button>
+                  <button v-if="selectedProvider.usageEnabled || credential.usage" type="button" class="model-auth-subtle" data-part="query-usage" :disabled="busy" @click="queryUsage(credential)">{{ credential.usage ? text.refreshUsage : text.queryUsage }}</button>
                 </div>
+                <section v-if="credential.resets !== undefined" class="model-auth-reset-vouchers" data-part="credential-resets" :aria-label="text.resetVouchers">
+                  <div class="model-auth-reset-heading"><strong>{{ text.resetVouchers }}</strong><button type="button" class="model-auth-subtle" data-part="query-resets" :disabled="busy" @click="queryResets(credential)">{{ credential.resets?.status === "ok" ? text.refreshResets : text.queryResets }}</button></div>
+                  <p v-if="!credential.resets || credential.resets.status === 'unknown'" role="status">{{ credential.resets?.error || text.resetVoucherUnknown }}</p>
+                  <p v-else-if="credential.resets?.status === 'signed-out'" role="status">{{ credential.resets.error || text.resetVoucherSignedOut }}</p>
+                  <p v-else-if="credential.resets?.status === 'error'" class="model-auth-error" role="status">{{ credential.resets.error || text.resetVoucherError }}</p>
+                  <small v-if="credential.resets?.checkedAt !== null && credential.resets?.checkedAt !== undefined">{{ fill(text.resetVoucherCheckedAt, { time: voucherTimestamp(credential.resets.checkedAt) }) }}</small>
+                  <p v-if="credential.resets?.status === 'ok' && !credential.resets.vouchers.length">{{ text.resetVoucherEmpty }}</p>
+                  <article v-for="voucher in credential.resets?.vouchers ?? []" :key="voucher.id" class="model-auth-reset-voucher" data-part="reset-voucher">
+                    <div class="model-auth-reset-voucher-info"><strong>{{ voucher.label }}</strong><span>{{ fill(text.resetVoucherScope, { scope: voucher.scope }) }}</span><span>{{ fill(text.resetVoucherRemaining, { remaining: voucher.remaining ?? text.remainingUnknown }) }}</span><span>{{ fill(text.resetVoucherStarts, { time: voucherTimestamp(voucher.startsAt) }) }}</span><span>{{ fill(text.resetVoucherExpires, { time: voucherTimestamp(voucher.expiresAt) }) }}</span></div>
+                    <span v-if="voucherUnavailableReason(voucher)" class="model-auth-reset-status" role="status">{{ voucherUnavailableReason(voucher) }}</span>
+                    <button type="button" class="model-auth-danger" data-part="use-reset-voucher" :disabled="voucherUseDisabled(credential, voucher)" @click="requestVoucherUse(credential, voucher)">{{ pendingVoucherUse === voucherKey(credential, voucher.id) ? text.resetVoucherReview : text.resetVoucherUse }}</button>
+                    <div v-if="pendingVoucherUse === voucherKey(credential, voucher.id)" class="model-auth-reset-confirm" role="group" :aria-label="text.resetVoucherReview">
+                      <p>{{ voucherConfirmationText(credential, voucher) }}</p>
+                      <div class="model-auth-credential-actions"><button type="button" class="model-auth-danger" data-part="confirm-reset-voucher" :disabled="voucherUseDisabled(credential, voucher)" @click="confirmVoucherUse(credential, voucher)">{{ text.resetVoucherConfirmUse }}</button><button type="button" class="model-auth-secondary" data-part="cancel-reset-voucher" :disabled="busy" @click="cancelVoucherUse">{{ text.resetVoucherCancel }}</button></div>
+                    </div>
+                  </article>
+                </section>
+
                 <div v-if="method === 'oauth' && needsReconnect(credential)" class="model-auth-credential-actions">
                   <button type="button" class="model-auth-primary" data-part="reconnect" :disabled="busy || !canUseMethod" @click="authorize(credential.id)">{{ text.reconnect }}</button>
                 </div>
