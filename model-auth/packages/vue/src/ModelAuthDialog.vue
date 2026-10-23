@@ -4,10 +4,10 @@ import { defaultMessages, type ModelAuthMessages } from "./messages";
 import ModelAuthIcon from "./ModelAuthIcon.vue";
 import ProviderMark from "./ProviderMark.vue";
 import { formatPercentage } from "./percentage";
-import { credentialReady, fill, formatCooldown, usagePlanLabel, windowRemaining } from "./usage";
+import { credentialReady, fill, formatCooldown, formatExactTimestamp, usagePlanLabel, windowRemaining } from "./usage";
 import type {
   AddApiKeyPayload, AuthMethod, CredentialExtend, CredentialLoginInput, CredentialReorderPayload, CredentialUpdatePayload, CatalogStatus, 
-  ModelAuthProvider, ModelConnectionTarget, ProviderAuthResponseRequest, ProviderAuthState, ProviderCredential, ProviderAuthNotice, ProviderUpdatePayload, Theme, CredentialUsageEstimate, CredentialUsageWindow,
+  ModelAuthProvider, ModelConnectionTarget, ProviderAuthResponseRequest, ProviderAuthState, ProviderCredential, ProviderAuthNotice, ProviderUpdatePayload, Theme, CredentialUsage, CredentialUsageEstimate, CredentialUsageWindow,
 } from "./types";
 
 const props = withDefaults(defineProps<{
@@ -351,7 +351,15 @@ function windowText(window: CredentialUsageWindow): string {
   return fill(text.value.usageRemaining, { label: window.label, percent: usagePercentText(windowRemaining(window)) });
 }
 function windowTitle(window: CredentialUsageWindow): string | undefined {
-  return window.resetAt ? new Date(window.resetAt).toLocaleString() : undefined;
+  return formatExactTimestamp(window.resetAt) ?? undefined;
+}
+function windowResetText(window: CredentialUsageWindow, usage: CredentialUsage): string {
+  const time = formatExactTimestamp(window.resetAt);
+  if (!time) return text.value.usageResetUnknown;
+  return fill(usage.basis === "estimated" ? text.value.usageResetEstimated : text.value.usageResetAt, { time });
+}
+function subscriptionTimeText(template: string, timestamp: number | null | undefined): string {
+  return fill(template, { time: formatExactTimestamp(timestamp) ?? text.value.remainingUnknown });
 }
 function windowLow(window: CredentialUsageWindow): boolean {
   return window.status === "exhausted" || (windowRemaining(window) ?? 100) <= 10;
@@ -596,8 +604,10 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                   <template v-if="credential.usage">
                     <span v-if="credential.usage.plan">{{ usagePlanLabel(credential.usage) }}</span>
                     <span v-if="credential.usage.balance">{{ credential.usage.balance.amount }} {{ credential.usage.balance.unit }}</span>
-                    <span v-for="window in credential.usage.windows" :key="window.id" :title="windowTitle(window)" :data-low="windowLow(window)">{{ windowText(window) }}</span>
+                    <span v-for="window in credential.usage.windows" :key="window.id" :title="windowTitle(window)" :data-low="windowLow(window)">{{ windowText(window) }} · {{ windowResetText(window, credential.usage) }}</span>
                     <span v-if="credential.usage.estimate">{{ usageEstimateText(credential.usage.estimate) }}</span>
+                    <span v-if="credential.usage.subscriptionRenewsAt !== undefined" data-part="subscription-renewal">{{ subscriptionTimeText(text.usageRenewalAt, credential.usage.subscriptionRenewsAt) }}</span>
+                    <span v-if="credential.usage.subscriptionExpiresAt !== undefined" data-part="subscription-expiry">{{ subscriptionTimeText(text.usageExpiresAt, credential.usage.subscriptionExpiresAt) }}</span>
                     <span v-if="credential.usage.error">{{ credential.usage.error }}</span>
                   </template>
                   <button type="button" class="model-auth-subtle" data-part="query-usage" :disabled="busy" @click="queryUsage(credential)">{{ credential.usage ? text.refreshUsage : text.queryUsage }}</button>

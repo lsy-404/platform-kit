@@ -1,5 +1,22 @@
 import type { CredentialUsage, CredentialUsageWindow, CredentialUsageWindowStatus, ProviderCredential } from "./types";
 
+/** Keep the local zone visible so displayed absolute times are unambiguous. */
+export function formatExactTimestamp(timestamp: number | null | undefined, locale?: string): string | null {
+  if (timestamp === null || timestamp === undefined || !Number.isFinite(timestamp)) return null;
+  const date = new Date(timestamp);
+  if (!Number.isFinite(date.getTime())) return null;
+
+  const dateFormatter = new Intl.DateTimeFormat(locale, { dateStyle: "medium" });
+  const timeFormatter = new Intl.DateTimeFormat(locale, {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZoneName: "longOffset",
+  });
+  const timeZone = dateFormatter.resolvedOptions().timeZone;
+  return dateFormatter.format(date) + ", " + timeFormatter.format(date) + " [" + timeZone + "]";
+}
+
 export function usagePlanLabel(usage: Pick<CredentialUsage, "plan" | "planMultiplier">): string | null {
   if (!usage.plan) return null;
   const names: Record<string, string> = { free: "Free", go: "Go", plus: "Plus", pro: "Pro", business: "Business", enterprise: "Enterprise", edu: "Edu" };
