@@ -26,3 +26,7 @@ Provider icons for known ids are bundled as inline SVG and never fetched. `Model
 New connections start with one searchable provider list. Each entry identifies its OAuth or Key method. For a provider with `accountLogin: true`, each API key can include an optional `login` payload for host-side usage queries. Return only `username` and `passwordSaved` in the credential view; keep the password in the host's encrypted store.
 
 `ModelAuthDialog.separateAuthMethods` defaults to `false`, showing OAuth and Key provider entries together. Set it to `true` to choose the authentication method before the provider. Existing connections still open directly through `initialConnection`. For custom elements, set `element.separateAuthMethods = true`.
+
+Exact usage reset, subscription renewal and subscription expiry times appear directly in connection details. `formatExactTimestamp(value, locale?)` formats an epoch-millisecond timestamp with seconds and an explicit local UTC offset; missing values remain unknown.
+
+Set `ProviderCredential.resets` to expose reset vouchers. Handle `query-resets` and `redeem-reset` through the host, returning updated state after each operation. The dialog shows voucher expiry and scope and requires confirmation before emitting redemption. The host owns account binding, request ids and post-attempt reconciliation.

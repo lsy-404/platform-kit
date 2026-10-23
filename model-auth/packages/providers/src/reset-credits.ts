@@ -298,7 +298,7 @@ async function requestJson(fetchImpl: typeof fetch, url: string, init: RequestIn
   const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
   let response: Response;
   try {
-    response = await fetchImpl(url, { ...init, signal: requestSignal });
+    response = await fetchImpl(url, { ...init, redirect: "manual", signal: requestSignal });
   } catch (error) {
     if (signal?.aborted) throw new Error("Reset credit request was cancelled.");
     throw new Error(error instanceof Error && error.name === "TimeoutError" ? "Reset credit request timed out." : "Reset credit request failed.");
