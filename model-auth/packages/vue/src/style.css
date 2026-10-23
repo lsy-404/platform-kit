@@ -240,3 +240,4 @@
 .model-auth-reset-voucher-info { display: grid; gap: 3px; min-width: 0; flex: 1 1 220px; }
 .model-auth-reset-status { color: var(--ma-danger, currentColor); }
 .model-auth-reset-confirm { display: grid; gap: 8px; flex: 1 1 100%; padding: 10px; border-inline-start: 3px solid var(--ma-danger, currentColor); }
+.model-auth-reset-times { display: flex; flex-wrap: wrap; gap: 6px 12px; padding-left: 17px; color: var(--ma-muted, currentColor); font-size: 12px; }

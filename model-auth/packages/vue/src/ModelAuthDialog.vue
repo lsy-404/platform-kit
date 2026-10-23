@@ -351,9 +351,14 @@ function queryResets(credential: ProviderCredential) {
 function voucherKey(credential: ProviderCredential, resetId: string): string {
   return [selectedProviderId.value, credential.id, resetId].join("/");
 }
+function validVoucherTime(value: number): boolean {
+  return Number.isFinite(value) && Number.isFinite(new Date(value).getTime());
+}
 function voucherUnavailableReason(voucher: ResetVoucher): string | null {
   if (!voucher.available) return text.value.resetVoucherUnavailable;
+  if (voucher.expiresAt !== null && !validVoucherTime(voucher.expiresAt)) return text.value.resetVoucherTimeUnknown;
   if (voucher.expiresAt !== null && voucher.expiresAt <= Date.now()) return text.value.resetVoucherExpired;
+  if (voucher.startsAt !== null && !validVoucherTime(voucher.startsAt)) return text.value.resetVoucherTimeUnknown;
   if (voucher.startsAt !== null && voucher.startsAt > Date.now()) return text.value.resetVoucherNotStarted;
   return null;
 }
@@ -388,7 +393,7 @@ function windowText(window: CredentialUsageWindow): string {
   return fill(text.value.usageRemaining, { label: window.label, percent: usagePercentText(windowRemaining(window)) });
 }
 function windowTitle(window: CredentialUsageWindow): string | undefined {
-  return formatExactTimestamp(window.resetAt) ?? undefined;
+  return window.resetAt ? new Date(window.resetAt).toLocaleString() : undefined;
 }
 function windowResetText(window: CredentialUsageWindow, usage: CredentialUsage): string {
   const time = formatExactTimestamp(window.resetAt);
@@ -641,13 +646,16 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                   <template v-if="credential.usage">
                     <span v-if="credential.usage.plan">{{ usagePlanLabel(credential.usage) }}</span>
                     <span v-if="credential.usage.balance">{{ credential.usage.balance.amount }} {{ credential.usage.balance.unit }}</span>
-                    <span v-for="window in credential.usage.windows" :key="window.id" :title="windowTitle(window)" :data-low="windowLow(window)">{{ windowText(window) }} · {{ windowResetText(window, credential.usage) }}</span>
+                    <span v-for="window in credential.usage.windows" :key="window.id" data-part="usage-window" :title="windowTitle(window)" :data-low="windowLow(window)">{{ windowText(window) }}</span>
                     <span v-if="credential.usage.estimate">{{ usageEstimateText(credential.usage.estimate) }}</span>
                     <span v-if="credential.usage.subscriptionRenewsAt !== undefined" data-part="subscription-renewal">{{ subscriptionTimeText(text.usageRenewalAt, credential.usage.subscriptionRenewsAt) }}</span>
                     <span v-if="credential.usage.subscriptionExpiresAt !== undefined" data-part="subscription-expiry">{{ subscriptionTimeText(text.usageExpiresAt, credential.usage.subscriptionExpiresAt) }}</span>
                     <span v-if="credential.usage.error">{{ credential.usage.error }}</span>
                   </template>
                   <button v-if="selectedProvider.usageEnabled || credential.usage" type="button" class="model-auth-subtle" data-part="query-usage" :disabled="busy" @click="queryUsage(credential)">{{ credential.usage ? text.refreshUsage : text.queryUsage }}</button>
+                </div>
+                <div v-if="credential.usage && credential.usage.windows.length" class="model-auth-reset-times" data-part="usage-reset-times">
+                  <span v-for="window in credential.usage.windows" :key="window.id" data-part="usage-reset-time">{{ windowResetText(window, credential.usage) }}</span>
                 </div>
                 <section v-if="credential.resets !== undefined" class="model-auth-reset-vouchers" data-part="credential-resets" :aria-label="text.resetVouchers">
                   <div class="model-auth-reset-heading"><strong>{{ text.resetVouchers }}</strong><button type="button" class="model-auth-subtle" data-part="query-resets" :disabled="busy" @click="queryResets(credential)">{{ credential.resets?.status === "ok" ? text.refreshResets : text.queryResets }}</button></div>
