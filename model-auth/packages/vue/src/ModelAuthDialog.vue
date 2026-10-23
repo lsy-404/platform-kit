@@ -351,6 +351,24 @@ function queryResets(credential: ProviderCredential) {
 function voucherKey(credential: ProviderCredential, resetId: string): string {
   return [selectedProviderId.value, credential.id, resetId].join("/");
 }
+const voucherScopeMessages: Readonly<Record<string, keyof ModelAuthMessages>> = {
+  five_hour: "resetVoucherScopeFiveHour",
+  seven_day: "resetVoucherScopeSevenDay",
+  seven_day_overage_included: "resetVoucherScopeSevenDayOverage",
+  seven_day_opus: "resetVoucherScopeSevenDayOpus",
+  seven_day_sonnet: "resetVoucherScopeSevenDaySonnet",
+  seven_day_cowork: "resetVoucherScopeSevenDayCowork",
+  seven_day_omelette: "resetVoucherScopeSevenDayOmelette",
+  seven_day_oauth_apps: "resetVoucherScopeSevenDayOauthApps",
+  codex_rate_limits: "resetVoucherScopeCodexRateLimits",
+};
+function voucherScope(scope: string): string {
+  return scope.split(",").map((part) => {
+    const value = part.trim();
+    const message = voucherScopeMessages[value];
+    return message ? text.value[message] : value;
+  }).join(", ");
+}
 function validVoucherTime(value: number): boolean {
   return Number.isFinite(value) && Number.isFinite(new Date(value).getTime());
 }
@@ -377,7 +395,7 @@ function confirmVoucherUse(credential: ProviderCredential, voucher: ResetVoucher
   emit("redeem-reset", provider.id, credential.id, voucher.id);
 }
 function voucherConfirmationText(credential: ProviderCredential, voucher: ResetVoucher): string {
-  return fill(text.value.resetVoucherConfirmation, { account: credential.account || credential.label, label: voucher.label, scope: voucher.scope });
+  return fill(text.value.resetVoucherConfirmation, { account: credential.account || credential.label, label: voucher.label, scope: voucherScope(voucher.scope) });
 }
 function voucherTimestamp(value: number | null): string {
   return formatExactTimestamp(value) ?? text.value.remainingUnknown;
@@ -665,7 +683,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                   <small v-if="credential.resets?.checkedAt !== null && credential.resets?.checkedAt !== undefined">{{ fill(text.resetVoucherCheckedAt, { time: voucherTimestamp(credential.resets.checkedAt) }) }}</small>
                   <p v-if="credential.resets?.status === 'ok' && !credential.resets.vouchers.length">{{ text.resetVoucherEmpty }}</p>
                   <article v-for="voucher in credential.resets?.vouchers ?? []" :key="voucher.id" class="model-auth-reset-voucher" data-part="reset-voucher">
-                    <div class="model-auth-reset-voucher-info"><strong>{{ voucher.label }}</strong><span>{{ fill(text.resetVoucherScope, { scope: voucher.scope }) }}</span><span>{{ fill(text.resetVoucherRemaining, { remaining: voucher.remaining ?? text.remainingUnknown }) }}</span><span>{{ fill(text.resetVoucherStarts, { time: voucherTimestamp(voucher.startsAt) }) }}</span><span>{{ fill(text.resetVoucherExpires, { time: voucherTimestamp(voucher.expiresAt) }) }}</span></div>
+                    <div class="model-auth-reset-voucher-info"><strong>{{ voucher.label }}</strong><span>{{ fill(text.resetVoucherScope, { scope: voucherScope(voucher.scope) }) }}</span><span>{{ fill(text.resetVoucherRemaining, { remaining: voucher.remaining ?? text.remainingUnknown }) }}</span><span>{{ fill(text.resetVoucherStarts, { time: voucherTimestamp(voucher.startsAt) }) }}</span><span>{{ fill(text.resetVoucherExpires, { time: voucherTimestamp(voucher.expiresAt) }) }}</span></div>
                     <span v-if="voucherUnavailableReason(voucher)" class="model-auth-reset-status" role="status">{{ voucherUnavailableReason(voucher) }}</span>
                     <button type="button" class="model-auth-danger" data-part="use-reset-voucher" :disabled="voucherUseDisabled(credential, voucher)" @click="requestVoucherUse(credential, voucher)">{{ pendingVoucherUse === voucherKey(credential, voucher.id) ? text.resetVoucherReview : text.resetVoucherUse }}</button>
                     <div v-if="pendingVoucherUse === voucherKey(credential, voucher.id)" class="model-auth-reset-confirm" role="group" :aria-label="text.resetVoucherReview">
