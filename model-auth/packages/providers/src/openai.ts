@@ -1,5 +1,7 @@
 import { normalizeModelId, type ModelDescriptor, type ProviderAuthNotice } from "@model-auth/core";
 import { latestClientVersion } from "./client-versions.js";
+import { openAICyberAccessProgram, openAIModelSupportsAccessProgram, parseOpenAIAccessPrograms, type OpenAIAccessPrograms, type OpenAICyberAccessProgram } from "./daybreak.js";
+export { OPENAI_CYBER_ACCESS_PROGRAMS, openAICyberAccessProgram, openAIModelSupportsAccessProgram, openAICyberRequestBody, type OpenAIAccessPrograms, type OpenAICyberAccessProgram } from "./daybreak.js";
 import { authorizeBrowserOAuth, BrowserOAuthError, exchangeBrowserOAuthCode, refreshBrowserOAuth, type BrowserOAuthAuthorizationOptions, type BrowserOAuthCredential, type BrowserOAuthRefreshOptions } from "./browser-oauth.js";
 
 const CODEX_ORIGINATOR = "pi";
@@ -26,8 +28,9 @@ const OPENAI_CONFIG = {
   },
 };
 
-export type OpenAIOAuthCredential = BrowserOAuthCredential;
+export type OpenAIOAuthCredential = BrowserOAuthCredential & { readonly cyberAccessProgram?: OpenAICyberAccessProgram };
 export interface OpenAIAuthorizationOptions extends BrowserOAuthAuthorizationOptions {
+  readonly cyberAccessProgram?: OpenAICyberAccessProgram;
   /** Receives the device code when the loopback port is taken; without it that failure is thrown. */
   readonly notify?: (notice: ProviderAuthNotice) => void;
   /** Overrides the server-provided polling interval. */
@@ -35,12 +38,19 @@ export interface OpenAIAuthorizationOptions extends BrowserOAuthAuthorizationOpt
 }
 export type OpenAIRefreshOptions = BrowserOAuthRefreshOptions;
 export async function authorizeOpenAI(options: OpenAIAuthorizationOptions): Promise<OpenAIOAuthCredential> {
+  const program = openAICyberAccessProgram(options.cyberAccessProgram);
+  let credential: BrowserOAuthCredential;
   try {
-    return await authorizeBrowserOAuth(OPENAI_CONFIG, options);
+    credential = await authorizeBrowserOAuth(OPENAI_CONFIG, options);
   } catch (error) {
     if (!(error instanceof BrowserOAuthError) || error.code !== "address-in-use" || !options.notify) throw error;
-    return authorizeDeviceCode(options, options.notify);
+    credential = await authorizeDeviceCode(options, options.notify);
   }
+  if (program && program !== "standard") {
+    const models = await listOpenAICodexModels(credential, options);
+    if (!models.some(model => model.availableAccessPrograms?.cyber.includes(program))) throw new Error("This ChatGPT account does not advertise the selected Daybreak access program.");
+  }
+  return { ...credential, ...(program ? { cyberAccessProgram: program } : {}) };
 }
 
 const DEVICE_AUTH_BASE = "https://auth.openai.com/api/accounts/deviceauth";
@@ -95,10 +105,14 @@ async function authorizeDeviceCode(options: OpenAIAuthorizationOptions, notify: 
     return exchangeBrowserOAuthCode(OPENAI_CONFIG, { code, code_verifier: verifier, redirect_uri: DEVICE_REDIRECT_URI }, { fetchImpl, signal });
   }
 }
-export const refreshOpenAI = (credential: OpenAIOAuthCredential, options?: OpenAIRefreshOptions): Promise<OpenAIOAuthCredential> => refreshBrowserOAuth(OPENAI_CONFIG, credential, options);
+export async function refreshOpenAI(credential: OpenAIOAuthCredential, options?: OpenAIRefreshOptions): Promise<OpenAIOAuthCredential> {
+  const program = openAICyberAccessProgram(credential.cyberAccessProgram);
+  return { ...await refreshBrowserOAuth(OPENAI_CONFIG, credential, options), ...(program ? { cyberAccessProgram: program } : {}) };
+}
 
 export interface OpenAICodexModel extends ModelDescriptor {
   readonly defaultReasoningEffort?: string;
+  readonly availableAccessPrograms?: OpenAIAccessPrograms;
 }
 
 export interface OpenAICodexModelsOptions {
@@ -170,6 +184,7 @@ export function parseOpenAICodexModels(payload: unknown): readonly OpenAICodexMo
     seen.add(id);
     const name = stringValue(model.display_name) ?? stringValue(model.name) ?? id;
     const description = stringValue(model.description);
+    const availableAccessPrograms = parseOpenAIAccessPrograms(model.available_access_programs);
     const defaultReasoningEffort = stringValue(model.default_reasoning_level) ?? stringValue(model.default_reasoning_effort);
     const reasoningEfforts = listReasoningEfforts(model.supported_reasoning_levels ?? model.supported_reasoning_efforts);
     const reasoning = typeof model.supports_reasoning === "boolean" ? model.supports_reasoning : reasoningEfforts ? true : undefined;
@@ -180,6 +195,7 @@ export function parseOpenAICodexModels(payload: unknown): readonly OpenAICodexMo
       id,
       name,
       ...(description ? { description } : {}),
+      ...(availableAccessPrograms ? { availableAccessPrograms } : {}),
       ...(reasoning !== undefined ? { reasoning } : {}),
       ...(reasoningEfforts ? { reasoningEfforts } : {}),
       ...(input.length ? { modalities: { input } } : {}),
@@ -187,6 +203,21 @@ export function parseOpenAICodexModels(payload: unknown): readonly OpenAICodexMo
       ...(defaultReasoningEffort ? { defaultReasoningEffort } : {}),
     }];
   });
+}
+
+export async function listOpenAIModels(apiKey: string, options: Pick<OpenAICodexModelsOptions, "fetchImpl" | "signal" | "timeoutMs"> & { readonly cyberAccessProgram?: OpenAICyberAccessProgram } = {}): Promise<readonly OpenAICodexModel[]> {
+  if (typeof apiKey !== "string" || !apiKey.trim()) throw new Error("OpenAI API key is required.");
+  const program = openAICyberAccessProgram(options.cyberAccessProgram);
+  const timeout = AbortSignal.timeout(options.timeoutMs && options.timeoutMs > 0 ? options.timeoutMs : CODEX_MODELS_TIMEOUT_MS);
+  const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
+  const response = await (options.fetchImpl ?? fetch)("https://api.openai.com/v1/models", {
+    headers: { accept: "application/json", authorization: `Bearer ${apiKey.trim()}` }, redirect: "error", signal,
+  });
+  if (!response.ok || response.redirected) throw new Error(`OpenAI API model catalog request failed (${response.status}).`);
+  const payload = record(await response.json());
+  if (!payload || !Array.isArray(payload.data)) throw new Error("OpenAI API model catalog response is invalid.");
+  const models = parseOpenAICodexModels({ models: payload.data });
+  return program ? models.filter(model => openAIModelSupportsAccessProgram(model, program)) : models;
 }
 
 async function errorDetail(response: Response): Promise<string | undefined> {

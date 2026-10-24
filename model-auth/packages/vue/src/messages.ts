@@ -11,6 +11,8 @@ export const defaultMessages = {
   refreshCatalog: "刷新", refreshingCatalog: "正在刷新…", catalogReady: "已同步",
   catalogUnavailable: "目录暂时不可用", cached: "已缓存目录", fallback: "离线目录",
   authorize: "添加 OAuth 账号", addApiKey: "添加 API Key", label: "标签（可选）",
+  cyberAccessProgram: "访问模式", cyberStandard: "标准", cyberDaybreakBlue: "Daybreak Blue", cyberDaybreakRed: "Daybreak Red",
+  cyberAccessHint: "Daybreak 需要对应账号或 API 项目的授权。仅显示当前接入模式支持的模型。",
   apiKeyPlaceholder: "粘贴 API Key", show: "显示", hide: "隐藏", saveAndVerify: "保存并验证",
   remove: "删除", confirmRemove: "确认删除", reconnect: "重连", enable: "启用", disabled: "已停用",
   moveUp: "上移", moveDown: "下移", position: "顺序", 

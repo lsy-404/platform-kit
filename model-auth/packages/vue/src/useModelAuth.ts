@@ -2,7 +2,7 @@ import { computed, onBeforeUnmount, ref, shallowRef } from "vue";
 import type {
   AddApiKeyPayload, AuthMethod, CatalogStatus, CredentialReorderPayload, CredentialUpdatePayload, ModelAuthProvider,
   ProviderAuthEvent, ProviderAuthResponseRequest, ProviderAuthState,
-  ProviderUpdatePayload,
+  ProviderUpdatePayload, CyberAccessProgram,
 } from "./types";
 
 export interface ModelAuthState {
@@ -11,7 +11,7 @@ export interface ModelAuthState {
   auth?: ProviderAuthState;
 }
 export type ModelAuthAction =
-  | { type: "authorize-oauth"; providerId: string; credentialId?: string }
+  | { type: "authorize-oauth"; providerId: string; credentialId?: string; cyberAccessProgram?: CyberAccessProgram }
   | { type: "logout"; providerId: string; credentialId: string }
   | { type: "query-usage"; providerId: string; credentialId: string }
   | { type: "query-resets"; providerId: string; credentialId: string }
@@ -89,8 +89,8 @@ export function useModelAuth(host: ModelAuthHost, options: { errorMessage?: stri
       if (auth.value.loginId) void host.cancelAuth?.(auth.value.loginId);
       authorization?.abort(); open.value = false;
     },
-    "authorize-oauth": (providerId: string) => run({ type: "authorize-oauth", providerId }),
-    "reconnect-oauth": (providerId: string, credentialId: string) => run({ type: "authorize-oauth", providerId, credentialId }),
+    "authorize-oauth": (providerId: string, cyberAccessProgram?: CyberAccessProgram) => run({ type: "authorize-oauth", providerId, ...(cyberAccessProgram ? { cyberAccessProgram } : {}) }),
+    "reconnect-oauth": (providerId: string, credentialId: string, cyberAccessProgram?: CyberAccessProgram) => run({ type: "authorize-oauth", providerId, credentialId, ...(cyberAccessProgram ? { cyberAccessProgram } : {}) }),
     logout: (providerId: string, credentialId: string) => run({ type: "logout", providerId, credentialId }),
     "query-usage": (providerId: string, credentialId: string) => run({ type: "query-usage", providerId, credentialId }),
     "query-resets": (providerId: string, credentialId: string) => run({ type: "query-resets", providerId, credentialId }),

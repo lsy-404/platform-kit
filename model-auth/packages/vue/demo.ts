@@ -1,6 +1,6 @@
 import { createApp, h, ref } from "vue";
 import { ModelAuthDialog } from "./src/index";
-import type { ModelAuthProvider, Theme } from "./src/types";
+import type { AddApiKeyPayload, CyberAccessProgram, ModelAuthProvider, Theme } from "./src/types";
 
 const initial: ModelAuthProvider[] = [
   { id: "anthropic", name: "Anthropic", description: "连接已有账号，或使用平台 API Key。", available: true,
@@ -10,7 +10,9 @@ const initial: ModelAuthProvider[] = [
       { id: "account-b", label: "备用账号", enabled: false, healthy: true },
     ], apiKeyCredentials: [] },
   { id: "openai", name: "OpenAI", description: "使用平台 API Key 连接模型。", available: true,
-    authMethods: ["api-key"], models: ["model-standard"], apiKeyCredentials: [] },
+    authMethods: ["api-key"], cyberAccessPrograms: ["standard", "daybreak_blue", "daybreak_red"], models: ["gpt-6-sol"], apiKeyCredentials: [] },
+  { id: "openai-codex", name: "Codex", description: "通过 ChatGPT 账号连接标准或 Daybreak 模型。", available: true,
+    authMethods: ["oauth"], cyberAccessPrograms: ["standard", "daybreak_blue", "daybreak_red"], models: ["gpt-6-sol"], oauthCredentials: [] },
   { id: "workbuddy", name: "WorkBuddy", description: "通过宿主授权连接 WorkBuddy。", available: true,
     authMethods: ["oauth"], models: [], oauthCredentials: [] },
   { id: "traecode", name: "TraeCode", description: "通过客户端授权连接。", available: false,
@@ -34,15 +36,15 @@ createApp({
         open: open.value, providers: providers.value, styled: styled.value, theme: theme.value, busy: busy.value,
         catalogStatus: { state: "ready", source: "cached" },
         onClose: () => { open.value = false; },
-        onAuthorizeOauth: (providerId: string) => {
+        onAuthorizeOauth: (providerId: string, cyberAccessProgram?: CyberAccessProgram) => {
           const provider = providers.value.find(item => item.id === providerId)!;
-          (provider.oauthCredentials ??= []).push({ id: crypto.randomUUID(), label: "演示账号", enabled: true, healthy: true, secret: "demo-oauth-token" });
+          (provider.oauthCredentials ??= []).push({ id: crypto.randomUUID(), label: "演示账号", enabled: true, healthy: true, secret: "demo-oauth-token", ...(cyberAccessProgram ? { cyberAccessProgram } : {}) });
           status.value = "演示授权已完成。真实授权由宿主适配器执行。";
         },
         onReconnectOauth: () => { status.value = "宿主收到重新授权请求。"; },
-        onAddApiKey: (payload: { providerId: string; label: string; apiKey: string }) => {
+        onAddApiKey: (payload: AddApiKeyPayload) => {
           const provider = providers.value.find(item => item.id === payload.providerId)!;
-          (provider.apiKeyCredentials ??= []).push({ id: crypto.randomUUID(), label: payload.label || "演示密钥", enabled: true, healthy: true, models: [...provider.models], secret: payload.apiKey });
+          (provider.apiKeyCredentials ??= []).push({ id: crypto.randomUUID(), label: payload.label || "演示密钥", enabled: true, healthy: true, models: [...provider.models], secret: payload.apiKey, ...(payload.cyberAccessProgram ? { cyberAccessProgram: payload.cyberAccessProgram } : {}) });
           status.value = "演示凭据已添加，密钥仅保留于内存。";
         },
         onUpdateCredential: (payload: { providerId: string; credentialId: string; enabled: boolean; secret?: string }) => {

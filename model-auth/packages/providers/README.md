@@ -53,6 +53,14 @@ The host owns model availability, secret persistence, account removal and routin
 
 ## ChatGPT Codex model catalog
 
+### Daybreak access
+
+Pass `cyberAccessProgram: "daybreak_blue"` or `"daybreak_red"` to `authorizeOpenAI` to sign in with ChatGPT and require the selected program in the account's live model catalog. The selected program survives `refreshOpenAI`. Catalog models preserve `availableAccessPrograms.cyber`; use it to restrict account model choices.
+
+For API credentials supplied by the user, `listOpenAIModels(apiKey, { cyberAccessProgram })` reads the project's visible model IDs and filters documented program compatibility. A model listing does not establish program approval. Use `openAICyberRequestBody(payload, program)` when sending Responses requests, and surface access errors without silently changing the selected program.
+
+Hosts can expose `cyberAccessPrograms: ["standard", "daybreak_blue", "daybreak_red"]` on OpenAI/Codex Vue provider entries. OAuth actions and API-key payloads then include `cyberAccessProgram`; persist it alongside the selected credential and return it in credential metadata. Reconnecting a credential retains its program.
+
 `listOpenAICodexModels(credential, options?)` reads the account's visible Codex models; `parseOpenAICodexModels` parses a raw catalog response. The catalog is filtered by the `client_version` query value, so it defaults to the latest official Codex CLI version. Pass `clientVersion` to override it.
 
 ## Latest client versions

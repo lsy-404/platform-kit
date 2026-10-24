@@ -136,6 +136,7 @@ export interface CatalogStatus {
 }
 
 export interface ProviderCredential {
+  cyberAccessProgram?: CyberAccessProgram;
   id: string;
   label: string;
   healthy: boolean;
@@ -156,6 +157,8 @@ export interface ApiKeyCredential extends ProviderCredential {
   models: string[];
 }
 
+export type CyberAccessProgram = "standard" | "daybreak_blue" | "daybreak_red";
+
 export interface ModelAuthProvider {
   id: string;
   name: string;
@@ -168,6 +171,7 @@ export interface ModelAuthProvider {
   mark?: string;
   iconUrl?: string;
   authorizeLabel?: string;
+  cyberAccessPrograms?: CyberAccessProgram[];
   usageEnabled?: boolean;
   logoutEnabled?: boolean;
   accountLogin?: boolean;
@@ -178,7 +182,7 @@ export interface ModelAuthProvider {
   apiKeyCredentials?: ApiKeyCredential[];
 }
 
-export interface AddApiKeyPayload { providerId: string; label: string; apiKey: string; extend?: CredentialExtend; login?: CredentialLoginInput }
+export interface AddApiKeyPayload { providerId: string; label: string; apiKey: string; extend?: CredentialExtend; login?: CredentialLoginInput; cyberAccessProgram?: CyberAccessProgram }
 export interface CredentialLoginInput { username: string; password?: string }
 export interface CredentialUpdatePayload { providerId: string; credentialId: string; enabled: boolean; extend?: CredentialExtend; secret?: string; label?: string; login?: CredentialLoginInput | null; allowExtraUsage?: boolean }
 export interface CredentialReorderPayload { providerId: string; method: AuthMethod; credentialIds: string[] }

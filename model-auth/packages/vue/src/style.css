@@ -48,6 +48,8 @@
 .model-auth-badge { white-space: nowrap; }
 .model-auth-row-chevron { grid-column: 4; }
 .model-auth-api-form { display: grid; gap: 10px; }
+.model-auth-cyber-program { display: grid; gap: 6px; }
+.model-auth-cyber-program small { color: var(--ma-muted, currentColor); }
 .model-auth-api-form > input { width: 100%; }
 .model-auth-key-input { display: flex; align-items: center; gap: 6px; }
 .model-auth-key-input input { flex: 1; min-width: 0; }

@@ -6,7 +6,7 @@ import ProviderMark from "./ProviderMark.vue";
 import { formatPercentage } from "./percentage";
 import { credentialReady, fill, formatCooldown, formatExactTimestamp, usagePlanLabel, windowRemaining } from "./usage";
 import type {
-  AddApiKeyPayload, AuthMethod, CredentialExtend, CredentialLoginInput, CredentialReorderPayload, CredentialUpdatePayload, CatalogStatus, ResetVoucher,
+  AddApiKeyPayload, AuthMethod, CredentialExtend, CredentialLoginInput, CredentialReorderPayload, CredentialUpdatePayload, CatalogStatus, ResetVoucher, CyberAccessProgram,
   ModelAuthProvider, ModelConnectionTarget, ProviderAuthResponseRequest, ProviderAuthState, ProviderCredential, ProviderAuthNotice, ProviderUpdatePayload, Theme, CredentialUsage, CredentialUsageEstimate, CredentialUsageWindow,
 } from "./types";
 
@@ -33,8 +33,8 @@ const props = withDefaults(defineProps<{
 });
 const emit = defineEmits<{
   close: [];
-  "authorize-oauth": [providerId: string];
-  "reconnect-oauth": [providerId: string, credentialId: string];
+  "authorize-oauth": [providerId: string, cyberAccessProgram?: CyberAccessProgram];
+  "reconnect-oauth": [providerId: string, credentialId: string, cyberAccessProgram?: CyberAccessProgram];
   "remove-oauth": [providerId: string, credentialId: string];
   "update-credential": [payload: CredentialUpdatePayload];
   "reorder-credentials": [payload: CredentialReorderPayload];
@@ -62,10 +62,12 @@ const dialog = ref<HTMLDialogElement>();
 const heading = ref<HTMLElement>();
 const labelInput = ref("");
 const apiKeyInput = ref("");
+const cyberAccessProgram = ref<CyberAccessProgram>("standard");
 const revealApiKey = ref(false);
 const accountUsername = ref("");
 const accountPassword = ref("");
 const methodLabel = (value: AuthMethod) => value === "oauth" ? text.value.oauth : text.value.apiKey;
+const cyberProgramLabel = (value: CyberAccessProgram) => value === "daybreak_blue" ? text.value.cyberDaybreakBlue : value === "daybreak_red" ? text.value.cyberDaybreakRed : text.value.cyberStandard;
 const secretDrafts = reactive<Record<string, string>>({});
 const labelDrafts = reactive<Record<string, string>>({});
 const loginDrafts = reactive<Record<string, { username?: string; password?: string }>>({});
@@ -150,6 +152,7 @@ function clearSecret() {
   for (const id of Object.keys(hiddenSecrets)) delete hiddenSecrets[id];
 }
 function resetState() {
+  cyberAccessProgram.value = "standard";
   awaitingVerification = false;
   connectionMode.value = Boolean(props.initialConnection);
   method.value = props.initialConnection?.method ?? props.initialMethod;
@@ -193,6 +196,7 @@ function chooseMethod(value: AuthMethod) {
   transitionName.value = "model-auth-step-forward"; clearSecret(); void nextTick(() => searchInput.value?.focus());
 }
 function chooseProvider(entry: { provider: ModelAuthProvider; method: AuthMethod }) {
+  cyberAccessProgram.value = "standard";
   const { provider, method: chosenMethod } = entry; method.value = chosenMethod;
   transitionName.value = "model-auth-step-forward"; clearSecret(); selectedProviderId.value = provider.id; step.value = "detail";
   pendingRemoval.value = ""; localError.value = ""; void focusHeading();
@@ -460,6 +464,7 @@ function addApiKey() {
   if (!provider || !canUseMethod.value || props.busy || !apiKeyInput.value.trim()) return;
   if (provider.accountLogin && Boolean(accountUsername.value.trim()) !== Boolean(accountPassword.value)) return;
   const payload = { providerId: provider.id, label: labelInput.value.trim(), apiKey: apiKeyInput.value.trim(),
+    ...(provider.cyberAccessPrograms?.includes(cyberAccessProgram.value) ? { cyberAccessProgram: cyberAccessProgram.value } : {}),
     ...(provider.accountLogin && accountUsername.value.trim() && accountPassword.value ? { login: { username: accountUsername.value.trim(), password: accountPassword.value } } : {}) };
   accountUsername.value = ""; accountPassword.value = "";
   clearNewKey(); awaitingVerification = true; emit("add-api-key", payload); void nextTick(checkVerification);
@@ -467,7 +472,13 @@ function addApiKey() {
 function authorize(credentialId?: string) {
   if (!selectedProvider.value || props.busy || !canUseMethod.value) return;
   awaitingVerification = true;
-  if (credentialId) emit("reconnect-oauth", selectedProvider.value.id, credentialId);
+  const program = credentialId
+    ? selectedProvider.value.oauthCredentials?.find(credential => credential.id === credentialId)?.cyberAccessProgram
+    : selectedProvider.value.cyberAccessPrograms?.includes(cyberAccessProgram.value) ? cyberAccessProgram.value : undefined;
+  if (credentialId) {
+    if (program) emit("reconnect-oauth", selectedProvider.value.id, credentialId, program);
+    else emit("reconnect-oauth", selectedProvider.value.id, credentialId);
+  } else if (program) emit("authorize-oauth", selectedProvider.value.id, program);
   else emit("authorize-oauth", selectedProvider.value.id);
   void nextTick(checkVerification);
 }
@@ -615,6 +626,13 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
             <button v-if="connectionMode" type="button" class="model-auth-secondary" data-part="refresh-connections" :disabled="busy" @click="emit('refresh-catalog')">{{ text.refreshCatalog }}</button>
           </div>
           <p v-if="!selectedProvider.available" class="model-auth-error" role="status">{{ selectedProvider.unavailableReason || text.unavailable }}</p>
+          <label v-if="selectedProvider.cyberAccessPrograms?.length" class="model-auth-cyber-program" data-part="cyber-access-program">
+            <span>{{ text.cyberAccessProgram }}</span>
+            <select v-model="cyberAccessProgram" :disabled="busy || !canUseMethod" :aria-label="text.cyberAccessProgram">
+              <option v-for="program in selectedProvider.cyberAccessPrograms" :key="program" :value="program">{{ cyberProgramLabel(program) }}</option>
+            </select>
+            <small>{{ text.cyberAccessHint }}</small>
+          </label>
           <section v-if="method === 'oauth'" class="model-auth-credential-section" data-part="oauth-config">
             <div v-if="connectionMode || credentials.length" class="model-auth-section-heading">
               <small v-if="credentials.length > 1">{{ text.credentialHint }}</small>
@@ -648,7 +666,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
               <slot name="credential-row" :credential="credential" :provider="selectedProvider" :method="method" :update="(enabled: boolean) => updateCredential(credential, enabled)" :remove="() => removeCredential(credential)" :rename="(label: string) => rename(credential, label)" :save-login="(login: CredentialLoginInput | null) => saveLogin(credential, login)">
                 <div class="model-auth-credential-summary">
                   <span class="model-auth-health" :class="{ healthy: credentialReady(credential), attention: needsReconnect(credential) }" aria-hidden="true"></span>
-                  <span class="model-auth-row-main"><strong>{{ credential.label }}</strong><small :class="{ 'model-auth-connection-attention': needsReconnect(credential) }" :title="credential.cooldownUntilUtc ?? undefined">{{ connectionMode && credential.account ? text.account + ' · ' + credential.account + ' · ' : '' }}{{ credentialStatus(credential) }}</small></span>
+                  <span class="model-auth-row-main"><strong>{{ credential.label }}</strong><small :class="{ 'model-auth-connection-attention': needsReconnect(credential) }" :title="credential.cooldownUntilUtc ?? undefined">{{ connectionMode && credential.account ? text.account + ' · ' + credential.account + ' · ' : '' }}{{ credentialStatus(credential) }}<template v-if="credential.cyberAccessProgram"> · {{ cyberProgramLabel(credential.cyberAccessProgram) }}</template></small></span>
                   <span v-if="credentials.length > 1" class="model-auth-move-group">
                     <button v-if="index > 0" type="button" class="model-auth-subtle model-auth-with-icon model-auth-move" data-part="move-up" :disabled="busy" :aria-label="text.moveUp + ' ' + credential.label" @click="moveCredential(index, -1)"><ModelAuthIcon name="arrow-up" /></button>
                     <span v-else class="model-auth-move-spacer" aria-hidden="true"></span>
