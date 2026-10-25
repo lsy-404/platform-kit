@@ -228,14 +228,15 @@ function windowFrom(id: string, label: string, value: unknown, target: WindowTar
     ...(limit !== null ? { limit } : {}),
     ...(remaining !== null ? { remaining } : {}),
     ...(stringValue(row.unit) ? { unit: stringValue(row.unit) } : {}),
-    ...(anthropicLocked(row) ? { exhausted: true } : {}),
+    ...(anthropicLocked(row, usedPercent) ? { exhausted: true } : {}),
   });
 }
 
-function anthropicLocked(row: Json): boolean {
+/** A lock reason blocks the window; a raised severity is only a near-limit hint until the reading is full. */
+function anthropicLocked(row: Json, usedPercent: number | null): boolean {
   if (stringValue(row.locked_reason, row.lockedReason)) return true;
   const severity = stringValue(row.severity)?.toLowerCase();
-  return severity !== undefined && !HEALTHY_SEVERITIES.has(severity);
+  return severity !== undefined && !HEALTHY_SEVERITIES.has(severity) && usedPercent !== null && usedPercent >= 100;
 }
 
 /** Mark only the fullest window as exhausted; ties go to the longer window. */

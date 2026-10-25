@@ -91,7 +91,7 @@ Model discovery returns the account's actual service metadata. `streamTrae` and 
 
 ## Structured usage windows
 
-Every `ProviderUsageWindow` carries `scope` (`account`, `model-family` or `model`), normalized `modelFamilies`, `status` (`known`, `unknown` or `exhausted`), `usedRatio` (0..1, null when unknown), `reliability` (`high`, or `low` for estimated sources) and `resetAt`. Providers fill these fields themselves, so consumers never infer scope from labels. `kind` (`session`, `daily`, `weekly`, `monthly` or null) is derived from the window duration. A window is `exhausted` only when the service reports it (limit flags, lock reasons or severity), never from a percentage alone. A window the provider lists without usage data is reported with status `unknown` rather than omitted. Use `usageWindow` to build windows and `normalizeModelFamilyId` to normalize ids.
+Every `ProviderUsageWindow` carries `scope` (`account`, `model-family` or `model`), normalized `modelFamilies`, `status` (`known`, `unknown` or `exhausted`), `usedRatio` (0..1, null when unknown), `reliability` (`high`, or `low` for estimated sources) and `resetAt`. Providers fill these fields themselves, so consumers never infer scope from labels. `kind` (`session`, `daily`, `weekly`, `monthly` or null) is derived from the window duration. A window is `exhausted` only when the service reports it (limit flags, lock reasons, or a raised severity on a full reading), never from a percentage alone; a raised severity below 100% is a near-limit hint and leaves the window usable. A window the provider lists without usage data is reported with status `unknown` rather than omitted. Use `usageWindow` to build windows and `normalizeModelFamilyId` to normalize ids.
 
 ## Usage requests and errors
 
