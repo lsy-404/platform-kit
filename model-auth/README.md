@@ -9,15 +9,15 @@ From this repository root:
 ```sh
 pnpm --dir model-auth install --frozen-lockfile
 pnpm --dir model-auth check
-pnpm --dir model-auth pack
+pnpm --dir model-auth run pack
 pnpm --dir model-auth test:packages
 ```
 
 The pack command writes local artifacts to `model-auth/release/`:
 
-- `model-auth-core/model-auth-core-0.6.1.tgz`
-- `model-auth-providers/model-auth-providers-0.6.2.tgz`
-- `model-auth-vue/model-auth-vue-0.6.6.tgz`
+- `model-auth-core-0.11.1.tgz`
+- `model-auth-providers-0.21.0.tgz`
+- `model-auth-vue-0.14.0.tgz`
 
 The package-consumer test installs those archives into a temporary consumer and verifies exports, declarations, styles, runtime behavior, and included notices.
 

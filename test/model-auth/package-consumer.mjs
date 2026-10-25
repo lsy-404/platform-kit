@@ -61,7 +61,7 @@ import { CredentialRouter, createCredentialMetadata, createUsageGate, parseRetry
 import { authorizeWorkBuddy, refreshWorkBuddy } from "@model-auth/providers/workbuddy";
 import { authorizeOpenAI, refreshOpenAI, listOpenAICodexModels, parseOpenAICodexModels, type OpenAICodexModel } from "@model-auth/providers/openai";
 import { latestClientVersion, CLIENT_VERSION_FLOORS, type ClientVersionTarget } from "@model-auth/providers/client-versions";
-import { authorizeAnthropic, refreshAnthropic } from "@model-auth/providers/anthropic";
+import { authorizeAnthropic, refreshAnthropic, normalizeAnthropicRequestUsage, type AnthropicRequestUsage } from "@model-auth/providers/anthropic";
 import { authorizeAnthropicInBrowser, type AnthropicBrowserAuthorization, type AnthropicSessionCookie } from "@model-auth/providers/anthropic-browser";
 import { authorizeTrae, refreshTrae, listTraeModels, streamTrae } from "@model-auth/providers/trae";
 import { authorizeGrok, queryGrokUsage } from "@model-auth/providers/grok";
@@ -70,6 +70,7 @@ import { queryOpencodeGoKeyUsage, parseOpencodeGoUsage } from "@model-auth/provi
 import { queryProviderUsage, queryClaudePrepaidCredits, parseAnthropicUsage } from "@model-auth/providers/usage";
 import type { ProviderUsageExtraUsage, ProviderUsageSnapshot } from "@model-auth/core";
 const extraUsage: ProviderUsageExtraUsage | null | undefined = parseAnthropicUsage({}).extraUsage;
+const requestUsage: AnthropicRequestUsage | null = normalizeAnthropicRequestUsage({ input_tokens: 1 });
 const gate: UsageGate = createUsageGate({ minIntervalMs: () => 0 });
 const retryAfter: number | null = parseRetryAfter("120");
 const throttled: ProviderUsageSnapshot = { providerId: "anthropic", credentialId: "one", status: "error", plan: null, windows: [], balance: null, fetchedAtUtc: "2030-01-01T00:00:00Z", error: "429", errorCode: "rate-limited", retryAfterMs: 1000 };
@@ -100,7 +101,7 @@ import { authorizeWorkBuddy, refreshWorkBuddy } from "@model-auth/providers/work
 import { authorizeOpenAI, refreshOpenAI, listOpenAICodexModels, parseOpenAICodexModels } from "@model-auth/providers/openai";
 import { latestClientVersion, CLIENT_VERSION_FLOORS } from "@model-auth/providers/client-versions";
 import { latestClientVersion as rootLatestClientVersion } from "@model-auth/providers";
-import { authorizeAnthropic, refreshAnthropic } from "@model-auth/providers/anthropic";
+import { authorizeAnthropic, refreshAnthropic, normalizeAnthropicRequestUsage } from "@model-auth/providers/anthropic";
 import { authorizeAnthropicInBrowser } from "@model-auth/providers/anthropic-browser";
 import { authorizeGrok, queryGrokUsage } from "@model-auth/providers/grok";
 import { authorizeOllamaWeb, queryOllamaUsage, parseOllamaSettings } from "@model-auth/providers/ollama";
@@ -112,6 +113,8 @@ const opencode = await queryOpencodeGoKeyUsage("consumer-key", { fetchImpl: asyn
 if (opencode.plan !== "Go" || opencode.windows[1]?.remainingPercent !== 75) throw new Error("Installed OpenCode Go usage unavailable");
 const extra = parseAnthropicUsage({ spend: { enabled: true, used: { amount_minor: 235, currency: "USD", exponent: 2 }, limit: { amount_minor: 2000, currency: "USD", exponent: 2 } } }).extraUsage;
 if (extra?.used !== 2.35 || extra.limit !== 20 || extra.usedPercent !== 11.75) throw new Error("Installed Claude extra usage unavailable");
+const requestUsage = normalizeAnthropicRequestUsage({ cache_creation: { ephemeral_1h_input_tokens: 3 } });
+if (requestUsage?.cacheWrite1h !== 3 || requestUsage.cacheWrite !== undefined) throw new Error("Installed Anthropic request accounting unavailable");
 const prepaid = await queryClaudePrepaidCredits({ fetchImpl: async url => Response.json(String(url).endsWith("/api/organizations") ? [{ uuid: "org-1" }] : { amount: 1234, currency: "USD" }) });
 if (prepaid.balance?.amount !== 12.34) throw new Error("Installed Claude prepaid credits unavailable");
 if (typeof authorizeWorkBuddy !== "function" || typeof refreshWorkBuddy !== "function") throw new Error("Installed providers unavailable");
