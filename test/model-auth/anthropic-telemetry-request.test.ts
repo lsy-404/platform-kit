@@ -17,16 +17,16 @@ describe("Anthropic request telemetry", () => {
     expect(await a.fetch(url, inputA)).toBe(responseA);
     expect(await b.fetch(url, inputB)).toBe(responseB);
     expect(transportA).toHaveBeenCalledWith(url, inputA);
-    a.onStreamEvent({ type: "message_start", message: { usage: { input_tokens: 12, output_tokens: 1 } } });
+    a.onStreamEvent({ type: "message_start", message: { usage: { input_tokens: 12, output_tokens: 1, cache_creation_input_tokens: 5 } } });
     b.onStreamEvent({ type: "message_start", message: { usage: { input_tokens: 20 } } });
-    a.onStreamEvent({ type: "message_delta", usage: { output_tokens: 8 } });
+    a.onStreamEvent({ type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 8 } });
     b.onStreamEvent({ type: "message_delta", usage: { output_tokens: 3 } });
     b.onStreamEvent({ type: "message_stop" }); a.onStreamEvent({ type: "message_stop" });
     await sender.close();
     const rows = batches.flat() as Array<{ event_name: string; model: string; metadata: Record<string, unknown> }>;
     expect(rows.map(row => row.event_name)).toEqual(["tengu_api_query", "tengu_api_query", "tengu_api_success", "tengu_api_success"]);
     expect(rows[2]).toMatchObject({ model: "model-b", metadata: { model: "model-b", inputTokens: 20, outputTokens: 3, requestId: "req-b" } });
-    expect(rows[3]).toMatchObject({ model: "model-a", metadata: { model: "model-a", inputTokens: 12, outputTokens: 8, requestId: "req-a" } });
+    expect(rows[3]).toMatchObject({ model: "model-a", metadata: { model: "model-a", inputTokens: 12, outputTokens: 8, uncachedInputTokens: 5, stop_reason: "end_turn", requestId: "req-a", ttftMs: expect.any(Number) } });
     expect(JSON.stringify(rows)).not.toContain("private");
   });
 
@@ -36,17 +36,65 @@ describe("Anthropic request telemetry", () => {
     const incomplete = sender.request(async () => new Response("incomplete"));
     await incomplete.fetch(url, init("m"));
     const http = sender.request(async () => new Response(null, { status: 429 }));
-    await http.fetch(url, init("m"));
+    await http.fetch(url, init("m")); http.onError();
     const failure = new Error("private error");
     const thrown = sender.request(async () => { throw failure; });
     await expect(thrown.fetch(url, init("m"))).rejects.toBe(failure);
+    thrown.onError();
     const stream = sender.request(async () => new Response("stream"));
-    await stream.fetch(url, init("m")); stream.onStreamEvent({ type: "error", error: { message: "private error" } }); stream.onStreamEvent({ type: "message_stop" });
+    await stream.fetch(url, init("m")); stream.onStreamEvent({ type: "error", error: { message: "private error" } }); stream.onError(); stream.onStreamEvent({ type: "message_stop" });
     await sender.close();
     expect(rows.filter(row => row.event_name === "tengu_api_success")).toHaveLength(0);
     expect(rows.filter(row => row.event_name === "tengu_api_error")).toHaveLength(3);
     expect(rows.find(row => row.metadata.status === "429")).toBeDefined();
+    expect(rows.filter(row => row.event_name === "tengu_api_error" && row.metadata.status === "200")).toHaveLength(0);
     expect(JSON.stringify(rows)).not.toContain("private error");
+  });
+
+  it("records a single query and success after an HTTP retry", async () => {
+    let rows: Array<{ event_name: string; metadata: Record<string, unknown> }> = [];
+    const sender = createAnthropicTelemetry({ enabled: true, sessionId: "s", context: { deviceId: "d" }, fetchImpl: async (_url, request) => { rows = eventsOf(request); return new Response(null, { status: 204 }); } });
+    let attempts = 0;
+    const observer = sender.request(async () => ++attempts === 1 ? new Response(null, { status: 503 }) : new Response("stream", { headers: { "request-id": "second" } }));
+    await observer.fetch(url, init("m"));
+    await observer.fetch(url, init("m"));
+    observer.onStreamEvent({ type: "message_stop" }); observer.onError();
+    await sender.close();
+    expect(rows.map(row => row.event_name)).toEqual(["tengu_api_query", "tengu_api_success"]);
+    expect(rows[1]?.metadata).toMatchObject({ attempt: 2, requestId: "second" });
+  });
+
+  it("reports a final failure once after retries", async () => {
+    let rows: Array<{ event_name: string; metadata: Record<string, unknown> }> = [];
+    const sender = createAnthropicTelemetry({ enabled: true, sessionId: "s", context: { deviceId: "d" }, fetchImpl: async (_url, request) => { rows = eventsOf(request); return new Response(null, { status: 204 }); } });
+    const observer = sender.request(async () => new Response(null, { status: 503 }));
+    await observer.fetch(url, init("m")); await observer.fetch(url, init("m"));
+    observer.onError(); observer.onError(); observer.onStreamEvent({ type: "message_stop" });
+    await sender.close();
+    expect(rows.map(row => row.event_name)).toEqual(["tengu_api_query", "tengu_api_error"]);
+    expect(rows[1]?.metadata).toMatchObject({ attempt: 2, status: "503" });
+  });
+
+  it("distinguishes confirmed cancellation from a timeout failure", async () => {
+    let rows: Array<{ event_name: string }> = [];
+    const sender = createAnthropicTelemetry({ enabled: true, sessionId: "s", context: { deviceId: "d" }, fetchImpl: async (_url, request) => { rows = eventsOf(request); return new Response(null, { status: 204 }); } });
+    const cancel = sender.request(async () => new Response("stream"));
+    await cancel.fetch(url, init("m")); cancel.onError({ cancelled: true }); cancel.onError();
+    const timeout = sender.request(async () => { throw new Error("timeout"); });
+    await expect(timeout.fetch(url, init("m"))).rejects.toThrow("timeout"); timeout.onError();
+    await sender.close();
+    expect(rows.map(row => row.event_name)).toEqual(["tengu_api_query", "tengu_api_query", "tengu_api_error"]);
+  });
+
+  it("does not attribute another account's request to the sender", async () => {
+    const telemetry = vi.fn(async () => new Response(null, { status: 204 }));
+    const sender = createAnthropicTelemetry({ enabled: true, sessionId: "s", context: { deviceId: "d", accountUuid: "account_a" }, fetchImpl: telemetry });
+    const request = init("m");
+    request.body = JSON.stringify({ model: "m", metadata: { user_id: JSON.stringify({ session_id: "s", device_id: "d", account_uuid: "account_b" }) } });
+    const observer = sender.request(async () => new Response("ok"));
+    await observer.fetch(url, request); observer.onStreamEvent({ type: "message_stop" }); observer.onError();
+    await sender.close();
+    expect(telemetry).not.toHaveBeenCalled();
   });
 
   it("skips mismatched identities and disabled observers without changing transport", async () => {

@@ -43,6 +43,7 @@ export function createAnthropicTelemetry(options: AnthropicTelemetryOptions = {}
   const { fetchImpl, sessionId, signal } = options;
   const context = options.context;
   const deviceId = context?.deviceId;
+  const accountUuid = context?.accountUuid;
   const environment = context?.environment;
   const strings = [context?.deviceId, context?.accountUuid, context?.organizationUuid, context?.model, context?.clientType, context?.entrypoint,
     environment?.version, environment?.versionBase, environment?.buildTime, environment?.platform, environment?.platformRaw, environment?.arch];
@@ -128,7 +129,7 @@ export function createAnthropicTelemetry(options: AnthropicTelemetryOptions = {}
   };
   return {
     record,
-    request: transport => observeAnthropicRequest(transport, sessionId, deviceId, (name, metadata, model) => { record(name, metadata, model); }),
+    request: transport => observeAnthropicRequest(transport, sessionId, deviceId, accountUuid, (name, metadata, model) => { record(name, metadata, model); }),
     flush,
     async close() {
       if (closed) return pending ? pending : !failed;
