@@ -127,7 +127,7 @@ try {
 await session.close();
 ```
 
-This optional profile shares the supplied client versions, device and session identity between first-party Messages requests and telemetry. The host owns the stable device ID, per-prompt ID and account-bound transports. Reuse a prompt ID across its tool loop; select request class and agent IDs per logical request. Telemetry is independently disabled unless explicitly enabled, and closing the session flushes it. The profile does not run the Agent SDK, its tools or its session loop.
+This optional profile shares the supplied client versions, device and session identity between first-party Messages requests and telemetry. The host owns the stable device ID, per-prompt ID and account-bound transports. Reuse a prompt ID across its tool loop; select request class and agent IDs per logical request. Telemetry is independently disabled unless explicitly enabled, and closing the session flushes it and prevents new requests. Observers created before close can still complete their inference. The profile does not run the Agent SDK, its tools or its session loop.
 
 ## Optional Claude telemetry
 

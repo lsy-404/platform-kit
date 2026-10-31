@@ -30,7 +30,11 @@ const object = (value: unknown): Record<string, unknown> | undefined => value &&
 
 /** Creates one explicitly enabled client identity shared by its requests. */
 export function createAnthropicClientSession(options: AnthropicClientSessionOptions = {}): AnthropicClientSession {
-  if (!options.enabled) return { sessionId: null, request: ({ fetchImpl }) => ({ fetch: fetchImpl, onStreamEvent() {}, onError() {} }), close: async () => true };
+  let closed = false;
+  if (!options.enabled) return { sessionId: null, request: ({ fetchImpl }) => {
+    if (closed) throw new Error("Anthropic client session is closed.");
+    return { fetch: fetchImpl, onStreamEvent() {}, onError() {} };
+  }, close: async () => { closed = true; return true; } };
   const { clientVersion, sdkVersion, deviceId, accountUuid, organizationUuid, clientApp, parentSessionId } = options;
   const sessionId = options.sessionId ?? randomUUID(), entrypoint = options.entrypoint ?? "sdk-ts";
   if (![sessionId, deviceId, ...(parentSessionId !== undefined ? [parentSessionId] : []), ...(accountUuid !== undefined ? [accountUuid] : []), ...(organizationUuid !== undefined ? [organizationUuid] : [])].every(value => IDENTIFIER.test(value))) throw new TypeError("Invalid Anthropic session identity.");
@@ -49,6 +53,7 @@ export function createAnthropicClientSession(options: AnthropicClientSessionOpti
   return {
     sessionId,
     request({ fetchImpl, requestClass = "main", promptId, agentId, parentAgentId, agentType }) {
+      if (closed) throw new Error("Anthropic client session is closed.");
       if (!CLASSES.includes(requestClass) || [promptId, agentId, parentAgentId, agentType].some(value => value !== undefined && !IDENTIFIER.test(value))) throw new TypeError("Invalid Anthropic request identity.");
       const observer = telemetry.request(fetchImpl);
       const fetch: typeof globalThis.fetch = (input, init) => {
@@ -77,6 +82,6 @@ export function createAnthropicClientSession(options: AnthropicClientSessionOpti
       };
       return { fetch, onStreamEvent: observer.onStreamEvent, onError: observer.onError };
     },
-    close: () => telemetry.close(),
+    close: () => { closed = true; return telemetry.close(); },
   };
 }

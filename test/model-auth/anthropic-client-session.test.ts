@@ -13,12 +13,14 @@ describe("Anthropic client session", () => {
     expect(observer.fetch).toBe(transport);
     expect(session.sessionId).toBeNull();
     expect(await session.close()).toBe(true);
+    expect(() => session.request({ fetchImpl: transport })).toThrow("closed");
     expect(transport).not.toHaveBeenCalled();
   });
 
   it("uses the supplied versions without a version lookup", async () => {
     const fetchImpl = vi.fn(async () => { throw new Error("network"); });
-    expect(await anthropicClientHeaders({ fetchImpl, clientVersion: "2.1.316", entrypoint: "sdk-ts", sdkVersion: "0.3.316", clientApp: "example" })).toEqual({ "user-agent": "claude-cli/2.1.316 (external, sdk-ts, agent-sdk/0.3.316, client-app/example)", "x-app": "cli", "x-client-app": "example" });
+    expect(await anthropicClientHeaders({ fetchImpl, clientVersion: "2.1.316", entrypoint: "sdk-ts", sdkVersion: "0.3.316", clientApp: "my-app/1.0.0" })).toEqual({ "user-agent": "claude-cli/2.1.316 (external, sdk-ts, agent-sdk/0.3.316, client-app/my-app/1.0.0)", "x-app": "cli", "x-client-app": "my-app/1.0.0" });
+    await expect(anthropicClientHeaders({ clientVersion: "2.1.316", clientApp: "bad)\r\nheader" })).rejects.toThrow("Invalid Anthropic client identity");
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
@@ -88,6 +90,16 @@ describe("Anthropic client session", () => {
     const transport = vi.fn(() => { throw error; }) as unknown as typeof fetch;
     const session = createAnthropicClientSession(options), observer = session.request({ fetchImpl: transport });
     expect(() => observer.fetch(url, request())).toThrow(error);
+    expect(transport).toHaveBeenCalledOnce();
+  });
+
+  it("rejects new requests after close without stopping an existing observer", async () => {
+    const transport = vi.fn(async () => new Response("ok"));
+    const session = createAnthropicClientSession(options);
+    const observer = session.request({ fetchImpl: transport });
+    await session.close();
+    expect(() => session.request({ fetchImpl: transport })).toThrow("closed");
+    expect(await (await observer.fetch(url, request())).text()).toBe("ok");
     expect(transport).toHaveBeenCalledOnce();
   });
 });
