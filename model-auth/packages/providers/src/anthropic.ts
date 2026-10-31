@@ -1,5 +1,8 @@
 import { latestClientVersion, type ClientVersionOptions } from "./client-versions.js";
 import { BrowserOAuthError, authorizeBrowserOAuth, refreshBrowserOAuth, type BrowserOAuthAuthorizationOptions, type BrowserOAuthCredential, type BrowserOAuthRefreshOptions } from "./browser-oauth.js";
+import { anthropicIdentityHeaders, type AnthropicClientIdentity } from "./anthropic-client-identity.js";
+export { createAnthropicClientSession, type AnthropicClientSession, type AnthropicClientSessionOptions, type AnthropicClientRequestOptions, type AnthropicRequestClass } from "./anthropic-client-session.js";
+export type { AnthropicClientIdentity } from "./anthropic-client-identity.js";
 export { createAnthropicTelemetry, type AnthropicTelemetry, type AnthropicTelemetryContext, type AnthropicTelemetryMetadata, type AnthropicTelemetryOptions } from "./anthropic-telemetry.js";
 export type { AnthropicTelemetryRequest } from "./anthropic-telemetry-request.js";
 
@@ -57,8 +60,9 @@ export function normalizeAnthropicRequestUsage(value: unknown): AnthropicRequest
   return Object.keys(result).length ? result : null;
 }
 
-export async function anthropicClientHeaders(options: ClientVersionOptions = {}): Promise<Record<string, string>> {
-  return { "user-agent": `claude-cli/${await latestClientVersion("claude", options)} (external, sdk-cli)`, "x-app": "cli" };
+export async function anthropicClientHeaders(options: ClientVersionOptions & Partial<AnthropicClientIdentity> = {}): Promise<Record<string, string>> {
+  const clientVersion = options.clientVersion ?? await latestClientVersion("claude", options);
+  return anthropicIdentityHeaders({ clientVersion, ...(options.entrypoint !== undefined ? { entrypoint: options.entrypoint } : {}), ...(options.sdkVersion !== undefined ? { sdkVersion: options.sdkVersion } : {}), ...(options.clientApp !== undefined ? { clientApp: options.clientApp } : {}) });
 }
 
 export async function authorizeAnthropic(options: AnthropicAuthorizationOptions): Promise<AnthropicOAuthCredential> {
