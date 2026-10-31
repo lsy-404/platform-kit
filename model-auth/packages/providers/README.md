@@ -99,6 +99,10 @@ Usage queries retry transient network failures twice, never retry 429 (a `Retry-
 
 `authorizeOpenAI` switches to the device code flow when the loopback port is taken and `notify` is supplied, reporting the code through a `device_code` notice.
 
+## Anthropic request policy
+
+Pass `bodyPolicy` to an enabled client session or its `request()` call to select an explicit system prefix, model thinking capabilities, cache targets, and permitted beta headers. Per-request policy replaces the session policy. Cache markers are added only at the supplied block indexes; TTL precedence is force five minutes, environment, setting, frontmatter, then the supplied subscriber eligibility. Unknown capabilities leave the payload unchanged. The host supplies actual capabilities and context; the policy does not generate attribution data or rename tools.
+
 ## Claude extra usage and prepaid credits
 
 `normalizeAnthropicRequestUsage` from `@model-auth/providers/anthropic` reads one Messages response's raw `usage` object into `input`, `output`, `cacheRead`, `cacheWrite`, and optional `cacheWrite5m`/`cacheWrite1h` token counts. Missing fields remain absent. Cache write subdivisions are parts of the aggregate, not additional tokens. These observed counts are separate from subscription quota readings and API cost estimates.
