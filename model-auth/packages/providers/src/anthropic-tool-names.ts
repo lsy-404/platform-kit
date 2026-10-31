@@ -27,21 +27,13 @@ export function createAnthropicToolNameCodec(mapping: AnthropicToolNameMapping =
     if (!validName(wire) || !validName(internal) || (reverse.has(wire) && reverse.get(wire) !== internal)) throw new TypeError("Invalid or colliding retired tool name mapping");
     reverse.set(wire, internal);
   }
-  for (const [wire, internal] of reverse) {
-    if (forward.has(wire) && wire !== internal) throw new TypeError("Ambiguous tool name mapping");
-  }
-  for (const [internal, wire] of forward) {
-    if (reverse.has(internal) && reverse.get(internal) !== internal) throw new TypeError("Ambiguous tool name mapping");
-    if (forward.has(wire) && forward.get(wire) !== wire) throw new TypeError("Ambiguous tool name mapping");
-  }
   const encodeName = (value: unknown): unknown => typeof value === "string" ? forward.get(value) ?? value : value;
   const encodeTree = (value: unknown): unknown => {
     if (Array.isArray(value)) return value.map(encodeTree);
     if (!isObject(value)) return value;
-    const out: ObjectValue = {};
-    for (const [key, entry] of Object.entries(value)) {
-      out[key] = key === "input" || key === "input_schema" ? entry : key === "exclude_tools" && Array.isArray(entry) ? entry.map(encodeName) : encodeTree(entry);
-    }
+    const out = Object.fromEntries(Object.entries(value).map(([key, entry]) => [key,
+      key === "input" || key === "input_schema" ? entry : key === "exclude_tools" && Array.isArray(entry) ? entry.map(encodeName) : encodeTree(entry),
+    ]));
     if (value.type === "tool_use") {
       const remembered = typeof value.id === "string" ? history.get(value.id) : undefined;
       out.name = remembered && remembered.internal === value.name ? remembered.wire : encodeName(value.name);

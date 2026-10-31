@@ -26,9 +26,23 @@ describe("Anthropic tool name codec", () => {
     const request = { messages: [{ content: [decoded.content[0], { ...decoded.content[0], id: "two" }, { ...decoded.content[0], id: "three" }] }] };
     expect(codec.encodeRequest(request).messages[0].content.map(block => block.name)).toEqual(["old", "new", "new"]);
   });
+  it("supports one-hop chained mappings and preserves JSON metadata", () => {
+    const codec = createAnthropicToolNameCodec({ current: { a: "b", b: "c" } });
+    const metadata = JSON.parse('{"__proto__":{"name":"a"},"input_schema":{"__proto__":{"name":"a"}}}');
+    const request = { tools: [{ name: "a" }, { name: "b" }], messages: [{ content: [{ type: "tool_use", id: "one", name: "a", input: {} }, { type: "metadata", metadata }] }] };
+    const encoded = codec.encodeRequest(request);
+    expect(encoded.tools.map(tool => tool.name)).toEqual(["b", "c"]);
+    expect(codec.decodeMessage({ content: [{ type: "tool_use", id: "one", name: "b" }, { type: "tool_use", id: "two", name: "c" }] }).content.map(block => block.name)).toEqual(["a", "b"]);
+    const actual = encoded.messages[0].content[1].metadata as typeof metadata;
+    expect(Object.getPrototypeOf(actual)).toBe(Object.prototype);
+    expect(Object.hasOwn(actual, "__proto__")).toBe(true);
+    expect(actual.__proto__).toEqual({ name: "a" });
+    expect(actual.input_schema).toBe(metadata.input_schema);
+    expect(Object.hasOwn(actual.input_schema, "__proto__")).toBe(true);
+    expect(metadata.__proto__.name).toBe("a");
+  });
   it("rejects invalid and ambiguous mappings and leaves unknown names alone", () => {
     expect(() => createAnthropicToolNameCodec({ current: { a: "same", b: "same" } })).toThrow();
-    expect(() => createAnthropicToolNameCodec({ current: { a: "b", b: "c" } })).toThrow();
     expect(() => createAnthropicToolNameCodec({ retired: { "bad name": "a" } })).toThrow();
     expect(() => createAnthropicToolNameCodec({ current: { a: "b" }, retired: { b: "c" } })).toThrow();
     const request = { tools: [{ name: "unknown" }], messages: [{ content: [{ type: "tool_use", name: "unknown" }] }] };
