@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { applyAnthropicRequestPolicy, type AnthropicRequestPolicy } from "./anthropic-request-policy.js";
 import { anthropicIdentityHeaders } from "./anthropic-client-identity.js";
 import { createAnthropicTelemetry, type AnthropicTelemetry, type AnthropicTelemetryContext, type AnthropicTelemetryStorage } from "./anthropic-telemetry.js";
 import type { AnthropicTelemetryRequest } from "./anthropic-telemetry-request.js";
@@ -7,11 +8,12 @@ export type AnthropicRequestClass = "main" | "subagent" | "workflow" | "compacti
 export type AnthropicClientSessionOptions = { readonly enabled?: false } | {
   readonly enabled: true; readonly clientVersion: string; readonly sdkVersion: string; readonly deviceId: string;
   readonly sessionId?: string; readonly parentSessionId?: string; readonly accountUuid?: string; readonly organizationUuid?: string;
-  readonly entrypoint?: string; readonly clientApp?: string;
+  readonly entrypoint?: string; readonly clientApp?: string; readonly bodyPolicy?: AnthropicRequestPolicy;
   readonly telemetry?: { readonly enabled: true; readonly fetchImpl: typeof fetch; readonly signal?: AbortSignal; readonly storage?: AnthropicTelemetryStorage; readonly environment?: Omit<NonNullable<AnthropicTelemetryContext["environment"]>, "version"> };
 };
 export interface AnthropicClientRequestOptions {
   readonly fetchImpl: typeof fetch;
+  readonly bodyPolicy?: AnthropicRequestPolicy;
   readonly requestClass?: AnthropicRequestClass;
   readonly promptId?: string;
   readonly agentId?: string;
@@ -54,8 +56,9 @@ export function createAnthropicClientSession(options: AnthropicClientSessionOpti
     : createAnthropicTelemetry();
   return {
     sessionId,
-    request({ fetchImpl, requestClass = "main", promptId, agentId, parentAgentId, agentType }) {
+    request({ fetchImpl, bodyPolicy = options.bodyPolicy, requestClass = "main", promptId, agentId, parentAgentId, agentType }) {
       if (closed) throw new Error("Anthropic client session is closed.");
+      if (bodyPolicy?.system?.mode === "recorded" && !bodyPolicy.system.recorded?.trim()) throw new TypeError("A recorded system prefix is required.");
       if (!CLASSES.includes(requestClass) || [promptId, agentId, parentAgentId, agentType].some(value => value !== undefined && !IDENTIFIER.test(value))) throw new TypeError("Invalid Anthropic request identity.");
       const observer = telemetry.request(fetchImpl);
       const fetch: typeof globalThis.fetch = (input, init) => {
@@ -66,8 +69,10 @@ export function createAnthropicClientSession(options: AnthropicClientSessionOpti
           if (url.origin === "https://api.anthropic.com" && url.pathname === "/v1/messages" && method === "POST" && typeof init?.body === "string") {
             const payload = object(JSON.parse(init.body));
             if (payload && Array.isArray(payload.messages)) {
-              const metadata = object(payload.metadata) ?? {};
-              payload.metadata = { ...metadata, user_id: JSON.stringify({ device_id: deviceId, account_uuid: accountUuid ?? "", session_id: sessionId, ...(parentSessionId ? { parent_session_id: parentSessionId } : {}) }) };
+              const result = bodyPolicy ? applyAnthropicRequestPolicy(payload, bodyPolicy) : undefined;
+              const requestBody = result?.body ?? payload;
+              const metadata = object(requestBody.metadata) ?? {};
+              requestBody.metadata = { ...metadata, user_id: JSON.stringify({ device_id: deviceId, account_uuid: accountUuid ?? "", session_id: sessionId, ...(parentSessionId ? { parent_session_id: parentSessionId } : {}) }) };
               const headers = new Headers(init.headers ?? (input instanceof Request ? input.headers : undefined));
               for (const [key, value] of Object.entries(clientHeaders)) headers.set(key, value);
               headers.set("x-claude-code-session-id", sessionId);
@@ -75,8 +80,15 @@ export function createAnthropicClientSession(options: AnthropicClientSessionOpti
               for (const [key, value] of [["x-claude-code-prompt-id", promptId], ["x-claude-code-agent-id", agentId], ["x-claude-code-parent-agent-id", parentAgentId], ["x-claude-code-agent-type", agentType]] as const) {
                 if (value) headers.set(key, value); else headers.delete(key);
               }
+              if (result && bodyPolicy) {
+                const existing = (headers.get("anthropic-beta") ?? "").split(",").map(value => value.trim()).filter(Boolean)
+                  .filter(value => !(bodyPolicy.supportsEffort === false && value === "effort-2025-11-24") && !(bodyPolicy.supportsContextManagement === false && value === "context-management-2025-06-27"));
+                const betas = [...new Set([...existing, ...result.betas])];
+                if (betas.length) headers.set("anthropic-beta", betas.join(","));
+                else headers.delete("anthropic-beta");
+              }
               headers.delete("content-length");
-              prepared = { ...init, headers, body: JSON.stringify(payload) };
+              prepared = { ...init, headers, body: JSON.stringify(requestBody) };
             }
           }
         } catch { /* Unrecognized request bodies pass through untouched. */ }

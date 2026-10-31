@@ -61,7 +61,7 @@ import { CredentialRouter, createCredentialMetadata, createUsageGate, parseRetry
 import { authorizeWorkBuddy, refreshWorkBuddy } from "@model-auth/providers/workbuddy";
 import { authorizeOpenAI, refreshOpenAI, listOpenAICodexModels, parseOpenAICodexModels, type OpenAICodexModel } from "@model-auth/providers/openai";
 import { latestClientVersion, CLIENT_VERSION_FLOORS, type ClientVersionTarget } from "@model-auth/providers/client-versions";
-import { authorizeAnthropic, refreshAnthropic, normalizeAnthropicRequestUsage, createAnthropicTelemetry, createAnthropicClientSession, type AnthropicClientSession, type AnthropicRequestUsage, type AnthropicTelemetry, type AnthropicTelemetryRequest } from "@model-auth/providers/anthropic";
+import { authorizeAnthropic, refreshAnthropic, normalizeAnthropicRequestUsage, createAnthropicTelemetry, createAnthropicClientSession, applyAnthropicRequestPolicy, type AnthropicRequestPolicy, type AnthropicClientSession, type AnthropicRequestUsage, type AnthropicTelemetry, type AnthropicTelemetryRequest } from "@model-auth/providers/anthropic";
 import { createAnthropicTelemetry as rootTelemetry } from "@model-auth/providers";
 import { authorizeAnthropicInBrowser, type AnthropicBrowserAuthorization, type AnthropicSessionCookie } from "@model-auth/providers/anthropic-browser";
 import { authorizeTrae, refreshTrae, listTraeModels, streamTrae } from "@model-auth/providers/trae";
@@ -74,6 +74,8 @@ const extraUsage: ProviderUsageExtraUsage | null | undefined = parseAnthropicUsa
 const requestUsage: AnthropicRequestUsage | null = normalizeAnthropicRequestUsage({ input_tokens: 1 });
 const telemetry: AnthropicTelemetry = createAnthropicTelemetry();
 const clientSession: AnthropicClientSession = createAnthropicClientSession();
+const bodyPolicy: AnthropicRequestPolicy = { supportsEffort: false };
+applyAnthropicRequestPolicy({}, bodyPolicy);
 const observedRequest: AnthropicTelemetryRequest = telemetry.request(fetch);
 void [observedRequest, clientSession, rootTelemetry];
 const gate: UsageGate = createUsageGate({ minIntervalMs: () => 0 });
@@ -106,7 +108,7 @@ import { authorizeWorkBuddy, refreshWorkBuddy } from "@model-auth/providers/work
 import { authorizeOpenAI, refreshOpenAI, listOpenAICodexModels, parseOpenAICodexModels } from "@model-auth/providers/openai";
 import { latestClientVersion, CLIENT_VERSION_FLOORS } from "@model-auth/providers/client-versions";
 import { latestClientVersion as rootLatestClientVersion, createAnthropicTelemetry as rootTelemetry, createAnthropicClientSession as rootClientSession } from "@model-auth/providers";
-import { authorizeAnthropic, refreshAnthropic, normalizeAnthropicRequestUsage, createAnthropicTelemetry, createAnthropicClientSession } from "@model-auth/providers/anthropic";
+import { authorizeAnthropic, refreshAnthropic, normalizeAnthropicRequestUsage, createAnthropicTelemetry, createAnthropicClientSession, applyAnthropicRequestPolicy } from "@model-auth/providers/anthropic";
 import { authorizeAnthropicInBrowser } from "@model-auth/providers/anthropic-browser";
 import { authorizeGrok, queryGrokUsage } from "@model-auth/providers/grok";
 import { authorizeOllamaWeb, queryOllamaUsage, parseOllamaSettings } from "@model-auth/providers/ollama";
@@ -123,6 +125,7 @@ if (createAnthropicTelemetry !== rootTelemetry) throw new Error("Installed telem
 const originalFetch = globalThis.fetch;
 let telemetryFetches = 0;
 globalThis.fetch = async () => { telemetryFetches++; throw new Error("Disabled telemetry used fetch"); };
+if (applyAnthropicRequestPolicy({ temperature: 1 }, {}).body.temperature !== 1) throw new Error("Installed request policy unavailable");
 const disabledTelemetry = createAnthropicTelemetry();
 const disabledSession = createAnthropicClientSession();
 if (createAnthropicClientSession !== rootClientSession) throw new Error("Installed client session exports differ");
