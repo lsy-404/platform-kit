@@ -56,12 +56,12 @@ describe("Anthropic telemetry", () => {
       sizes.push(JSON.parse(String(init?.body)).events.length); await waiting; return new Response(null, { status: 204 });
     } });
     for (let i = 0; i < 200; i++) expect(sender.record("tengu_plugin_survey_answered")).toBe(true);
-    expect(sender.record("tengu_plugin_survey_answered")).toBe(false);
+    expect(sender.record("tengu_plugin_survey_answered")).toBe(true);
     const closing = sender.close();
     expect(sender.record("tengu_plugin_survey_answered")).toBe(false);
     finish();
     expect(await closing).toBe(true);
-    expect(sizes).toEqual([100, 100]);
+    expect(sizes).toEqual([200, 1]);
   });
 
   it("cancels scheduled work and isolates fetch errors", async () => {
@@ -93,7 +93,9 @@ describe("Anthropic telemetry", () => {
     await vi.advanceTimersByTimeAsync(10_000);
     expect(await result).toBe(false);
     expect(requestSignal?.aborted).toBe(true);
-    expect(await sender.close()).toBe(false);
+    const closing = sender.close();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(await closing).toBe(false);
     expect(vi.getTimerCount()).toBe(0);
   });
 
@@ -114,7 +116,7 @@ describe("Anthropic telemetry", () => {
     const sender = createAnthropicTelemetry({ enabled: true, sessionId: "concurrent", fetchImpl: async () => new Promise<Response>(resolve => completions.push(resolve)) });
     sender.record("tengu_plugin_survey_answered");
     const first = sender.flush();
-    await Promise.resolve();
+    await vi.waitFor(() => expect(completions).toHaveLength(1));
     sender.record("tengu_plugin_survey_answered");
     let finished = 0;
     const flushing = sender.flush().then(value => { finished++; return value; });
@@ -124,7 +126,83 @@ describe("Anthropic telemetry", () => {
     await vi.waitFor(() => expect(completions).toHaveLength(2));
     expect(finished).toBe(0);
     completions[1]!(new Response(null, { status: 503 }));
-    expect(await first).toBe(true);
+    expect(await first).toBe(false);
     expect(await Promise.all([flushing, closeOne, closeTwo])).toEqual([false, false, false]);
   });
+  it("schedules after ten seconds and preserves a failed batch for its session", async () => {
+    vi.useFakeTimers();
+    const memory = new Map<string, any>();
+    const storage = { load: vi.fn(async (key: string) => memory.get(key) ?? []), save: vi.fn(async (key: string, batches: any) => { memory.set(key, structuredClone(batches)); }), remove: vi.fn(async (key: string) => { memory.delete(key); }) };
+    const context = { deviceId: "d", accountUuid: "a" };
+    const bad = vi.fn(async () => new Response(null, { status: 503 }));
+    const sender = createAnthropicTelemetry({ enabled: true, sessionId: "s", context, storage, fetchImpl: bad });
+    await vi.advanceTimersByTimeAsync(0);
+    sender.record("tengu_api_query");
+    await vi.advanceTimersByTimeAsync(9999); expect(bad).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1); expect(bad).toHaveBeenCalledTimes(1);
+    const saved = [...memory.values()][0];
+    expect(saved[0].attempts).toBe(1);
+    const id = saved[0].events[0].event_data.event_id;
+    const good = vi.fn(async () => new Response(null, { status: 204 }));
+    const restored = createAnthropicTelemetry({ enabled: true, sessionId: "s", context, storage, fetchImpl: good });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(await restored.flush()).toBe(true);
+    expect(JSON.parse(String(good.mock.calls[0]?.[1]?.body)).events[0].event_data.event_id).toBe(id);
+    expect(memory.size).toBe(0);
+    await restored.close();
+    await sender.close();
+  });
+
+  it("retries failures with increasing quadratic delays", async () => {
+    vi.useFakeTimers();
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 503 }));
+    const sender = createAnthropicTelemetry({ enabled: true, sessionId: "retry", fetchImpl });
+    sender.record("tengu_api_query");
+    expect(await sender.flush()).toBe(false);
+    await vi.advanceTimersByTimeAsync(499); expect(fetchImpl).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1); expect(fetchImpl).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1999); expect(fetchImpl).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1); expect(fetchImpl).toHaveBeenCalledTimes(3);
+    await sender.close();
+  });
+
+  it("bounds pending events at 8192", async () => {
+    const controller = new AbortController();
+    const sender = createAnthropicTelemetry({ enabled: true, sessionId: "bound", signal: controller.signal, fetchImpl: async () => new Promise<Response>(() => {}) });
+    for (let i = 0; i < 8192; i++) expect(sender.record("tengu_api_query")).toBe(true);
+    expect(sender.record("tengu_api_query")).toBe(false);
+    controller.abort();
+    expect(await sender.close()).toBe(false);
+  });
+
+  it("drops the batch after eight failed attempts", async () => {
+    vi.useFakeTimers();
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 503 }));
+    const sender = createAnthropicTelemetry({ enabled: true, sessionId: "limit", fetchImpl });
+    sender.record("tengu_api_query");
+    expect(await sender.flush()).toBe(false);
+    await vi.advanceTimersByTimeAsync(70_000);
+    expect(fetchImpl).toHaveBeenCalledTimes(8);
+    expect(await sender.close()).toBe(false);
+  });
+
+  it("paces separate batches and rejects mismatched restored identities", async () => {
+    vi.useFakeTimers();
+    const calls = vi.fn(async () => new Response(null, { status: 204 }));
+    const sender = createAnthropicTelemetry({ enabled: true, sessionId: "pace", fetchImpl: calls });
+    for (let i = 0; i < 201; i++) sender.record("tengu_api_query");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(99); expect(calls).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1); expect(calls).toHaveBeenCalledTimes(2);
+    expect(await sender.close()).toBe(true);
+    const save = vi.fn(async () => {});
+    const storage = { load: async () => [{ attempts: 1, events: [{ event_type: "ClaudeCodeInternalEvent" as const, event_data: { session_id: "other" } }] }], save, remove: vi.fn(async () => {}) };
+    const isolated = createAnthropicTelemetry({ enabled: true, sessionId: "s", context: { deviceId: "d", accountUuid: "a" }, storage, fetchImpl: calls });
+    isolated.record("tengu_api_query");
+    expect(await isolated.flush()).toBe(false);
+    expect(save).not.toHaveBeenCalled();
+    expect(await isolated.close()).toBe(false);
+  });
+
 });
