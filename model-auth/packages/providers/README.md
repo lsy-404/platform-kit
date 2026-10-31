@@ -107,6 +107,28 @@ Usage queries retry transient network failures twice, never retry 429 (a `Retry-
 
 `queryClaudePrepaidCredits({ fetchImpl, signal, organizationId })` reads the prepaid credit pool, which the OAuth token cannot see. `fetchImpl` must be a fetch bound to a signed-in claude.ai web session; the module never handles cookies or authorization headers, does not retry, and does not follow redirects (a redirect, 401 or 403 reports `signed-out`). It lists `/api/organizations`, keeps chat-capable organizations (or, failing that, anything that is not API-only) and reads `/api/organizations/{id}/prepaid/credits`. A session with several eligible organizations and no `organizationId` yields an `unreadable` snapshot asking to choose one. The balance is `amount / 100` in the reported currency. `balance.funded` is `false` only for a pool with a zero amount and no tranches, so a host can hide a never-funded pool while keeping a drained one at zero.
 
+## Optional Claude client session
+
+```ts
+import { createAnthropicClientSession } from "@model-auth/providers/anthropic";
+
+const session = createAnthropicClientSession({
+  enabled: true, clientVersion, sdkVersion, deviceId, accountUuid,
+  telemetry: { enabled: true, fetchImpl: accountAuthenticatedFetch },
+});
+const observer = session.request({ fetchImpl: inferenceFetch, promptId });
+try {
+  await runMessages({ fetch: observer.fetch, onStreamEvent: observer.onStreamEvent });
+} catch (error) {
+  observer.onError({ cancelled: isUserCancellation(error) });
+  throw error;
+}
+// Close when the session ends, after any further requests.
+await session.close();
+```
+
+This optional profile shares the supplied client versions, device and session identity between first-party Messages requests and telemetry. The host owns the stable device ID, per-prompt ID and account-bound transports. Reuse a prompt ID across its tool loop; select request class and agent IDs per logical request. Telemetry is independently disabled unless explicitly enabled, and closing the session flushes it. The profile does not run the Agent SDK, its tools or its session loop.
+
 ## Optional Claude telemetry
 
 ```ts
