@@ -126,7 +126,7 @@ describe("Anthropic telemetry", () => {
     await vi.waitFor(() => expect(completions).toHaveLength(2));
     expect(finished).toBe(0);
     completions[1]!(new Response(null, { status: 503 }));
-    expect(await first).toBe(false);
+    expect(await first).toBe(true);
     expect(await Promise.all([flushing, closeOne, closeTwo])).toEqual([false, false, false]);
   });
   it("schedules after ten seconds and preserves a failed batch for its session", async () => {
@@ -203,6 +203,60 @@ describe("Anthropic telemetry", () => {
     expect(await isolated.flush()).toBe(false);
     expect(save).not.toHaveBeenCalled();
     expect(await isolated.close()).toBe(false);
+  });
+
+  it("waits for the second successful batch for every concurrent waiter", async () => {
+    const releases: Array<(response: Response) => void> = [];
+    const sender = createAnthropicTelemetry({ enabled: true, sessionId: "two", fetchImpl: async () => new Promise<Response>(resolve => releases.push(resolve)) });
+    sender.record("tengu_api_query");
+    const first = sender.flush();
+    await vi.waitFor(() => expect(releases).toHaveLength(1));
+    sender.record("tengu_api_query");
+    let done = 0;
+    const a = sender.flush().then(value => { done++; return value; });
+    const b = sender.close().then(value => { done++; return value; });
+    releases[0]!(new Response(null, { status: 204 }));
+    await vi.waitFor(() => expect(releases).toHaveLength(2));
+    expect(done).toBe(0);
+    releases[1]!(new Response(null, { status: 204 }));
+    await first;
+    expect(await Promise.all([a, b])).toEqual([true, true]);
+  });
+
+  it("does not let new events accelerate a retry", async () => {
+    vi.useFakeTimers();
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 503 }));
+    const sender = createAnthropicTelemetry({ enabled: true, sessionId: "paced-retry", fetchImpl });
+    sender.record("tengu_api_query");
+    expect(await sender.flush()).toBe(false);
+    for (let i = 0; i < 200; i++) sender.record("tengu_api_query");
+    await vi.advanceTimersByTimeAsync(499); expect(fetchImpl).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1); expect(fetchImpl).toHaveBeenCalledTimes(2);
+    await sender.close();
+  });
+
+  it("does not accept events before recovery or schedule after pre-abort", async () => {
+    let finish!: (batches: any[]) => void;
+    const storage = { load: () => new Promise<any[]>(resolve => { finish = resolve; }), save: vi.fn(async () => {}), remove: vi.fn(async () => {}) };
+    const controller = new AbortController(); controller.abort();
+    vi.useFakeTimers();
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 204 }));
+    const sender = createAnthropicTelemetry({ enabled: true, sessionId: "s", context: { accountUuid: "a", deviceId: "d" }, storage, signal: controller.signal, fetchImpl });
+    expect(sender.record("tengu_api_query")).toBe(false);
+    finish([]); await vi.advanceTimersByTimeAsync(20_000);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+    expect(await sender.close()).toBe(true);
+  });
+
+  it("refuses an oversized restored queue without overwriting it", async () => {
+    const row = { event_type: "ClaudeCodeInternalEvent" as const, event_data: { session_id: "s", device_id: "d", auth: { account_uuid: "a" } } };
+    const storage = { load: async () => Array.from({ length: 41 }, () => ({ attempts: 1, events: Array(200).fill(row) })), save: vi.fn(async () => {}), remove: vi.fn(async () => {}) };
+    const sender = createAnthropicTelemetry({ enabled: true, sessionId: "s", context: { deviceId: "d", accountUuid: "a" }, storage, fetchImpl: vi.fn() });
+    expect(sender.record("tengu_api_query")).toBe(false);
+    expect(await sender.flush()).toBe(false);
+    expect(storage.save).not.toHaveBeenCalled();
+    expect(await sender.close()).toBe(false);
   });
 
 });

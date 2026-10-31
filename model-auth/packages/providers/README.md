@@ -138,7 +138,7 @@ When the session ends, flush and close the sender:
 if (!await telemetry.close()) reportTelemetryFailure();
 ```
 
-Batches contain up to 200 events, with a 10-second scheduled flush and an 8192-event queue. Failed batches retry with bounded quadratic backoff. To recover failed batches, provide a `storage` object with asynchronous `load`, `save`, and `remove` methods; storage keys bind the session, device, account, and organization. The host must protect the data and ensure exclusive access. Without storage, failed events remain in memory. `close()` waits at most 10 seconds and returns false when events remain unsent or were dropped.
+Batches contain up to 200 events, with a 10-second scheduled flush and an 8192-event queue. Failed batches retry with bounded quadratic backoff. To recover failed batches, provide a `storage` object with asynchronous `load`, `save`, and `remove` methods; storage keys bind the session, device, account, and organization. The host must protect the data and ensure exclusive access. While storage loads, `record()` returns false; wait for a completed `flush()` before recording. Without storage, failed events remain in memory. `close()` waits at most 10 seconds and returns false when events remain unsent or were dropped.
 
 The [batch protocol](https://github.com/anthropics/claude-code/tree/80c6959d28c4c30ecd14fc1cdf172f19d9adad81/mods/telemetry) is non-public, and service acceptance has not been verified. The host fetch must honor `signal` and `redirect: "error"`; a ten-second timeout stops waiting, but a transport that ignores cancellation may continue its request.
 
