@@ -107,6 +107,23 @@ Usage queries retry transient network failures twice, never retry 429 (a `Retry-
 
 `queryClaudePrepaidCredits({ fetchImpl, signal, organizationId })` reads the prepaid credit pool, which the OAuth token cannot see. `fetchImpl` must be a fetch bound to a signed-in claude.ai web session; the module never handles cookies or authorization headers, does not retry, and does not follow redirects (a redirect, 401 or 403 reports `signed-out`). It lists `/api/organizations`, keeps chat-capable organizations (or, failing that, anything that is not API-only) and reads `/api/organizations/{id}/prepaid/credits`. A session with several eligible organizations and no `organizationId` yields an `unreadable` snapshot asking to choose one. The balance is `amount / 100` in the reported currency. `balance.funded` is `false` only for a pool with a zero amount and no tranches, so a host can hide a never-funded pool while keeping a drained one at zero.
 
+## Optional Claude telemetry
+
+```ts
+import { createAnthropicTelemetry } from "@model-auth/providers/anthropic";
+
+const telemetry = createAnthropicTelemetry({
+  enabled: true, sessionId, fetchImpl: accountAuthenticatedFetch,
+  context: { deviceId, accountUuid, model, isInteractive: false },
+});
+telemetry.record(eventName, metadata);
+if (!await telemetry.close()) reportTelemetryFailure();
+```
+
+The sender is disabled by default and sends no requests until explicitly enabled. Enabled senders batch up to 100 events or wait five seconds; `flush()` and `close()` return `false` if a batch failed or queued events were cancelled during the sender's lifetime. Metadata accepts bounded string, number and boolean values. The host supplies events, metadata and optional context; it must exclude secrets and match the upstream event schema. Bind `fetchImpl` to one account, and create a new sender when switching accounts.
+
+The [batch protocol](https://github.com/anthropics/claude-code/tree/80c6959d28c4c30ecd14fc1cdf172f19d9adad81/mods/telemetry) is non-public, and service acceptance has not been verified. The host fetch must honor `signal` and `redirect: "error"`; a ten-second timeout stops waiting, but a transport that ignores cancellation may continue its request.
+
 ## Codex plans and tiers
 
 `normalizeCodexPlan` maps the reported name to `{ plan, multiplier, tier }`. Official `prolite`, `pro`, and `promax` identify Pro 5x, 10x, and 25x; `tier` preserves those identities while `plan` is `pro`. Numeric names such as `pro_10x_usage_based` retain their encoded size (1 to 100). Go and Plus remain distinct, workspace aliases normalize to their plan family, unknown names pass through, and values containing `@` are dropped. An explicit service multiplier wins. Usage queries read token claims when the usage response omits its plan.

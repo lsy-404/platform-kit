@@ -1,5 +1,6 @@
 import { latestClientVersion, type ClientVersionOptions } from "./client-versions.js";
 import { BrowserOAuthError, authorizeBrowserOAuth, refreshBrowserOAuth, type BrowserOAuthAuthorizationOptions, type BrowserOAuthCredential, type BrowserOAuthRefreshOptions } from "./browser-oauth.js";
+export { createAnthropicTelemetry, type AnthropicTelemetry, type AnthropicTelemetryContext, type AnthropicTelemetryMetadata, type AnthropicTelemetryOptions } from "./anthropic-telemetry.js";
 
 const ANTHROPIC_CONFIG = {
   authorizeUrl: "https://claude.ai/oauth/authorize",
