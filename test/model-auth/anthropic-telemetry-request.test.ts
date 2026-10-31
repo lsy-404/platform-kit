@@ -30,6 +30,35 @@ describe("Anthropic request telemetry", () => {
     expect(JSON.stringify(rows)).not.toContain("private");
   });
 
+  it("observes a real non-streaming message once without inventing first-token timing", async () => {
+    let rows: Array<{ event_name: string; metadata: Record<string, unknown> }> = [];
+    const sender = createAnthropicTelemetry({ enabled: true, sessionId: "s", context: { deviceId: "d" }, fetchImpl: async (_url, request) => { rows = eventsOf(request); return new Response(null, { status: 204 }); } });
+    let attempts = 0;
+    const observer = sender.request(async () => ++attempts === 1 ? new Response(null, { status: 503 }) : new Response("ok", { headers: { "request-id": "second" } }));
+    await observer.fetch(url, init("m")); await observer.fetch(url, init("m"));
+    observer.onResponseMessage({ type: "message", role: "assistant", id: "msg", model: "m", content: [], stop_reason: "end_turn", usage: { input_tokens: 12, output_tokens: 7, cache_read_input_tokens: 3, cache_creation_input_tokens: 4, cache_creation: { ephemeral_5m_input_tokens: 1, ephemeral_1h_input_tokens: 3 } } });
+    observer.onResponseMessage({ type: "message", role: "assistant", id: "msg", model: "m", content: [], stop_reason: "end_turn", usage: { input_tokens: 12, output_tokens: 7 } });
+    observer.onStreamEvent({ type: "message_stop" }); observer.onError();
+    await sender.close();
+    expect(rows.map(row => row.event_name)).toEqual(["tengu_api_query", "tengu_api_success"]);
+    expect(rows[1].metadata).toMatchObject({ attempt: 2, requestId: "second", inputTokens: 12, outputTokens: 7, cachedInputTokens: 3, uncachedInputTokens: 4, cache_creation_5m_input_tokens: 1, cache_creation_1h_input_tokens: 3, stop_reason: "end_turn" });
+    expect(rows[1].metadata).not.toHaveProperty("ttftMs");
+  });
+
+  it("ignores malformed messages and non-success HTTP responses", async () => {
+    let rows: Array<{ event_name: string }> = [];
+    const sender = createAnthropicTelemetry({ enabled: true, sessionId: "s", context: { deviceId: "d" }, fetchImpl: async (_url, request) => { rows = eventsOf(request); return new Response(null, { status: 204 }); } });
+    const observer = sender.request(async () => new Response(null, { status: 400 }));
+    await observer.fetch(url, init("m"));
+    observer.onResponseMessage({ type: "message", role: "assistant", id: "msg", model: "m", content: [], stop_reason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 } });
+    observer.onError();
+    const invalid = sender.request(async () => new Response("ok"));
+    await invalid.fetch(url, init("m")); invalid.onResponseMessage({ type: "message", usage: { input_tokens: 1, output_tokens: 1 } }); invalid.onError();
+    createAnthropicTelemetry().request(fetch).onResponseMessage({});
+    await sender.close();
+    expect(rows.map(row => row.event_name)).toEqual(["tengu_api_query", "tengu_api_error", "tengu_api_query", "tengu_api_error"]);
+  });
+
   it("does not report success for incomplete streams, and observes actual failures", async () => {
     let rows: Array<{ event_name: string; metadata: Record<string, unknown> }> = [];
     const sender = createAnthropicTelemetry({ enabled: true, sessionId: "s", context: { deviceId: "d" }, fetchImpl: async (_url, request) => { rows = eventsOf(request); return new Response(null, { status: 204 }); } });

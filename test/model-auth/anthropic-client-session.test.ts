@@ -55,7 +55,7 @@ describe("Anthropic client session", () => {
     expect(headers.get("user-agent")).toBe("claude-cli/2.1.316 (external, sdk-ts, agent-sdk/0.3.316)");
     expect(body.metadata.retained).toBe(true);
     expect(JSON.parse(body.metadata.user_id)).toEqual({ device_id: "device_a", account_uuid: "account_a", session_id: "session_a", parent_session_id: "parent_a" });
-    observer.onStreamEvent({ type: "message_stop" });
+    observer.onResponseMessage({ type: "message", role: "assistant", id: "msg", model: "model", content: [], stop_reason: "end_turn", usage: { input_tokens: 3, output_tokens: 2 } });
     expect(await session.close()).toBe(true);
     expect(events.map(event => event.event_name)).toEqual(["tengu_api_query", "tengu_api_success"]);
     expect(telemetryHeaders?.get("user-agent")).toBe("claude-code/2.1.316");

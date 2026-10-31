@@ -36,7 +36,7 @@ export function createAnthropicClientSession(options: AnthropicClientSessionOpti
   let closed = false;
   if (!options.enabled) return { sessionId: null, request: ({ fetchImpl }) => {
     if (closed) throw new Error("Anthropic client session is closed.");
-    return { fetch: fetchImpl, onStreamEvent() {}, onError() {} };
+    return { fetch: fetchImpl, onStreamEvent() {}, onResponseMessage() {}, onError() {} };
   }, flush: async () => true, close: async () => { closed = true; return true; } };
   const { clientVersion, sdkVersion, deviceId, accountUuid, organizationUuid, clientApp, parentSessionId } = options;
   const sessionId = options.sessionId ?? randomUUID(), entrypoint = options.entrypoint ?? "sdk-ts";
@@ -97,7 +97,7 @@ export function createAnthropicClientSession(options: AnthropicClientSessionOpti
         }
         return observer.fetch(input, prepared ?? init);
       };
-      return { fetch, onStreamEvent: observer.onStreamEvent, onError: observer.onError };
+      return { fetch, onStreamEvent: observer.onStreamEvent, onResponseMessage: observer.onResponseMessage, onError: observer.onError };
     },
     flush: () => telemetry.flush(),
     close: () => { closed = true; return telemetry.close(); },

@@ -3,6 +3,7 @@ import type { AnthropicTelemetryMetadata } from "./anthropic-telemetry.js";
 export interface AnthropicTelemetryRequest {
   readonly fetch: typeof fetch;
   onStreamEvent(event: unknown): void;
+  onResponseMessage(message: unknown): void;
   onError(options?: { readonly cancelled?: boolean }): void;
 }
 
@@ -11,7 +12,7 @@ const object = (value: unknown): Record<string, unknown> | undefined => value &&
 const count = (value: unknown): number | undefined => typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
 
 export function observeAnthropicRequest(transport: typeof fetch, sessionId?: string, deviceId?: string, accountUuid?: string, emit?: Emit): AnthropicTelemetryRequest {
-  if (!emit || !sessionId || !deviceId) return { fetch: transport, onStreamEvent() {}, onError() {} };
+  if (!emit || !sessionId || !deviceId) return { fetch: transport, onStreamEvent() {}, onResponseMessage() {}, onError() {} };
   let active = false, finished = false, started = 0, attemptStarted = 0, attempts = 0;
   let model = "", requestId: string | undefined, status: number | undefined, firstToken: number | undefined, stopReason: string | undefined;
   const usage: Record<string, number> = {};
@@ -22,6 +23,20 @@ export function observeAnthropicRequest(transport: typeof fetch, sessionId?: str
     finished = true;
     send("tengu_api_error", { durationMs: duration(attemptStarted), durationMsIncludingRetries: duration(started), attempt: attempts,
       ...(status !== undefined ? { status: String(status) } : {}), ...(requestId ? { requestId } : {}) });
+  };
+  const readUsage = (data: Record<string, unknown>) => {
+    for (const [key, target] of [["input_tokens", "inputTokens"], ["output_tokens", "outputTokens"], ["cache_read_input_tokens", "cachedInputTokens"], ["cache_creation_input_tokens", "uncachedInputTokens"]] as const) {
+      const value = count(data[key]); if (value !== undefined) usage[target] = value;
+    }
+    const creation = object(data.cache_creation);
+    for (const [key, target] of [["ephemeral_5m_input_tokens", "cache_creation_5m_input_tokens"], ["ephemeral_1h_input_tokens", "cache_creation_1h_input_tokens"]] as const) {
+      const value = count(creation?.[key]); if (value !== undefined) usage[target] = value;
+    }
+  };
+  const succeed = () => {
+    finished = true;
+    send("tengu_api_success", { ...usage, durationMs: duration(attemptStarted), durationMsIncludingRetries: duration(started), attempt: attempts,
+      ...(requestId ? { requestId } : {}), ...(firstToken !== undefined ? { ttftMs: firstToken } : {}), ...(stopReason ? { stop_reason: stopReason } : {}) });
   };
   return {
     fetch: async (input, init) => {
@@ -73,21 +88,20 @@ export function observeAnthropicRequest(transport: typeof fetch, sessionId?: str
         const reason = event.type === "message_delta" ? object(event.delta)?.stop_reason : undefined;
         if (typeof reason === "string" && reason.length <= 64) stopReason = reason;
         const data = event.type === "message_start" ? object(object(event.message)?.usage) : event.type === "message_delta" ? object(event.usage) : undefined;
-        if (data) {
-          for (const [key, target] of [["input_tokens", "inputTokens"], ["output_tokens", "outputTokens"], ["cache_read_input_tokens", "cachedInputTokens"], ["cache_creation_input_tokens", "uncachedInputTokens"]] as const) {
-            const value = count(data[key]); if (value !== undefined) usage[target] = value;
-          }
-          const creation = object(data.cache_creation);
-          for (const [key, target] of [["ephemeral_5m_input_tokens", "cache_creation_5m_input_tokens"], ["ephemeral_1h_input_tokens", "cache_creation_1h_input_tokens"]] as const) {
-            const value = count(creation?.[key]); if (value !== undefined) usage[target] = value;
-          }
-        }
-        if (event.type === "message_stop") {
-          finished = true;
-          send("tengu_api_success", { ...usage, durationMs: duration(attemptStarted), durationMsIncludingRetries: duration(started), attempt: attempts,
-            ...(requestId ? { requestId } : {}), ...(firstToken !== undefined ? { ttftMs: firstToken } : {}), ...(stopReason ? { stop_reason: stopReason } : {}) });
-        }
+        if (data) readUsage(data);
+        if (event.type === "message_stop") succeed();
       } catch { /* Malformed observer events are ignored. */ }
+    },
+    onResponseMessage(raw) {
+      if (!active || finished || status !== undefined) return;
+      try {
+        const message = object(raw), data = object(message?.usage);
+        if (message?.type !== "message" || message.role !== "assistant" || typeof message.id !== "string" || !message.id || typeof message.model !== "string" || !message.model || !Array.isArray(message.content) || !data || count(data.input_tokens) === undefined || count(data.output_tokens) === undefined || !(message.stop_reason === null || typeof message.stop_reason === "string" && message.stop_reason.length <= 64)) return;
+        readUsage(data);
+        firstToken = undefined;
+        if (typeof message.stop_reason === "string") stopReason = message.stop_reason;
+        succeed();
+      } catch { /* Malformed observer messages are ignored. */ }
     },
     onError(options) { if (options?.cancelled) finished = true; else fail(); },
   };

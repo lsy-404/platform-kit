@@ -84,6 +84,7 @@ const clientSession: AnthropicClientSession = createAnthropicClientSession();
 const bodyPolicy: AnthropicRequestPolicy = { supportsEffort: false };
 applyAnthropicRequestPolicy({}, bodyPolicy);
 const observedRequest: AnthropicTelemetryRequest = telemetry.request(fetch);
+observedRequest.onResponseMessage({});
 void [observedRequest, clientSession, rootTelemetry];
 const gate: UsageGate = createUsageGate({ minIntervalMs: () => 0 });
 const retryAfter: number | null = parseRetryAfter("120");
@@ -139,6 +140,7 @@ globalThis.fetch = async () => { telemetryFetches++; throw new Error("Disabled t
 if (applyAnthropicRequestPolicy({ temperature: 1 }, {}).body.temperature !== 1) throw new Error("Installed request policy unavailable");
 const disabledTelemetry = createAnthropicTelemetry();
 const disabledSession = createAnthropicClientSession();
+disabledSession.request({ fetchImpl: globalThis.fetch }).onResponseMessage({});
 if (createAnthropicClientSession !== rootClientSession) throw new Error("Installed client session exports differ");
 if (disabledSession.request({ fetchImpl: globalThis.fetch }).fetch !== globalThis.fetch || !await disabledSession.close()) throw new Error("Disabled client session changed transport");
 if (disabledTelemetry.record("tengu_plugin_survey_answered") || !await disabledTelemetry.close()) throw new Error("Disabled telemetry is not inert");
