@@ -39,9 +39,8 @@ export function applyAnthropicRequestPolicy(input: Record<string, unknown>, poli
       body.thinking = { type: "adaptive", ...(thinking.display ? { display: thinking.display } : {}) };
     } else {
       const max = body.max_tokens;
-      if (Number.isSafeInteger(max) && max >= 1025 && Number.isSafeInteger(thinking.budgetTokens) && thinking.budgetTokens! > 0) {
-        body.thinking = { type: "enabled", budget_tokens: Math.min(max - 1, Math.max(1024, thinking.budgetTokens!)), ...(thinking.display ? { display: thinking.display } : {}) };
-      }
+      if (!Number.isSafeInteger(max) || max < 1025 || !Number.isSafeInteger(thinking.budgetTokens) || thinking.budgetTokens! <= 0) throw new TypeError("Enabled thinking requires a valid budget and max_tokens of at least 1025.");
+      body.thinking = { type: "enabled", budget_tokens: Math.min(max - 1, Math.max(1024, thinking.budgetTokens!)), ...(thinking.display ? { display: thinking.display } : {}) };
     }
     if (body.thinking?.type === "adaptive" || body.thinking?.type === "enabled") {
       delete body.temperature;
@@ -59,8 +58,9 @@ export function applyAnthropicRequestPolicy(input: Record<string, unknown>, poli
   if (policy.cache) {
     const cache = policy.cache;
     const ttl = cache.force5m ? "5m" : cache.environment ?? cache.setting ?? cache.frontmatter ?? (cache.subscriberEligible === undefined ? undefined : cache.subscriberEligible ? "1h" : "5m");
+    if (!ttl && cache.targets?.length) throw new TypeError("Cache targets require an explicit TTL policy.");
     if (ttl) for (const target of cache.targets ?? []) {
-      if (!validIndex(target.index)) continue;
+      if (!validIndex(target.index)) throw new TypeError("Invalid cache target.");
       let block: unknown;
       if (target.kind === "system") block = Array.isArray(body.system) ? body.system[target.index] : undefined;
       else if (target.kind === "tool") block = Array.isArray(body.tools) ? body.tools[target.index] : undefined;
@@ -69,10 +69,19 @@ export function applyAnthropicRequestPolicy(input: Record<string, unknown>, poli
         block = Array.isArray(message?.content) ? message.content[target.block] : undefined;
       }
       const item = obj(block);
-      if (item && (item.type === "text" ? typeof item.text === "string" && !!item.text.trim() : target.kind === "tool" ? typeof item.name === "string" : ["tool_use", "tool_result"].includes(item.type))) {
-        item.cache_control = { type: "ephemeral", ...(ttl === "1h" ? { ttl } : {}), ...(target.scope === "global" ? { scope: "global" } : {}) };
-      }
+      const valid = item && (target.kind === "tool" ? typeof item.name === "string" : item.type === "text" ? typeof item.text === "string" && !!item.text.trim() : target.kind === "message" && ["image", "document", "tool_use", "tool_result"].includes(item.type));
+      if (!valid) throw new TypeError("Invalid cache target.");
+      item.cache_control = { type: "ephemeral", ...(ttl === "1h" ? { ttl } : {}), ...(target.scope === "global" ? { scope: "global" } : {}) };
     }
+    const present = (value: unknown) => obj(value)?.cache_control != null ? 1 : 0;
+    let count = body.cache_control != null ? 1 : 0;
+    if (Array.isArray(body.system)) count += body.system.reduce((n: number, item: unknown) => n + present(item), 0);
+    if (Array.isArray(body.tools)) count += body.tools.reduce((n: number, item: unknown) => n + present(item), 0);
+    if (Array.isArray(body.messages)) for (const message of body.messages) {
+      const content = obj(message)?.content;
+      if (Array.isArray(content)) count += content.reduce((n: number, item: unknown) => n + present(item), 0);
+    }
+    if (count > 4) throw new RangeError("At most four cache breakpoints are allowed.");
   }
   return { body, betas: [...new Set(policy.betas?.allowed ?? [])].filter(beta => !(policy.supportsEffort === false && beta === "effort-2025-11-24") && !(policy.supportsContextManagement === false && beta === "context-management-2025-06-27")) };
 }

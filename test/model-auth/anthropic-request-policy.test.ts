@@ -45,4 +45,25 @@ describe("Anthropic request policy", () => {
     const disabled = createAnthropicClientSession();
     expect(disabled.request({ fetchImpl: transport }).fetch).toBe(transport);
   });
+  it("rejects a fifth real breakpoint without counting tool input data", () => {
+    const block = () => ({ type: "text", text: "x", cache_control: { type: "ephemeral" } });
+    const input = { cache_control: { type: "ephemeral" }, system: [block()], tools: [{ name: "read", input_schema: { cache_control: { type: "ephemeral" } } }], messages: [{ role: "user", content: [block(), block(), { type: "image", source: { type: "base64", media_type: "image/png", data: "x" } }] }] };
+    expect(() => applyAnthropicRequestPolicy(input, { cache: { setting: "5m", targets: [{ kind: "message", index: 0, block: 2 }] } })).toThrow(RangeError);
+    delete (input as any).cache_control;
+    const result = applyAnthropicRequestPolicy(input, { cache: { setting: "5m", targets: [{ kind: "message", index: 0, block: 2 }] } });
+    expect((result.body.messages as any[])[0].content[2].cache_control).toEqual({ type: "ephemeral" });
+    expect((input.messages[0].content[2] as any).cache_control).toBeUndefined();
+  });
+  it("rejects invalid explicit policy before transport and passes malformed JSON through", async () => {
+    const transport = vi.fn(async () => new Response(null, { status: 204 }));
+    const session = createAnthropicClientSession({ enabled: true, clientVersion: "2.1.316", sdkVersion: "0.3.316", deviceId: "d" });
+    expect(() => session.request({ fetchImpl: transport, bodyPolicy: { thinking: { mode: "enabled", supported: true, budgetTokens: 0 } } })).toThrow();
+    const req = session.request({ fetchImpl: transport, bodyPolicy: { thinking: { mode: "enabled", supported: true, budgetTokens: 1024 } } });
+    expect(() => req.fetch("https://api.anthropic.com/v1/messages", { method: "POST", body: JSON.stringify({ messages: [], max_tokens: 100 }) })).toThrow();
+    expect(transport).not.toHaveBeenCalled();
+    await req.fetch("https://api.anthropic.com/v1/messages", { method: "POST", body: "{" });
+    expect(transport).toHaveBeenCalledOnce();
+    await session.close();
+  });
+
 });
