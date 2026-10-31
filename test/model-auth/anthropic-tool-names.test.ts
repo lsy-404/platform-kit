@@ -41,6 +41,16 @@ describe("Anthropic tool name codec", () => {
     expect(Object.hasOwn(actual.input_schema, "__proto__")).toBe(true);
     expect(metadata.__proto__.name).toBe("a");
   });
+  it("rejects declared names that cannot be reversed safely", () => {
+    const codec = createAnthropicToolNameCodec({ current: { a: "b" }, retired: { old: "a" } });
+    expect(() => codec.encodeRequest({ tools: [{ name: "a" }, { name: "b" }] })).toThrow();
+    expect(() => codec.encodeRequest({ tools: [{ name: "b" }] })).toThrow();
+    expect(() => codec.encodeRequest({ tools: [{ name: "old" }] })).toThrow();
+    expect(codec.encodeRequest({ tools: [{ name: "a" }, { name: "unrelated" }] }).tools.map(tool => tool.name)).toEqual(["b", "unrelated"]);
+    expect(codec.encodeRequest({ messages: [] })).toEqual({ messages: [] });
+    const chain = createAnthropicToolNameCodec({ current: { a: "b", b: "c" } });
+    expect(chain.encodeRequest({ tools: [{ name: "a" }, { name: "b" }] }).tools.map(tool => tool.name)).toEqual(["b", "c"]);
+  });
   it("rejects invalid and ambiguous mappings and leaves unknown names alone", () => {
     expect(() => createAnthropicToolNameCodec({ current: { a: "same", b: "same" } })).toThrow();
     expect(() => createAnthropicToolNameCodec({ retired: { "bad name": "a" } })).toThrow();
