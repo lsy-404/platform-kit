@@ -82,3 +82,4 @@ async function withClientHeaders<T extends BrowserOAuthRefreshOptions>(options: 
     ...init, headers: { ...Object.fromEntries(new Headers(init?.headers)), ...clientHeaders },
   }) };
 }
+export { createAnthropicToolNameCodec, type AnthropicToolNameCodec, type AnthropicToolNameMapping } from "./anthropic-tool-names.js";

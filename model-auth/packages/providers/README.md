@@ -191,3 +191,17 @@ A trusted host can pass provider objects from `builtinProviders()` in `@earendil
 Import reset operations from `@model-auth/providers/reset-credits`. `queryClaudeResetGrants` uses an organization-bound web-session fetch; a null result means reset information was not supplied. `queryCodexResetCredits` uses the selected OAuth credential and account. Timestamps are epoch milliseconds; an absent expiry stays null.
 
 After explicit user confirmation, call `redeemClaudeResetGrant` or `redeemCodexResetCredit` with the selected grant/credit id and a caller-generated request id. Keep that request id across unresolved attempts. Requests never follow redirects or retry a redemption. Inspect the returned result code and refresh usage and reset offers after an attempt; an unknown result does not establish that a reset failed.
+
+## Anthropic tool name mapping
+
+`createAnthropicToolNameCodec` accepts an explicit `current` internal-to-wire map and optional `retired` wire-to-internal map. Create one codec per conversation. Encode each Messages request before sending it; decode each parsed response or raw stream event before handing it to the host's tool dispatcher and storing the conversation. Decoding records tool-use IDs so a later request preserves the original wire name for historical calls. The host supplies mappings from its own registry and session state; the codec does not discover servers or feature gates.
+
+```ts
+const codec = createAnthropicToolNameCodec({ current: { localTool: "wireTool" } });
+const request = codec.encodeRequest(hostRequest);
+const response = await sendMessages(request);
+const hostMessage = codec.decodeMessage(response);
+// For streaming, apply codec.decodeStreamEvent(event) to each parsed event instead.
+```
+
+The codec leaves unknown names and tool inputs unchanged, and rejects ambiguous mappings. Pi's Anthropic adapter already performs its own tool-name conversion; do not stack the two blindly. Apply the codec at a boundary where both outgoing requests and incoming responses can be translated consistently.

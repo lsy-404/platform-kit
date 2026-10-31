@@ -62,7 +62,11 @@ import { authorizeWorkBuddy, refreshWorkBuddy } from "@model-auth/providers/work
 import { authorizeOpenAI, refreshOpenAI, listOpenAICodexModels, parseOpenAICodexModels, type OpenAICodexModel } from "@model-auth/providers/openai";
 import { latestClientVersion, CLIENT_VERSION_FLOORS, type ClientVersionTarget } from "@model-auth/providers/client-versions";
 import { authorizeAnthropic, refreshAnthropic, normalizeAnthropicRequestUsage, createAnthropicTelemetry, createAnthropicClientSession, type AnthropicClientSession, type AnthropicRequestUsage, type AnthropicTelemetry, type AnthropicTelemetryRequest } from "@model-auth/providers/anthropic";
-import { createAnthropicTelemetry as rootTelemetry } from "@model-auth/providers";
+import { createAnthropicTelemetry as rootTelemetry, createAnthropicToolNameCodec as rootCodec } from "@model-auth/providers";
+import { createAnthropicToolNameCodec, type AnthropicToolNameCodec, type AnthropicToolNameMapping } from "@model-auth/providers/anthropic";
+const mapping: AnthropicToolNameMapping = { current: { local: "wire" } };
+const codec: AnthropicToolNameCodec = createAnthropicToolNameCodec(mapping);
+void [codec, rootCodec];
 import { authorizeAnthropicInBrowser, type AnthropicBrowserAuthorization, type AnthropicSessionCookie } from "@model-auth/providers/anthropic-browser";
 import { authorizeTrae, refreshTrae, listTraeModels, streamTrae } from "@model-auth/providers/trae";
 import { authorizeGrok, queryGrokUsage } from "@model-auth/providers/grok";
@@ -105,7 +109,7 @@ import { CredentialRouter, createCredentialMetadata, createUsageGate, parseRetry
 import { authorizeWorkBuddy, refreshWorkBuddy } from "@model-auth/providers/workbuddy";
 import { authorizeOpenAI, refreshOpenAI, listOpenAICodexModels, parseOpenAICodexModels } from "@model-auth/providers/openai";
 import { latestClientVersion, CLIENT_VERSION_FLOORS } from "@model-auth/providers/client-versions";
-import { latestClientVersion as rootLatestClientVersion, createAnthropicTelemetry as rootTelemetry, createAnthropicClientSession as rootClientSession } from "@model-auth/providers";
+import { latestClientVersion as rootLatestClientVersion, createAnthropicTelemetry as rootTelemetry, createAnthropicClientSession as rootClientSession, createAnthropicToolNameCodec as rootCodec } from "@model-auth/providers";
 import { authorizeAnthropic, refreshAnthropic, normalizeAnthropicRequestUsage, createAnthropicTelemetry, createAnthropicClientSession } from "@model-auth/providers/anthropic";
 import { authorizeAnthropicInBrowser } from "@model-auth/providers/anthropic-browser";
 import { authorizeGrok, queryGrokUsage } from "@model-auth/providers/grok";
@@ -118,6 +122,8 @@ const opencode = await queryOpencodeGoKeyUsage("consumer-key", { fetchImpl: asyn
 if (opencode.plan !== "Go" || opencode.windows[1]?.remainingPercent !== 75) throw new Error("Installed OpenCode Go usage unavailable");
 const extra = parseAnthropicUsage({ spend: { enabled: true, used: { amount_minor: 235, currency: "USD", exponent: 2 }, limit: { amount_minor: 2000, currency: "USD", exponent: 2 } } }).extraUsage;
 if (extra?.used !== 2.35 || extra.limit !== 20 || extra.usedPercent !== 11.75) throw new Error("Installed Claude extra usage unavailable");
+const codec = rootCodec({ current: { local: "wire" } });
+if (codec.decodeMessage({ content: [{ type: "tool_use", name: "wire" }] }).content[0].name !== "local") throw new Error("Installed tool codec unavailable");
 const requestUsage = normalizeAnthropicRequestUsage({ cache_creation: { ephemeral_1h_input_tokens: 3 } });
 if (createAnthropicTelemetry !== rootTelemetry) throw new Error("Installed telemetry exports differ");
 const originalFetch = globalThis.fetch;
