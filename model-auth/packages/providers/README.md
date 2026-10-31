@@ -116,8 +116,6 @@ const telemetry = createAnthropicTelemetry({
   enabled: true, sessionId, fetchImpl: accountAuthenticatedFetch,
   context: { deviceId, accountUuid, model, isInteractive: false },
 });
-telemetry.record(eventName, metadata);
-if (!await telemetry.close()) reportTelemetryFailure();
 ```
 
 The sender is disabled by default and sends no requests until explicitly enabled. Enabled senders batch up to 100 events or wait five seconds; `flush()` and `close()` return `false` if a batch failed or queued events were cancelled during the sender's lifetime. Metadata accepts bounded string, number and boolean values. The host supplies events, metadata and optional context; it must exclude secrets and match the upstream event schema. Bind `fetchImpl` to one account, and create a new sender when switching accounts.
@@ -129,9 +127,15 @@ const observer = telemetry.request(inferenceFetch);
 try {
   await runMessages({ fetch: observer.fetch, onStreamEvent: observer.onStreamEvent });
 } catch (error) {
-  observer.onError();
+  observer.onError({ cancelled: isUserCancellation(error) });
   throw error;
 }
+```
+
+When the session ends, flush and close the sender:
+
+```ts
+if (!await telemetry.close()) reportTelemetryFailure();
 ```
 
 The [batch protocol](https://github.com/anthropics/claude-code/tree/80c6959d28c4c30ecd14fc1cdf172f19d9adad81/mods/telemetry) is non-public, and service acceptance has not been verified. The host fetch must honor `signal` and `redirect: "error"`; a ten-second timeout stops waiting, but a transport that ignores cancellation may continue its request.
