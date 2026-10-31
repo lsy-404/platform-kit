@@ -12,6 +12,10 @@ export interface AnthropicTelemetryContext {
   readonly isInteractive?: boolean;
   readonly clientType?: string;
   readonly entrypoint?: string;
+  readonly agentSdkVersion?: string;
+  readonly parentSessionId?: string;
+  readonly agentId?: string;
+  readonly agentType?: string;
   readonly environment?: { readonly version?: string; readonly versionBase?: string; readonly buildTime?: string; readonly platform?: string; readonly platformRaw?: string; readonly arch?: string; readonly isClaudeAiAuth?: boolean };
 }
 
@@ -25,11 +29,16 @@ export interface AnthropicTelemetryBatch { readonly events: readonly Row[]; read
 
 export type AnthropicTelemetryOptions =
   | { readonly enabled?: false }
-  | { readonly enabled: true; readonly sessionId: string; readonly fetchImpl: typeof fetch; readonly context?: AnthropicTelemetryContext; readonly signal?: AbortSignal; readonly storage?: AnthropicTelemetryStorage };
+  | { readonly enabled: true; readonly sessionId: string; readonly fetchImpl: typeof fetch; readonly context?: AnthropicTelemetryContext; readonly signal?: AbortSignal; readonly storage?: AnthropicTelemetryStorage; readonly privacyEnv?: AnthropicTelemetryPrivacyEnv; readonly eligible?: () => boolean };
+
+export interface AnthropicTelemetryPrivacyEnv { readonly DISABLE_TELEMETRY?: string | undefined; readonly DO_NOT_TRACK?: string | undefined; readonly CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC?: string | undefined }
+export function anthropicTelemetryPrivacyAllowed(env: AnthropicTelemetryPrivacyEnv): boolean {
+  return !env.DISABLE_TELEMETRY && !env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC && !["1", "true", "yes", "on"].includes((env.DO_NOT_TRACK ?? "").trim().toLowerCase());
+}
 
 export interface AnthropicTelemetry {
   record(event: string, metadata?: AnthropicTelemetryMetadata): boolean;
-  request(fetchImpl: typeof fetch): AnthropicTelemetryRequest;
+  request(fetchImpl: typeof fetch, context?: { readonly agentId?: string; readonly agentType?: string }): AnthropicTelemetryRequest;
   flush(): Promise<boolean>;
   close(): Promise<boolean>;
 }
@@ -52,11 +61,15 @@ export function createAnthropicTelemetry(options: AnthropicTelemetryOptions = {}
   if (!options.enabled) return { record: () => false, request: fetchImpl => observeAnthropicRequest(fetchImpl), flush: async () => true, close: async () => true };
   if (!SESSION_ID.test(options.sessionId)) throw new TypeError("Invalid telemetry session ID.");
   const { fetchImpl, sessionId, signal } = options;
+  const allowed = () => {
+    try { const env = options.privacyEnv ?? { DISABLE_TELEMETRY: process.env.DISABLE_TELEMETRY, DO_NOT_TRACK: process.env.DO_NOT_TRACK, CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC }; return anthropicTelemetryPrivacyAllowed(env) && (options.eligible ? options.eligible() === true : true); }
+    catch { return false; }
+  };
   const context = options.context;
   const deviceId = context?.deviceId;
   const accountUuid = context?.accountUuid;
   const environment = context?.environment;
-  const strings = [context?.deviceId, context?.accountUuid, context?.organizationUuid, context?.model, context?.clientType, context?.entrypoint,
+  const strings = [context?.deviceId, context?.accountUuid, context?.organizationUuid, context?.model, context?.clientType, context?.entrypoint, context?.agentSdkVersion, context?.parentSessionId, context?.agentId, context?.agentType,
     environment?.version, environment?.versionBase, environment?.buildTime, environment?.platform, environment?.platformRaw, environment?.arch];
   if (strings.some(value => value !== undefined && (typeof value !== "string" || !value.length || value.length > 256))
     || (context?.userType !== undefined && context.userType !== "external" && context.userType !== "ant")
@@ -73,6 +86,10 @@ export function createAnthropicTelemetry(options: AnthropicTelemetryOptions = {}
     ...(context?.isInteractive !== undefined ? { is_interactive: context.isInteractive } : {}),
     ...(context?.clientType !== undefined ? { client_type: context.clientType } : {}),
     ...(context?.entrypoint !== undefined ? { entrypoint: context.entrypoint } : {}),
+    ...(context?.agentSdkVersion !== undefined ? { agent_sdk_version: context.agentSdkVersion } : {}),
+    ...(context?.parentSessionId !== undefined ? { parent_session_id: context.parentSessionId } : {}),
+    ...(context?.agentId !== undefined ? { agent_id: context.agentId } : {}),
+    ...(context?.agentType !== undefined ? { agent_type: context.agentType } : {}),
     ...(environment ? { env: {
       ...(environment.version !== undefined ? { version: environment.version } : {}),
       ...(environment.versionBase !== undefined ? { version_base: environment.versionBase } : {}),
@@ -98,25 +115,31 @@ export function createAnthropicTelemetry(options: AnthropicTelemetryOptions = {}
   const onAbort = () => { closed = true; clear(); if (queue.length || batches.length || pending) failed = true; };
   if (signal?.aborted) onAbort();
   else signal?.addEventListener("abort", onAbort, { once: true });
-  const ready = storage && storageKey ? storage.load(storageKey).then(saved => {
+  let ready: Promise<void> | undefined;
+  const load = (): Promise<void> => {
+    if (ready) return ready;
+    try { return ready = storage && storageKey ? storage.load(storageKey).then(saved => {
     if (saved.reduce((total, batch) => total + (Array.isArray(batch.events) ? batch.events.length : QUEUE_LIMIT + 1), 0) > QUEUE_LIMIT) throw new Error("Stored telemetry queue exceeds its limit.");
     batches = saved.map(batch => {
       if (!Number.isInteger(batch.attempts) || batch.attempts < 0 || batch.attempts >= MAX_ATTEMPTS || !Array.isArray(batch.events) || !batch.events.length || batch.events.length > LIMIT || batch.events.some(row => row.event_type !== "ClaudeCodeInternalEvent" || row.event_data?.session_id !== sessionId || row.event_data?.device_id !== deviceId || (row.event_data?.auth as { account_uuid?: string; organization_uuid?: string } | undefined)?.account_uuid !== accountUuid || (row.event_data?.auth as { organization_uuid?: string } | undefined)?.organization_uuid !== context?.organizationUuid)) throw new Error("Invalid stored telemetry batch.");
       return { events: [...batch.events], attempts: batch.attempts };
     });
     loaded = true;
-  }).catch(() => { failed = true; loadFailed = true; }) : Promise.resolve();
+    }).catch(() => { failed = true; loadFailed = true; }) : Promise.resolve(); }
+    catch { failed = true; loadFailed = true; return ready = Promise.resolve(); }
+  };
   const persist = async () => {
     if (!storage || !storageKey) return;
     try { if (batches.length) await storage.save(storageKey, batches); else await storage.remove(storageKey); }
     catch { failed = true; }
   };
   const schedule = (delay = DELAY_MS) => {
-    if (closed || closing || timer !== undefined || (!queue.length && !batches.length)) return;
+    if (closed || closing || timer !== undefined || (!queue.length && !batches.length) || !allowed()) return;
     timer = setTimeout(() => { timer = undefined; retryAt = 0; void flush(); }, delay);
     timer.unref?.();
   };
-  const post = async (events: Row[]): Promise<boolean> => {
+  const post = async (events: Row[]): Promise<boolean | "blocked"> => {
+    if (!allowed()) return "blocked";
     const controller = new AbortController();
     let timeout: ReturnType<typeof setTimeout> | undefined;
     let abort: (() => void) | undefined;
@@ -127,26 +150,34 @@ export function createAnthropicTelemetry(options: AnthropicTelemetryOptions = {}
       closeController.signal.addEventListener("abort", abort, { once: true });
       if (signal?.aborted || closeController.signal.aborted) abort();
     });
-    const request = Promise.resolve().then(() => controller.signal.aborted ? false : fetchImpl(ENDPOINT, {
+    const request = Promise.resolve().then(async () => !allowed() ? "blocked" as const : controller.signal.aborted ? false : (await fetchImpl(ENDPOINT, {
       method: "POST", redirect: "error", headers: { "content-type": "application/json", "x-service-name": "claude-code" },
       body: JSON.stringify({ events }), signal: controller.signal,
-    }).then(response => response.ok)).catch(() => false);
+    })).ok).catch(() => false);
     try { return await Promise.race([request, expired]); }
     finally { if (timeout !== undefined) clearTimeout(timeout); if (abort) { signal?.removeEventListener("abort", abort); closeController.signal.removeEventListener("abort", abort); } }
   };
   const flush = (): Promise<boolean> => {
     clear();
     if (pending) return pending.then(ok => ok ? flush() : false);
+    if (!allowed()) {
+      pending = (async () => {
+      if (storage && loaded && queue.length) { while (queue.length) batches.push({ events: queue.splice(0, LIMIT), attempts: 0 }); await persist(); }
+      return !storage && !queue.length && !batches.length && !failed && !dropped;
+      })().finally(() => { pending = undefined; });
+      return pending;
+    }
     retryAt = 0;
     pending = (async () => {
-      await ready;
+      await load();
       if (loadFailed) return false;
       while (queue.length) batches.push({ events: queue.splice(0, LIMIT), attempts: 0 });
       await persist();
       while (batches.length && !closed) {
         const batch = batches[0]!;
         const ok = await post(batch.events);
-        if (ok) { batches.shift(); await persist(); if (batches.length) await new Promise<void>(resolve => setTimeout(resolve, BATCH_DELAY_MS)); }
+        if (ok === "blocked") break;
+        if (ok) { batches.shift(); await persist(); if (batches.length && allowed()) await new Promise<void>(resolve => setTimeout(resolve, BATCH_DELAY_MS)); }
         else {
           batch.attempts++;
           if (batch.attempts >= MAX_ATTEMPTS) { batches.shift(); dropped = true; }
@@ -159,14 +190,15 @@ export function createAnthropicTelemetry(options: AnthropicTelemetryOptions = {}
     })().finally(() => { pending = undefined; if (queue.length && !retryAt && !closed && !closing) { if (queue.length >= LIMIT) void flush(); else schedule(); } });
     return pending;
   };
-  void ready.then(() => schedule());
-  const record = (event: string, metadata: AnthropicTelemetryMetadata = {}, model?: string): boolean => {
-      if (closed || closing || !loaded || typeof event !== "string" || !EVENT_NAME.test(event) || queue.length + batches.reduce((total, batch) => total + batch.events.length, 0) >= QUEUE_LIMIT || !metadata || typeof metadata !== "object" || Array.isArray(metadata)) return false;
+  if (allowed()) void load().then(() => schedule());
+  const record = (event: string, metadata: AnthropicTelemetryMetadata = {}, model?: string, requestContext?: { readonly agentId?: string; readonly agentType?: string }): boolean => {
+      if (closed || closing || !allowed() || !loaded || typeof event !== "string" || !EVENT_NAME.test(event) || queue.length + batches.reduce((total, batch) => total + batch.events.length, 0) >= QUEUE_LIMIT || !metadata || typeof metadata !== "object" || Array.isArray(metadata)) return false;
       const entries = Object.entries(metadata);
       if (entries.length > 32 || entries.some(([key, value]) => !KEY.test(key) || !(typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value)) || (typeof value === "string" && value.length <= 256)))) return false;
       queue.push({ event_type: "ClaudeCodeInternalEvent", event_data: {
         event_id: randomUUID(), event_name: event,
         client_timestamp: new Date().toISOString(), session_id: sessionId, ...stamp, ...(model ? { model } : {}),
+        ...(requestContext?.agentId ? { agent_id: requestContext.agentId } : {}), ...(requestContext?.agentType ? { agent_type: requestContext.agentType } : {}),
         additional_metadata: Buffer.from(JSON.stringify(Object.fromEntries(entries)), "utf8").toString("base64"),
       } });
       if (queue.length >= LIMIT && !pending && (!retryAt || Date.now() >= retryAt)) void flush(); else schedule();
@@ -174,7 +206,11 @@ export function createAnthropicTelemetry(options: AnthropicTelemetryOptions = {}
   };
   return {
     record,
-    request: transport => observeAnthropicRequest(transport, sessionId, deviceId, accountUuid, (name, metadata, model) => { record(name, metadata, model); }),
+    request: (transport, requestContext) => {
+      const agentId = requestContext?.agentId, agentType = requestContext?.agentType;
+      if ([agentId, agentType].some(value => value !== undefined && (typeof value !== "string" || !value.length || value.length > 256))) throw new TypeError("Invalid telemetry request context.");
+      return observeAnthropicRequest(transport, sessionId, deviceId, accountUuid, (name, metadata, model) => { record(name, metadata, model, { ...(agentId ? { agentId } : {}), ...(agentType ? { agentType } : {}) }); });
+    },
     flush,
     close() {
       if (closePromise) return closePromise;
