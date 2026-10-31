@@ -259,4 +259,17 @@ describe("Anthropic telemetry", () => {
     expect(await sender.close()).toBe(false);
   });
 
+  it("restores against the organization captured when the sender was created", async () => {
+    let resolveLoad!: (value: any[]) => void;
+    const storage = { load: () => new Promise<any[]>(resolve => { resolveLoad = resolve; }), save: vi.fn(async () => {}), remove: vi.fn(async () => {}) };
+    const context = { deviceId: "d", accountUuid: "a", organizationUuid: "org_a" };
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 204 }));
+    const sender = createAnthropicTelemetry({ enabled: true, sessionId: "s", context, storage, privacyEnv: {}, fetchImpl });
+    context.organizationUuid = "org_b";
+    resolveLoad([{ attempts: 1, events: [{ event_type: "ClaudeCodeInternalEvent", event_data: { event_id: "old", session_id: "s", device_id: "d", auth: { account_uuid: "a", organization_uuid: "org_a" } } }] }]);
+    expect(await sender.flush()).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(await sender.close()).toBe(true);
+  });
+
 });

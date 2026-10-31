@@ -68,6 +68,7 @@ export function createAnthropicTelemetry(options: AnthropicTelemetryOptions = {}
   const context = options.context;
   const deviceId = context?.deviceId;
   const accountUuid = context?.accountUuid;
+  const organizationUuid = context?.organizationUuid;
   const environment = context?.environment;
   const strings = [context?.deviceId, context?.accountUuid, context?.organizationUuid, context?.model, context?.clientType, context?.entrypoint, context?.agentSdkVersion, context?.parentSessionId, context?.agentId, context?.agentType,
     environment?.version, environment?.versionBase, environment?.buildTime, environment?.platform, environment?.platformRaw, environment?.arch];
@@ -102,7 +103,7 @@ export function createAnthropicTelemetry(options: AnthropicTelemetryOptions = {}
   };
   if (options.storage && (!accountUuid || !deviceId)) throw new TypeError("Storage requires account and device IDs.");
   const { storage } = options;
-  const storageKey = JSON.stringify([sessionId, deviceId, accountUuid, context?.organizationUuid ?? null]);
+  const storageKey = JSON.stringify([sessionId, deviceId, accountUuid, organizationUuid ?? null]);
   const closeController = new AbortController();
   let queue: Row[] = [];
   let batches: Array<{ events: Row[]; attempts: number }> = [];
@@ -121,7 +122,7 @@ export function createAnthropicTelemetry(options: AnthropicTelemetryOptions = {}
     try { return ready = storage && storageKey ? storage.load(storageKey).then(saved => {
     if (saved.reduce((total, batch) => total + (Array.isArray(batch.events) ? batch.events.length : QUEUE_LIMIT + 1), 0) > QUEUE_LIMIT) throw new Error("Stored telemetry queue exceeds its limit.");
     batches = saved.map(batch => {
-      if (!Number.isInteger(batch.attempts) || batch.attempts < 0 || batch.attempts >= MAX_ATTEMPTS || !Array.isArray(batch.events) || !batch.events.length || batch.events.length > LIMIT || batch.events.some(row => row.event_type !== "ClaudeCodeInternalEvent" || row.event_data?.session_id !== sessionId || row.event_data?.device_id !== deviceId || (row.event_data?.auth as { account_uuid?: string; organization_uuid?: string } | undefined)?.account_uuid !== accountUuid || (row.event_data?.auth as { organization_uuid?: string } | undefined)?.organization_uuid !== context?.organizationUuid)) throw new Error("Invalid stored telemetry batch.");
+      if (!Number.isInteger(batch.attempts) || batch.attempts < 0 || batch.attempts >= MAX_ATTEMPTS || !Array.isArray(batch.events) || !batch.events.length || batch.events.length > LIMIT || batch.events.some(row => row.event_type !== "ClaudeCodeInternalEvent" || row.event_data?.session_id !== sessionId || row.event_data?.device_id !== deviceId || (row.event_data?.auth as { account_uuid?: string; organization_uuid?: string } | undefined)?.account_uuid !== accountUuid || (row.event_data?.auth as { organization_uuid?: string } | undefined)?.organization_uuid !== organizationUuid)) throw new Error("Invalid stored telemetry batch.");
       return { events: [...batch.events], attempts: batch.attempts };
     });
     loaded = true;

@@ -5,6 +5,7 @@ export { createAnthropicClientSession, type AnthropicClientSession, type Anthrop
 export { applyAnthropicRequestPolicy, type AnthropicRequestPolicy, type AnthropicCacheTarget } from "./anthropic-request-policy.js";
 export type { AnthropicClientIdentity } from "./anthropic-client-identity.js";
 export { createAnthropicTelemetry, type AnthropicTelemetry, type AnthropicTelemetryContext, type AnthropicTelemetryMetadata, type AnthropicTelemetryOptions, type AnthropicTelemetryStorage, type AnthropicTelemetryBatch } from "./anthropic-telemetry.js";
+export { anthropicTelemetryPrivacyAllowed, type AnthropicTelemetryPrivacyEnv } from "./anthropic-telemetry.js";
 export type { AnthropicTelemetryRequest } from "./anthropic-telemetry-request.js";
 
 const ANTHROPIC_CONFIG = {

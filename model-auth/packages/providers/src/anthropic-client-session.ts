@@ -57,8 +57,9 @@ export function createAnthropicClientSession(options: AnthropicClientSessionOpti
     : createAnthropicTelemetry();
   return {
     sessionId,
-    request({ fetchImpl, bodyPolicy = options.bodyPolicy, requestClass = "main", promptId, agentId, parentAgentId, agentType }) {
+    request({ fetchImpl, bodyPolicy: requestPolicy = options.bodyPolicy, requestClass = "main", promptId, agentId, parentAgentId, agentType }) {
       if (closed) throw new Error("Anthropic client session is closed.");
+      const bodyPolicy = requestPolicy ? structuredClone(requestPolicy) : undefined;
       if (bodyPolicy?.system?.mode === "recorded" && !bodyPolicy.system.recorded?.trim()) throw new TypeError("A recorded system prefix is required.");
       if (bodyPolicy?.thinking?.supported && bodyPolicy.thinking.mode === "enabled" && (!Number.isSafeInteger(bodyPolicy.thinking.budgetTokens) || bodyPolicy.thinking.budgetTokens! <= 0)) throw new TypeError("Enabled thinking requires a valid budget.");
       if (bodyPolicy?.cache?.targets?.some(target => !Number.isSafeInteger(target.index) || target.index < 0 || (target.kind === "message" && (!Number.isSafeInteger(target.block) || target.block < 0)))) throw new TypeError("Invalid cache target.");

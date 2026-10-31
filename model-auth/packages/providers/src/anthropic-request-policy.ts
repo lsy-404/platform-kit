@@ -7,6 +7,7 @@ export interface AnthropicRequestPolicy {
   readonly system?: { readonly mode: "sdk" | "sdk-append" | "interactive" | "recorded"; readonly recorded?: string };
   readonly thinking?: { readonly mode: "adaptive" | "enabled" | "disabled"; readonly supported: boolean; readonly budgetTokens?: number; readonly display?: "summarized" | "omitted"; readonly acceptsDisabled?: boolean };
   readonly supportsEffort?: boolean;
+  readonly supportsTemperature?: boolean;
   readonly supportsContextManagement?: boolean;
   readonly cache?: { readonly force5m?: boolean; readonly environment?: "5m" | "1h"; readonly setting?: "5m" | "1h"; readonly frontmatter?: "5m" | "1h"; readonly subscriberEligible?: boolean; readonly targets?: readonly AnthropicCacheTarget[] };
   readonly betas?: { readonly allowed: readonly string[] };
@@ -47,6 +48,7 @@ export function applyAnthropicRequestPolicy(input: Record<string, unknown>, poli
       if (body.tool_choice?.type === "tool") body.tool_choice = { type: "auto" };
     }
   }
+  if (policy.supportsTemperature === false) delete body.temperature;
   if (policy.supportsEffort === false && obj(body.output_config)) {
     delete body.output_config.effort;
     if (!Object.keys(body.output_config).length) delete body.output_config;

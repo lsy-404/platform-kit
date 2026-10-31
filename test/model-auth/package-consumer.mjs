@@ -64,6 +64,9 @@ import { latestClientVersion, CLIENT_VERSION_FLOORS, type ClientVersionTarget } 
 import { authorizeAnthropic, refreshAnthropic, normalizeAnthropicRequestUsage, createAnthropicTelemetry, createAnthropicClientSession, applyAnthropicRequestPolicy, type AnthropicRequestPolicy, type AnthropicClientSession, type AnthropicRequestUsage, type AnthropicTelemetry, type AnthropicTelemetryRequest } from "@model-auth/providers/anthropic";
 import { createAnthropicTelemetry as rootTelemetry, createAnthropicToolNameCodec as rootCodec } from "@model-auth/providers";
 import { createAnthropicToolNameCodec, type AnthropicToolNameCodec, type AnthropicToolNameMapping } from "@model-auth/providers/anthropic";
+import { anthropicTelemetryPrivacyAllowed, type AnthropicTelemetryPrivacyEnv } from "@model-auth/providers/anthropic";
+const privacyEnv: AnthropicTelemetryPrivacyEnv = { DO_NOT_TRACK: "1" };
+void anthropicTelemetryPrivacyAllowed(privacyEnv);
 const mapping: AnthropicToolNameMapping = { current: { local: "wire" } };
 const codec: AnthropicToolNameCodec = createAnthropicToolNameCodec(mapping);
 void [codec, rootCodec];
@@ -113,6 +116,8 @@ import { authorizeOpenAI, refreshOpenAI, listOpenAICodexModels, parseOpenAICodex
 import { latestClientVersion, CLIENT_VERSION_FLOORS } from "@model-auth/providers/client-versions";
 import { latestClientVersion as rootLatestClientVersion, createAnthropicTelemetry as rootTelemetry, createAnthropicClientSession as rootClientSession, createAnthropicToolNameCodec as rootCodec } from "@model-auth/providers";
 import { authorizeAnthropic, refreshAnthropic, normalizeAnthropicRequestUsage, createAnthropicTelemetry, createAnthropicClientSession, applyAnthropicRequestPolicy } from "@model-auth/providers/anthropic";
+import { anthropicTelemetryPrivacyAllowed } from "@model-auth/providers/anthropic";
+if (anthropicTelemetryPrivacyAllowed({ DO_NOT_TRACK: "1" })) throw new Error("Installed telemetry privacy policy unavailable");
 import { authorizeAnthropicInBrowser } from "@model-auth/providers/anthropic-browser";
 import { authorizeGrok, queryGrokUsage } from "@model-auth/providers/grok";
 import { authorizeOllamaWeb, queryOllamaUsage, parseOllamaSettings } from "@model-auth/providers/ollama";

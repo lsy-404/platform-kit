@@ -101,7 +101,7 @@ Usage queries retry transient network failures twice, never retry 429 (a `Retry-
 
 ## Anthropic request policy
 
-Pass `bodyPolicy` to an enabled client session or its `request()` call to select an explicit system prefix, model thinking capabilities, cache targets, and permitted beta headers. Per-request policy replaces the session policy. Cache markers are added only at the supplied block indexes; TTL precedence is force five minutes, environment, setting, frontmatter, then the supplied subscriber eligibility. Unknown capabilities leave the payload unchanged. The host supplies actual capabilities and context; the policy does not generate attribution data or rename tools.
+Pass `bodyPolicy` to an enabled client session or its `request()` call to select an explicit system prefix, model capabilities for thinking, temperature, effort and context management, cache targets, and permitted beta headers. Per-request policy replaces the session policy and is captured for all attempts of that logical request. Cache markers are added only at the supplied block indexes, after system prefix composition; TTL precedence is force five minutes, environment, setting, frontmatter, then the supplied subscriber eligibility. Unknown capabilities leave the payload unchanged. The host supplies actual capabilities and context; the policy does not generate attribution data or rename tools.
 
 ## Claude extra usage and prepaid credits
 

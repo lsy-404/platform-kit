@@ -45,6 +45,22 @@ describe("Anthropic request policy", () => {
     const disabled = createAnthropicClientSession();
     expect(disabled.request({ fetchImpl: transport }).fetch).toBe(transport);
   });
+  it("keeps one policy across retries and caches the selected composed system block", async () => {
+    const policy = { system: { mode: "sdk" as "sdk" | "interactive" }, supportsTemperature: false, cache: { setting: "5m" as const, targets: [{ kind: "system" as const, index: 1 }] } };
+    const bodies: any[] = [];
+    const session = createAnthropicClientSession({ enabled: true, clientVersion: "2.1.316", sdkVersion: "0.3.316", deviceId: "d" });
+    const observer = session.request({ bodyPolicy: policy, fetchImpl: async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return new Response(null, { status: 503 }); } });
+    policy.system.mode = "interactive";
+    policy.cache.targets[0].index = 0;
+    for (let attempt = 0; attempt < 2; attempt++) await observer.fetch("https://api.anthropic.com/v1/messages", { method: "POST", body: JSON.stringify({ messages: [], system: "application", temperature: 0.2 }) });
+    for (const body of bodies) {
+      expect(body.temperature).toBeUndefined();
+      expect(body.system[0].text).toContain("You are a Claude agent");
+      expect(body.system[0].cache_control).toBeUndefined();
+      expect(body.system[1]).toEqual({ type: "text", text: "application", cache_control: { type: "ephemeral", ttl: "5m" } });
+    }
+    await session.close();
+  });
   it("rejects a fifth real breakpoint without counting tool input data", () => {
     const block = () => ({ type: "text", text: "x", cache_control: { type: "ephemeral" } });
     const input = { cache_control: { type: "ephemeral" }, system: [block()], tools: [{ name: "read", input_schema: { cache_control: { type: "ephemeral" } } }], messages: [{ role: "user", content: [block(), block(), { type: "image", source: { type: "base64", media_type: "image/png", data: "x" } }] }] };
