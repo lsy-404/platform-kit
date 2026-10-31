@@ -122,6 +122,8 @@ if (!await telemetry.close()) reportTelemetryFailure();
 
 The sender is disabled by default and sends no requests until explicitly enabled. Enabled senders batch up to 100 events or wait five seconds; `flush()` and `close()` return `false` if a batch failed or queued events were cancelled during the sender's lifetime. Metadata accepts bounded string, number and boolean values. The host supplies events, metadata and optional context; it must exclude secrets and match the upstream event schema. Bind `fetchImpl` to one account, and create a new sender when switching accounts.
 
+For one Messages request, `const observer = telemetry.request(inferenceFetch)` gives a fetch wrapper and an `observer.onStreamEvent(event)` callback for the host's parsed stream events. Supply `context.deviceId` and a matching session header and request metadata; unrecognized requests pass through without telemetry. The wrapper does not read response bodies. A success event requires an observed `message_stop`; an incomplete stream does not become a success. Create one observer per request and close the sender when the session ends. The event names and fields follow observations from Claude Agent SDK 0.2.112; they are not a public compatibility contract.
+
 The [batch protocol](https://github.com/anthropics/claude-code/tree/80c6959d28c4c30ecd14fc1cdf172f19d9adad81/mods/telemetry) is non-public, and service acceptance has not been verified. The host fetch must honor `signal` and `redirect: "error"`; a ten-second timeout stops waiting, but a transport that ignores cancellation may continue its request.
 
 ## Codex plans and tiers

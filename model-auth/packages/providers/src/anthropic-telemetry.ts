@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { observeAnthropicRequest, type AnthropicTelemetryRequest } from "./anthropic-telemetry-request.js";
 
 export type AnthropicTelemetryMetadata = Readonly<Record<string, string | number | boolean>>;
 
@@ -20,6 +21,7 @@ export type AnthropicTelemetryOptions =
 
 export interface AnthropicTelemetry {
   record(event: string, metadata?: AnthropicTelemetryMetadata): boolean;
+  request(fetchImpl: typeof fetch): AnthropicTelemetryRequest;
   flush(): Promise<boolean>;
   close(): Promise<boolean>;
 }
@@ -29,17 +31,18 @@ const LIMIT = 100;
 const DELAY_MS = 5_000;
 const TIMEOUT_MS = 10_000;
 const EVENT_NAME = /^tengu_[a-z0-9_]{1,58}$/;
-const KEY = /^[a-z][a-z0-9_]{0,63}$/;
+const KEY = /^[a-zA-Z][a-zA-Z0-9_]{0,63}$/;
 const SESSION_ID = /^[a-zA-Z0-9_-]{1,128}$/;
 
 type Row = { event_type: "ClaudeCodeInternalEvent"; event_data: Record<string, unknown> };
 
 /** Creates an explicitly enabled sender bound to one host-authenticated session. */
 export function createAnthropicTelemetry(options: AnthropicTelemetryOptions = {}): AnthropicTelemetry {
-  if (!options.enabled) return { record: () => false, flush: async () => true, close: async () => true };
+  if (!options.enabled) return { record: () => false, request: fetchImpl => observeAnthropicRequest(fetchImpl), flush: async () => true, close: async () => true };
   if (!SESSION_ID.test(options.sessionId)) throw new TypeError("Invalid telemetry session ID.");
   const { fetchImpl, sessionId, signal } = options;
   const context = options.context;
+  const deviceId = context?.deviceId;
   const environment = context?.environment;
   const strings = [context?.deviceId, context?.accountUuid, context?.organizationUuid, context?.model, context?.clientType, context?.entrypoint,
     environment?.version, environment?.versionBase, environment?.buildTime, environment?.platform, environment?.platformRaw, environment?.arch];
@@ -111,19 +114,21 @@ export function createAnthropicTelemetry(options: AnthropicTelemetryOptions = {}
     })().finally(() => { pending = undefined; schedule(); });
     return pending;
   };
-  return {
-    record(event, metadata = {}) {
+  const record = (event: string, metadata: AnthropicTelemetryMetadata = {}, model?: string): boolean => {
       if (closed || closing || typeof event !== "string" || !EVENT_NAME.test(event) || queue.length >= LIMIT || !metadata || typeof metadata !== "object" || Array.isArray(metadata)) return false;
       const entries = Object.entries(metadata);
       if (entries.length > 32 || entries.some(([key, value]) => !KEY.test(key) || !(typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value)) || (typeof value === "string" && value.length <= 256)))) return false;
       queue.push({ event_type: "ClaudeCodeInternalEvent", event_data: {
         event_id: randomUUID(), event_name: event,
-        client_timestamp: new Date().toISOString(), session_id: sessionId, ...stamp,
+        client_timestamp: new Date().toISOString(), session_id: sessionId, ...stamp, ...(model ? { model } : {}),
         additional_metadata: Buffer.from(JSON.stringify(Object.fromEntries(entries)), "utf8").toString("base64"),
       } });
       if (queue.length === LIMIT) void flush(); else schedule();
       return true;
-    },
+  };
+  return {
+    record,
+    request: transport => observeAnthropicRequest(transport, sessionId, deviceId, (name, metadata, model) => { record(name, metadata, model); }),
     flush,
     async close() {
       if (closed) return pending ? pending : !failed;

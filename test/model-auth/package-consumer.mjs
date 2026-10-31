@@ -61,7 +61,7 @@ import { CredentialRouter, createCredentialMetadata, createUsageGate, parseRetry
 import { authorizeWorkBuddy, refreshWorkBuddy } from "@model-auth/providers/workbuddy";
 import { authorizeOpenAI, refreshOpenAI, listOpenAICodexModels, parseOpenAICodexModels, type OpenAICodexModel } from "@model-auth/providers/openai";
 import { latestClientVersion, CLIENT_VERSION_FLOORS, type ClientVersionTarget } from "@model-auth/providers/client-versions";
-import { authorizeAnthropic, refreshAnthropic, normalizeAnthropicRequestUsage, createAnthropicTelemetry, type AnthropicRequestUsage, type AnthropicTelemetry } from "@model-auth/providers/anthropic";
+import { authorizeAnthropic, refreshAnthropic, normalizeAnthropicRequestUsage, createAnthropicTelemetry, type AnthropicRequestUsage, type AnthropicTelemetry, type AnthropicTelemetryRequest } from "@model-auth/providers/anthropic";
 import { createAnthropicTelemetry as rootTelemetry } from "@model-auth/providers";
 import { authorizeAnthropicInBrowser, type AnthropicBrowserAuthorization, type AnthropicSessionCookie } from "@model-auth/providers/anthropic-browser";
 import { authorizeTrae, refreshTrae, listTraeModels, streamTrae } from "@model-auth/providers/trae";
@@ -73,7 +73,8 @@ import type { ProviderUsageExtraUsage, ProviderUsageSnapshot } from "@model-auth
 const extraUsage: ProviderUsageExtraUsage | null | undefined = parseAnthropicUsage({}).extraUsage;
 const requestUsage: AnthropicRequestUsage | null = normalizeAnthropicRequestUsage({ input_tokens: 1 });
 const telemetry: AnthropicTelemetry = createAnthropicTelemetry();
-void [telemetry, rootTelemetry];
+const observedRequest: AnthropicTelemetryRequest = telemetry.request(fetch);
+void [observedRequest, rootTelemetry];
 const gate: UsageGate = createUsageGate({ minIntervalMs: () => 0 });
 const retryAfter: number | null = parseRetryAfter("120");
 const throttled: ProviderUsageSnapshot = { providerId: "anthropic", credentialId: "one", status: "error", plan: null, windows: [], balance: null, fetchedAtUtc: "2030-01-01T00:00:00Z", error: "429", errorCode: "rate-limited", retryAfterMs: 1000 };
@@ -123,6 +124,7 @@ let telemetryFetches = 0;
 globalThis.fetch = async () => { telemetryFetches++; throw new Error("Disabled telemetry used fetch"); };
 const disabledTelemetry = createAnthropicTelemetry();
 if (disabledTelemetry.record("tengu_plugin_survey_answered") || !await disabledTelemetry.close()) throw new Error("Disabled telemetry is not inert");
+if (disabledTelemetry.request(globalThis.fetch).fetch !== globalThis.fetch) throw new Error("Disabled telemetry changed transport");
 globalThis.fetch = originalFetch;
 if (telemetryFetches) throw new Error("Disabled telemetry used fetch");
 if (requestUsage?.cacheWrite1h !== 3 || requestUsage.cacheWrite !== undefined) throw new Error("Installed Anthropic request accounting unavailable");
