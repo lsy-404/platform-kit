@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { anthropicIdentityHeaders } from "./anthropic-client-identity.js";
-import { createAnthropicTelemetry, type AnthropicTelemetry, type AnthropicTelemetryContext, type AnthropicTelemetryStorage } from "./anthropic-telemetry.js";
+import { createAnthropicTelemetry, type AnthropicTelemetry, type AnthropicTelemetryContext, type AnthropicTelemetryPrivacyEnv, type AnthropicTelemetryStorage } from "./anthropic-telemetry.js";
 import type { AnthropicTelemetryRequest } from "./anthropic-telemetry-request.js";
 
 export type AnthropicRequestClass = "main" | "subagent" | "workflow" | "compaction" | "auxiliary" | "side_reply";
@@ -8,7 +8,7 @@ export type AnthropicClientSessionOptions = { readonly enabled?: false } | {
   readonly enabled: true; readonly clientVersion: string; readonly sdkVersion: string; readonly deviceId: string;
   readonly sessionId?: string; readonly parentSessionId?: string; readonly accountUuid?: string; readonly organizationUuid?: string;
   readonly entrypoint?: string; readonly clientApp?: string;
-  readonly telemetry?: { readonly enabled: true; readonly fetchImpl: typeof fetch; readonly signal?: AbortSignal; readonly storage?: AnthropicTelemetryStorage; readonly environment?: Omit<NonNullable<AnthropicTelemetryContext["environment"]>, "version"> };
+  readonly telemetry?: { readonly enabled: true; readonly fetchImpl: typeof fetch; readonly signal?: AbortSignal; readonly storage?: AnthropicTelemetryStorage; readonly privacyEnv?: AnthropicTelemetryPrivacyEnv; readonly eligible?: () => boolean; readonly environment?: Omit<NonNullable<AnthropicTelemetryContext["environment"]>, "version"> };
 };
 export interface AnthropicClientRequestOptions {
   readonly fetchImpl: typeof fetch;
@@ -47,17 +47,18 @@ export function createAnthropicClientSession(options: AnthropicClientSessionOpti
       headers.set("user-agent", `claude-code/${clientVersion}`);
       return telemetryFetch!(input, { ...init, headers });
     },
-      context: { deviceId, ...(accountUuid ? { accountUuid } : {}), ...(organizationUuid ? { organizationUuid } : {}), entrypoint,
+      context: { deviceId, ...(accountUuid ? { accountUuid } : {}), ...(organizationUuid ? { organizationUuid } : {}), entrypoint, agentSdkVersion: sdkVersion, ...(parentSessionId ? { parentSessionId } : {}),
         ...(entrypoint === "sdk-ts" ? { isInteractive: false, userType: "external" as const } : {}), environment: { ...options.telemetry.environment, version: clientVersion } },
       ...(options.telemetry.signal ? { signal: options.telemetry.signal } : {}),
-      ...(options.telemetry.storage ? { storage: options.telemetry.storage } : {}) })
+      ...(options.telemetry.storage ? { storage: options.telemetry.storage } : {}),
+      ...(options.telemetry.privacyEnv ? { privacyEnv: options.telemetry.privacyEnv } : {}), ...(options.telemetry.eligible ? { eligible: options.telemetry.eligible } : {}) })
     : createAnthropicTelemetry();
   return {
     sessionId,
     request({ fetchImpl, requestClass = "main", promptId, agentId, parentAgentId, agentType }) {
       if (closed) throw new Error("Anthropic client session is closed.");
       if (!CLASSES.includes(requestClass) || [promptId, agentId, parentAgentId, agentType].some(value => value !== undefined && !IDENTIFIER.test(value))) throw new TypeError("Invalid Anthropic request identity.");
-      const observer = telemetry.request(fetchImpl);
+      const observer = telemetry.request(fetchImpl, { ...(agentId ? { agentId } : {}), ...(agentType ? { agentType } : {}) });
       const fetch: typeof globalThis.fetch = (input, init) => {
         let prepared: RequestInit | undefined;
         try {
