@@ -3,7 +3,7 @@ import { BrowserOAuthError, authorizeBrowserOAuth, refreshBrowserOAuth, type Bro
 import { anthropicIdentityHeaders, type AnthropicClientIdentity } from "./anthropic-client-identity.js";
 export { createAnthropicClientSession, type AnthropicClientSession, type AnthropicClientSessionOptions, type AnthropicClientRequestOptions, type AnthropicRequestClass } from "./anthropic-client-session.js";
 export type { AnthropicClientIdentity } from "./anthropic-client-identity.js";
-export { createAnthropicTelemetry, type AnthropicTelemetry, type AnthropicTelemetryContext, type AnthropicTelemetryMetadata, type AnthropicTelemetryOptions } from "./anthropic-telemetry.js";
+export { createAnthropicTelemetry, type AnthropicTelemetry, type AnthropicTelemetryContext, type AnthropicTelemetryMetadata, type AnthropicTelemetryOptions, type AnthropicTelemetryStorage, type AnthropicTelemetryBatch } from "./anthropic-telemetry.js";
 export type { AnthropicTelemetryRequest } from "./anthropic-telemetry-request.js";
 
 const ANTHROPIC_CONFIG = {

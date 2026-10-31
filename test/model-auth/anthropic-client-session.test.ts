@@ -75,6 +75,21 @@ describe("Anthropic client session", () => {
     await a.close(); await b.close();
   });
 
+  it("restores and persists telemetry through the session API", async () => {
+    const storage = { load: vi.fn(async () => []), save: vi.fn(async () => {}), remove: vi.fn(async () => {}) };
+    const telemetryFetch = vi.fn(async () => new Response(null, { status: 204 }));
+    const session = createAnthropicClientSession({ ...options, telemetry: { enabled: true, fetchImpl: telemetryFetch, storage } });
+    expect(await session.flush()).toBe(true);
+    const observer = session.request({ fetchImpl: async () => new Response("ok") });
+    await observer.fetch(url, request());
+    observer.onStreamEvent({ type: "message_stop" });
+    expect(await session.close()).toBe(true);
+    expect(storage.load).toHaveBeenCalledWith(JSON.stringify(["session_a", "device_a", "account_a", "org_a"]));
+    expect(storage.save).toHaveBeenCalled();
+    expect(storage.remove).toHaveBeenCalled();
+    expect(telemetryFetch).toHaveBeenCalledOnce();
+  });
+
   it("passes other requests and cancellation through unchanged", async () => {
     const error = new DOMException("cancelled", "AbortError");
     const transport = vi.fn(async () => { throw error; });
