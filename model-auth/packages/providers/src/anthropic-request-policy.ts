@@ -71,7 +71,7 @@ export function applyAnthropicRequestPolicy(input: Record<string, unknown>, poli
       const item = obj(block);
       const valid = item && (target.kind === "tool" ? typeof item.name === "string" : item.type === "text" ? typeof item.text === "string" && !!item.text.trim() : target.kind === "message" && ["image", "document", "tool_use", "tool_result"].includes(item.type));
       if (!valid) throw new TypeError("Invalid cache target.");
-      item.cache_control = { type: "ephemeral", ...(ttl === "1h" ? { ttl } : {}), ...(target.scope === "global" ? { scope: "global" } : {}) };
+      item.cache_control = { type: "ephemeral", ttl, ...(target.scope === "global" ? { scope: "global" } : {}) };
     }
     const present = (value: unknown) => obj(value)?.cache_control != null ? 1 : 0;
     let count = body.cache_control != null ? 1 : 0;

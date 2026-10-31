@@ -29,7 +29,7 @@ describe("Anthropic request policy", () => {
     const input = { system: [{ type: "text", text: "system" }], messages: [{ role: "user", content: [{ type: "text", text: "hello" }, { type: "text", text: "tail" }] }] };
     const result = applyAnthropicRequestPolicy(input, { cache: { force5m: true, environment: "1h", targets: [{ kind: "message", index: 0, block: 0, scope: "global" }] } });
     const message = (result.body.messages as any[])[0];
-    expect(message.content[0].cache_control).toEqual({ type: "ephemeral", scope: "global" });
+    expect(message.content[0].cache_control).toEqual({ type: "ephemeral", ttl: "5m", scope: "global" });
     expect(message.content[1].cache_control).toBeUndefined();
     expect((input.messages[0].content[0] as any).cache_control).toBeUndefined();
   });
@@ -51,7 +51,7 @@ describe("Anthropic request policy", () => {
     expect(() => applyAnthropicRequestPolicy(input, { cache: { setting: "5m", targets: [{ kind: "message", index: 0, block: 2 }] } })).toThrow(RangeError);
     delete (input as any).cache_control;
     const result = applyAnthropicRequestPolicy(input, { cache: { setting: "5m", targets: [{ kind: "message", index: 0, block: 2 }] } });
-    expect((result.body.messages as any[])[0].content[2].cache_control).toEqual({ type: "ephemeral" });
+    expect((result.body.messages as any[])[0].content[2].cache_control).toEqual({ type: "ephemeral", ttl: "5m" });
     expect((input.messages[0].content[2] as any).cache_control).toBeUndefined();
   });
   it("rejects invalid explicit policy before transport and passes malformed JSON through", async () => {
