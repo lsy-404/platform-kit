@@ -194,7 +194,7 @@ After explicit user confirmation, call `redeemClaudeResetGrant` or `redeemCodexR
 
 ## Anthropic tool name mapping
 
-`createAnthropicToolNameCodec` accepts an explicit `current` internal-to-wire map and optional `retired` wire-to-internal map. Create one codec per conversation. Encode each Messages request before sending it; decode each parsed response or raw stream event before handing it to the host's tool dispatcher and storing the conversation. Decoding records tool-use IDs so a later request preserves the original wire name for historical calls. The host supplies mappings from its own registry and session state; the codec does not discover servers or feature gates.
+`createAnthropicToolNameCodec` accepts an explicit `current` internal-to-wire map and optional `retired` wire-to-internal map. Create one codec per conversation. Encode each Messages request before sending it; decode each parsed response or raw stream event before handing it to the host's tool dispatcher and storing the conversation. Decoding records tool-use IDs so a later request preserves the original wire name for historical calls. The host supplies mappings from its own registry and session state; `current` must cover all active tools, using identity mappings for unchanged names. Update it when the active registry changes. The codec checks declared tools for ambiguous names but cannot discover tools absent from a request, servers, or feature gates.
 
 ```ts
 const codec = createAnthropicToolNameCodec({ current: { localTool: "wireTool" } });

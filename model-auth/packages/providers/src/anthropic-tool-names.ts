@@ -56,7 +56,16 @@ export function createAnthropicToolNameCodec(mapping: AnthropicToolNameMapping =
     encodeRequest<T extends object>(request: T): T {
       const source = request as ObjectValue;
       const out: ObjectValue = { ...source };
-      if (Array.isArray(source.tools)) out.tools = source.tools.map(tool => isObject(tool) && typeof tool.name === "string" ? { ...tool, name: encodeName(tool.name) } : tool);
+      if (Array.isArray(source.tools)) {
+        const declared = new Set<string>();
+        out.tools = source.tools.map(tool => {
+          if (!isObject(tool) || typeof tool.name !== "string") return tool;
+          const name = encodeName(tool.name) as string;
+          if (declared.has(name) || (reverse.has(name) && reverse.get(name) !== tool.name)) throw new TypeError("Ambiguous declared tool name");
+          declared.add(name);
+          return { ...tool, name };
+        });
+      }
       if (isObject(source.tool_choice) && typeof source.tool_choice.name === "string") out.tool_choice = { ...source.tool_choice, name: encodeName(source.tool_choice.name) };
       if (Array.isArray(source.messages)) out.messages = source.messages.map(message => isObject(message) && Array.isArray(message.content) ? { ...message, content: encodeTree(message.content) } : message);
       if (source.context_management != null) out.context_management = encodeTree(source.context_management);
