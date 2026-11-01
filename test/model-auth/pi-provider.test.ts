@@ -37,7 +37,7 @@ describe("Pi OAuth provider bridge", () => {
 
   it("adapts Pi's OAuth providers and leaves Radius model discovery to its runtime", async () => {
     expect(PI_OAUTH_PROVIDER_IDS).toEqual([
-      "anthropic", "openai-codex", "github-copilot", "kimi-coding", "openrouter", "xai", "meta", "radius",
+      "google-antigravity", "anthropic", "openai-codex", "github-copilot", "kimi-coding", "openrouter", "xai", "meta", "radius",
     ]);
     const descriptors = listPiOAuthProviders(PI_OAUTH_PROVIDER_IDS.map(id => provider(id)));
     expect(descriptors.map(item => item.providerId)).toEqual(PI_OAUTH_PROVIDER_IDS);

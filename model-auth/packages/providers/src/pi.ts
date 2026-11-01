@@ -1,9 +1,9 @@
 import type { ProviderAuthInteraction, ProviderAuthNotice, ProviderAuthPrompt } from "@model-auth/core";
 import { modelAuthProviderCapability } from "./capabilities.js";
 
-export type PiOAuthProviderId = "anthropic" | "openai-codex" | "github-copilot" | "kimi-coding" | "openrouter" | "xai" | "meta" | "radius";
+export type PiOAuthProviderId = "google-antigravity" | "anthropic" | "openai-codex" | "github-copilot" | "kimi-coding" | "openrouter" | "xai" | "meta" | "radius";
 export const PI_OAUTH_PROVIDER_IDS: readonly PiOAuthProviderId[] = Object.freeze([
-  "anthropic", "openai-codex", "github-copilot", "kimi-coding", "openrouter", "xai", "meta", "radius",
+  "google-antigravity", "anthropic", "openai-codex", "github-copilot", "kimi-coding", "openrouter", "xai", "meta", "radius",
 ]);
 export interface PiOAuthCredential extends Readonly<Record<string, unknown>> { readonly type: "oauth"; readonly access: string; readonly refresh: string; readonly expires: number; }
 export interface PiOAuthCredentialEnvelope { readonly providerId: PiOAuthProviderId; readonly credential: PiOAuthCredential; }

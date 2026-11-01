@@ -4,7 +4,7 @@ import { MODEL_AUTH_PROVIDER_CAPABILITIES, modelAuthProviderCapability } from ".
 describe("model-auth provider capabilities", () => {
   it("declares every shipped provider exactly once", () => {
     expect(MODEL_AUTH_PROVIDER_CAPABILITIES.map((item) => item.id)).toEqual([
-      "anthropic", "openai-codex", "workbuddy", "traecode", "grok", "ollama-cloud", "opencode-go",
+      "google-antigravity", "anthropic", "openai-codex", "workbuddy", "traecode", "grok", "ollama-cloud", "opencode-go",
       "github-copilot", "kimi-coding", "openrouter", "xai", "meta", "radius",
     ]);
     expect(new Set(MODEL_AUTH_PROVIDER_CAPABILITIES.map((item) => item.id)).size).toBe(MODEL_AUTH_PROVIDER_CAPABILITIES.length);

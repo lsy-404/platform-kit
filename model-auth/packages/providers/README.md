@@ -211,3 +211,9 @@ const hostMessage = codec.decodeMessage(response);
 ```
 
 The codec leaves unknown names and tool inputs unchanged, and rejects ambiguous mappings. Pi's Anthropic adapter already performs its own tool-name conversion; do not stack the two blindly. Apply the codec at a boundary where both outgoing requests and incoming responses can be translated consistently.
+
+## Google Antigravity
+
+Import `createAntigravityProvider` from `@model-auth/providers/antigravity` and pass the host's `fetchImpl` to route OAuth and model requests through the host network configuration. Login opens a browser authorization URL and accepts either the callback URL or its authorization code.
+
+This integration uses an unofficial Antigravity protocol. The upstream project warns that third-party access may violate Google's terms and result in account suspension.

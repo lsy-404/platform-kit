@@ -3,7 +3,7 @@
  * package support only; a host must still verify its own transport and policy
  * before presenting a provider as available.
  */
-export type ModelAuthProviderId = "anthropic" | "openai-codex" | "workbuddy" | "traecode" | "grok" | "ollama-cloud" | "opencode-go" | "github-copilot" | "kimi-coding" | "openrouter" | "xai" | "meta" | "radius";
+export type ModelAuthProviderId = "google-antigravity" | "anthropic" | "openai-codex" | "workbuddy" | "traecode" | "grok" | "ollama-cloud" | "opencode-go" | "github-copilot" | "kimi-coding" | "openrouter" | "xai" | "meta" | "radius";
 export type ProviderAuthorizationKind = "browser-oauth" | "browser-web-session" | "runtime-oauth" | "api-key";
 
 export interface ModelAuthProviderCapability {
@@ -26,6 +26,7 @@ export interface ModelAuthProviderCapability {
 }
 
 export const MODEL_AUTH_PROVIDER_CAPABILITIES: readonly ModelAuthProviderCapability[] = Object.freeze([
+  { id: "google-antigravity", displayName: "Google Antigravity", authorization: { kind: "runtime-oauth", renewable: true, multiAccount: true }, access: { inference: true, modelCatalog: true, usage: false }, catalogProviderIds: [], catalogProviderId: null },
   { id: "anthropic", displayName: "Claude", authorization: { kind: "browser-oauth", renewable: true, multiAccount: true }, access: { inference: true, modelCatalog: true, usage: true }, catalogProviderIds: ["anthropic"], catalogProviderId: "anthropic" },
   { id: "openai-codex", displayName: "Codex", authorization: { kind: "browser-oauth", renewable: true, multiAccount: true }, access: { inference: true, modelCatalog: true, usage: true }, catalogProviderIds: ["openai", "openai-codex"], catalogProviderId: "openai" },
   { id: "workbuddy", displayName: "WorkBuddy", authorization: { kind: "browser-oauth", renewable: true, multiAccount: true }, access: { inference: true, modelCatalog: true, usage: false }, catalogProviderIds: ["zhipuai", "tencent-tokenhub", "deepseek"], catalogProviderId: "zhipuai" },
