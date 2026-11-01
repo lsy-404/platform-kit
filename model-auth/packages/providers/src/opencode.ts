@@ -3,6 +3,13 @@ import { quotaWindow, usageSnapshot, type ProviderUsageData, type ProviderUsageR
 
 export const OPENCODE_GO_USAGE_URL = "https://opencode.ai/zen/go/v1/usage";
 
+export function opencodeGoRequestHeaders(options: { userAgent: string; sessionId: string }): Record<string, string> {
+  const userAgent = typeof options.userAgent === "string" ? options.userAgent.trim() : "";
+  const sessionId = typeof options.sessionId === "string" ? options.sessionId.trim() : "";
+  if (!userAgent || !sessionId) throw new Error("OpenCode Go requires a user agent and session ID.");
+  return { "user-agent": userAgent, "x-opencode-session": sessionId };
+}
+
 const REQUEST_TIMEOUT_MS = 15_000;
 const WINDOWS = [
   { key: "rolling", id: "rolling", label: "Rolling", kind: "session", windowSeconds: 18_000 },

@@ -176,6 +176,8 @@ The [batch protocol](https://github.com/anthropics/claude-code/tree/80c6959d28c4
 
 ## OpenCode Go usage
 
+For OpenCode Go inference, use `opencodeGoRequestHeaders({ userAgent, sessionId })` from `@model-auth/providers/opencode`. Supply the host's own user agent and a session ID that remains stable for the conversation; both must be nonblank. Add the returned headers to each inference request. The host owns the session ID lifecycle.
+
 `queryOpencodeGoKeyUsage(apiKey, options)` reads the Go subscription quota from `https://opencode.ai/zen/go/v1/usage` with a Bearer API key. `parseOpencodeGoUsage` maps the `rolling`, `weekly` and `monthly` windows to session, weekly and monthly usage with their reset times, and the plan is reported as `Go`. A payload without both the session and weekly windows is unreadable. A 403 carrying the `EntitlementError` body means the key has no Go subscription and yields an `unknown` snapshot with `no-limits`; any other 403 is a `server-error`. Window lengths are the documented 5 hours, 7 days and 30 days; dollar limits are not reported by the endpoint and stay unknown.
 
 ## Ollama web session and usage
