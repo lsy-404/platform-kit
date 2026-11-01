@@ -1,5 +1,6 @@
 export * from "./workbuddy.js";
 export * from "./trae.js";
+export * from "./antigravity.js";
 export * from "./openai.js";
 export * from "./anthropic.js";
 export * from "./grok.js";

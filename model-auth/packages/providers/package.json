@@ -1,6 +1,6 @@
 {
   "name": "@model-auth/providers",
-  "version": "0.23.0",
+  "version": "0.24.0",
   "description": "Host-side AI provider access, authentication, requests and usage queries.",
   "type": "module",
   "main": "./dist/index.js",
@@ -42,6 +42,9 @@
       ],
       "anthropic-browser": [
         "dist/anthropic-browser.d.ts"
+      ],
+      "antigravity": [
+        "dist/antigravity.d.ts"
       ]
     }
   },
@@ -108,6 +111,10 @@
     "./client-versions": {
       "types": "./dist/client-versions.d.ts",
       "import": "./dist/client-versions.js"
+    },
+    "./antigravity": {
+      "types": "./dist/antigravity.d.ts",
+      "import": "./dist/antigravity.js"
     }
   },
   "scripts": {
@@ -116,6 +123,7 @@
   },
   "dependencies": {
     "@puppeteer/browsers": "3.2.5",
+    "protobufjs": "8.8.1",
     "tough-cookie": "6.0.2",
     "ws": "^8.22.0"
   },

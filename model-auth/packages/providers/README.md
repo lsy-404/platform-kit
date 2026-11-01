@@ -34,6 +34,66 @@ const { credential, cookies } = await authorizeAnthropicInBrowser({
 
 This trusted-host API launches an installed Chromium browser with a temporary profile, completes the shared Anthropic OAuth flow, and returns only `claude.ai` cookies alongside the OAuth credential. The host resolves the executable and proxy arguments, then owns secure persistence and use of both results. The temporary profile is removed when authorization finishes; the package does not persist credentials or cookies.
 
+## Antigravity personal account access
+
+`@model-auth/providers/antigravity` exposes browser authorization with PKCE, token renewal, Code Assist account initialization, the account's model catalogue and native CCPA streaming requests.
+
+```ts
+import {
+  authorizeAntigravity, antigravityNeedsRefresh, refreshAntigravity,
+  loadAntigravityCodeAssist, fetchAntigravityModels, streamAntigravityContent,
+} from "@model-auth/providers/antigravity";
+
+const oauthClient = host.antigravityOAuthClient;
+let credential = await authorizeAntigravity({
+  ...oauthClient,
+  openExternal: host.openExternal,
+  prompt: () => host.promptAuthorizationCode(),
+  signal,
+});
+if (antigravityNeedsRefresh(credential)) {
+  credential = await refreshAntigravity(credential, { ...oauthClient, signal });
+}
+await secureStore.set(accountId, credential);
+
+const options = { userAgent: host.userAgent, signal };
+const account = await loadAntigravityCodeAssist(credential, options);
+const catalogue = await fetchAntigravityModels(credential, host.selectedProjectId, options);
+const response = await streamAntigravityContent(credential, {
+  project: host.selectedProjectId,
+  model: host.selectedModelId,
+  request: host.googleGenerateContentRequest,
+}, options);
+```
+
+The host supplies its OAuth application `clientId` and `clientSecret` for both authorization and renewal, keeping this configuration in the trusted host. The package embeds no vendor OAuth application credentials. The host opens the authorization URL and prompts for the code or complete official HTTPS callback URL. Complete URLs must match the redirect and generated state. Login has a ten-minute maximum budget; token requests have a thirty-second budget. Credentials carry the actual Unix-millisecond expiry; `antigravityNeedsRefresh` uses a five-minute margin. Persist refreshed credentials before the next request.
+
+Inspect `currentTier`, `ineligibleTiers` and their validation information before choosing or initializing a project. `onboardAntigravityUser(credential, tierId, options, project?)` returns the original operation; the host handles pending completion and service eligibility. Load responses provide `cloudaicompanionProject` as a string; a completed onboarding response provides its project object. The package does not automatically choose a tier or perform onboarding.
+
+These helpers target the personal-account CCPA route observed in official CLI 1.4.12 and App 2.28.2. The host supplies its user agent and selected project/model from actual service responses. Catalogue metadata and the streaming `Response` remain native; the host handles SSE, tools, thought signatures, usage, stream errors and cancellation. Keep the request signal alive while reading the body. All helpers accept `fetchImpl` and `signal`, reject redirects and surface HTTP errors without exposing response bodies in errors.
+
+### Antigravity analytics
+
+```ts
+import { createAntigravityTelemetry } from "@model-auth/providers/antigravity";
+
+const telemetry = createAntigravityTelemetry({
+  enabled: true,
+  initialized: true,
+  fetchImpl: accountAuthenticatedFetch,
+  settings: readAccountTelemetrySettings,
+  onError: reportTelemetryError,
+});
+telemetry.record(actualEventType);
+await telemetry.close();
+```
+
+The host supplies actual schema event identifiers, account-bound transport and current account settings. A sender starts only when explicitly enabled and initialized. Upload requires `telemetryEnabled: true` and `userDataCollectionForceDisabled: false`; missing settings, read errors or disallowed settings reject flushing and retain the batch. This policy avoids sending a payload whose native redaction behavior has not been established. Event identifiers accept letters, digits, underscores, dots and hyphens, start with a letter and have at most 128 characters. Treat identifiers and the optional IDE/platform context as non-secret data.
+
+The first scheduled flush occurs five seconds after the sender starts; later scheduling waits for the previous flush to settle. The memory queue holds at most 1024 events; `record()` returns false when full, closed, disabled or given an invalid identifier. Passing a conversation sensitivity of 2 or higher suppresses that conversation event. Successful HTTP responses remove the batch; failed flushes retain it. `flush()` and `close()` reject on an unsent batch, with a five-second request budget; after a failed close, either can retry the retained batch. The host fetch must honor its signal and reject redirects.
+
+The encoder uses the recovered Clearcut analytics envelope (source 2747, analytics event code 5, nested protobuf source extension). `encodeAntigravityTelemetryBatch` also exposes pure encoding with a caller-supplied `isRedacted` field; that flag is not a content sanitizer. Live service acceptance, the complete native redactor, global initialization defaults and BAIC telemetry are outside this interface's verified behavior. Validation used local synthetic flows and independent decoding against selected official descriptors.
+
 ## WorkBuddy browser authorization
 
 ```ts
