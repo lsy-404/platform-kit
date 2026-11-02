@@ -219,6 +219,7 @@ function close() {
   });
 }
 function handleProviderKeydown(event: KeyboardEvent) {
+  if (event.isComposing || event.keyCode === 229) return;
   const count = orderedProviders.value.length;
   if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key) && count) {
     event.preventDefault();
@@ -239,6 +240,7 @@ function closedDetailsAncestors(element: HTMLElement): HTMLElement[] {
   return found;
 }
 function handleDialogKeydown(event: KeyboardEvent) {
+  if (event.isComposing || event.keyCode === 229) return;
   if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); return; }
   if (event.key !== "Tab" || !dialog.value) return;
   const focusable = [...dialog.value.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]), [tabindex='0'], a[href], summary")]
@@ -281,6 +283,7 @@ function rename(credential: ProviderCredential, label: string) {
 }
 function onLabelEnter(event: KeyboardEvent, credential: ProviderCredential) {
   if (event.isComposing || event.keyCode === 229) return;
+  event.preventDefault();
   saveLabel(credential);
 }
 function saveLabel(credential: ProviderCredential) {
@@ -717,7 +720,7 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
                 <details class="model-auth-credential-settings" data-part="credential-settings">
                   <summary>{{ text.credentialSettings }}</summary>
                   <div class="model-auth-credential-rename">
-                    <input :value="labelValue(credential)" :disabled="busy" maxlength="80" type="text" autocomplete="off" data-part="credential-label" :aria-label="text.label" @input="labelDrafts[credential.id] = ($event.target as HTMLInputElement).value" @keydown.enter.prevent="onLabelEnter($event, credential)" />
+                    <input :value="labelValue(credential)" :disabled="busy" maxlength="80" type="text" autocomplete="off" data-part="credential-label" :aria-label="text.label" @input="labelDrafts[credential.id] = ($event.target as HTMLInputElement).value" @keydown.enter="onLabelEnter($event, credential)" />
                     <button type="button" class="model-auth-secondary" data-part="save-label" :disabled="busy || !labelChanged(credential)" @click="saveLabel(credential)">{{ text.saveLabel }}</button>
                   </div>
                   <div v-if="credential.secret !== undefined" class="model-auth-credential-secret" data-part="credential-secret">
