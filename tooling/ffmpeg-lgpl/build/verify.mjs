@@ -14,7 +14,7 @@ const runBuffer = (args) => {
   return result.stdout;
 };
 
-const license = run(["-L"]).replace(/s+/g, " ");
+const license = run(["-L"]).split(/\s+/).join(" ");
 assert.match(license, /GNU Lesser General Public License/);
 assert.doesNotMatch(license, /GNU General Public License(?! v)|nonfree/i);
 
