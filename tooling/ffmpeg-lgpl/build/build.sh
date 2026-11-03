@@ -16,7 +16,7 @@ tar -xJf "$work/ffmpeg.tar.xz" -C "$work"
 common=()
 while IFS= read -r line; do
   [ -z "$line" ] || common+=("$line")
-done < <(tr -d '' < "$here/configure.args")
+done < <(tr -d "" < "$here/configure.args")
 
 exe=ffmpeg
 extra=()
