@@ -13,7 +13,10 @@ curl -fsSL --retry 3 -o "$work/ffmpeg.tar.xz" "$FFMPEG_URL"
 echo "$FFMPEG_SHA256  $work/ffmpeg.tar.xz" | sha256sum -c -
 cp "$work/ffmpeg.tar.xz" "$out/ffmpeg-$FFMPEG_VERSION.tar.xz"
 tar -xJf "$work/ffmpeg.tar.xz" -C "$work"
-mapfile -t common < <(grep -v '^$' "$here/configure.args" | tr -d '\r')
+common=()
+while IFS= read -r line; do
+  [ -z "$line" ] || common+=("$line")
+done < <(tr -d '' < "$here/configure.args")
 
 exe=ffmpeg
 extra=()

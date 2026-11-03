@@ -18,7 +18,6 @@ Common configure flags (build/configure.args):
   --disable-ffplay
   --disable-ffprobe
   --disable-avdevice
-  --disable-postproc
   --enable-small
   --enable-protocol=file,pipe
   --enable-demuxer=mov,mp3,wav,w64,aiff,caf,flac,aac,ogg,matroska,avi,asf,flv,mpegps,mpegts,ac3,eac3,amr,amrnb,amrwb
