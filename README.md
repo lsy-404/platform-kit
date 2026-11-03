@@ -10,6 +10,7 @@ Apache-2.0 theme and public AI access packages, distributed directly through thi
 | `@platform-kit/toast` | Transient notifications with Vue and framework-free hosts; [usage](styles/toast/README.md) |
 | `@platform-kit/liquid-glass` | Liquid glass appearance pack: a rim-refracting lens with surface and field materials; [usage](styles/liquid-glass/README.md) |
 | `@platform-kit/appearance-check` | Development-time appearance checks with stable IDs, optional DESIGN.md token baselines, CLI and Vite build warnings; [usage](tooling/appearance-check/README.md) |
+| `@platform-kit/ffmpeg-lgpl` | LGPL-2.1-or-later FFmpeg executable for audio decoding and AAC encoding on five desktop targets; [usage](tooling/ffmpeg-lgpl/README.md) |
 | `@model-auth/core` | Framework-neutral provider access, credential routing, authentication interaction and usage contracts |
 | `@model-auth/providers` | Host-side provider authentication, requests, streams and usage queries for OpenAI, Anthropic, WorkBuddy, Trae, Grok, Ollama and OpenCode Go |
 | `model-auth-native` | Rust browser authentication for OpenAI and Anthropic; host-owned credential storage |

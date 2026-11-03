@@ -103,6 +103,8 @@ importers:
         specifier: ^7.1.7
         version: 7.3.6(@types/node@24.19.1)
 
+  tooling/ffmpeg-lgpl: {}
+
   tooling/visual-center:
     dependencies:
       culori:

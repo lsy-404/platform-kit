@@ -1,0 +1,20 @@
+{
+  "name": "@platform-kit/ffmpeg-lgpl",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LGPL-only FFmpeg binary for audio decoding and AAC encoding on desktop platforms.",
+  "license": "LGPL-2.1-or-later",
+  "main": "./index.cjs",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": "./index.cjs"
+  },
+  "files": [
+    "bin",
+    "index.cjs",
+    "index.d.ts",
+    "NOTICE",
+    "README.md",
+    "LICENSE"
+  ]
+}

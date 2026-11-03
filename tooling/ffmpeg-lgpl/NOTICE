@@ -1,0 +1,36 @@
+@platform-kit/ffmpeg-lgpl bundles unmodified FFmpeg builds.
+
+FFmpeg version: 9.0.2
+Source: https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz
+Source SHA-256: 8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e
+License: GNU Lesser General Public License, version 2.1 or later (see LICENSE).
+The exact source tarball is published next to the package archive in the same GitHub Release.
+
+FFmpeg is a trademark of Fabrice Bellard, originator of the FFmpeg project.
+No external libraries are linked; the build uses --disable-autodetect and neither --enable-gpl nor --enable-nonfree.
+
+Common configure flags (build/configure.args):
+  --disable-everything
+  --disable-autodetect
+  --disable-network
+  --disable-doc
+  --disable-debug
+  --disable-ffplay
+  --disable-ffprobe
+  --disable-avdevice
+  --disable-postproc
+  --enable-small
+  --enable-protocol=file,pipe
+  --enable-demuxer=mov,mp3,wav,w64,aiff,caf,flac,aac,ogg,matroska,avi,asf,flv,mpegps,mpegts,ac3,eac3,amr,amrnb,amrwb
+  --enable-parser=aac,aac_latm,mpegaudio,flac,opus,vorbis,ac3,amr
+  --enable-decoder=aac,aac_latm,mp1,mp1float,mp2,mp2float,mp3,mp3float,mp3adu,mp3adufloat,mp3on4,mp3on4float,opus,vorbis,flac,alac,wmav1,wmav2,wmapro,wmalossless,wmavoice,ac3,eac3,amrnb,amrwb,adpcm_ima_wav,adpcm_ms,pcm_s8,pcm_u8,pcm_s16le,pcm_s16be,pcm_s24le,pcm_s24be,pcm_s32le,pcm_s32be,pcm_f32le,pcm_f32be,pcm_f64le,pcm_f64be,pcm_alaw,pcm_mulaw
+  --enable-bsf=aac_adtstoasc
+  --enable-encoder=aac,pcm_s16le,pcm_f32le
+  --enable-muxer=ipod,mp4,wav,s16le,f32le,null
+  --enable-filter=abuffer,abuffersink,aresample,anull,aformat,atrim
+
+Per-target additional flags (build/build.sh):
+  darwin-arm64: MACOSX_DEPLOYMENT_TARGET=13.0 --enable-pthreads --extra-cflags=-mmacosx-version-min=13.0 --extra-ldflags=-mmacosx-version-min=13.0
+  linux-x64, linux-arm64 (Alpine, musl, fully static): --enable-pthreads --extra-ldflags=-static
+  win32-x64 (MSYS2 UCRT64): --target-os=mingw32 --extra-ldflags=-static
+  win32-arm64 (MSYS2 CLANGARM64): --target-os=mingw32 --arch=aarch64 --cc=clang --extra-ldflags=-static

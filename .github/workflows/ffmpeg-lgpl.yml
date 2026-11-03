@@ -1,0 +1,173 @@
+name: Build ffmpeg-lgpl
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'tooling/ffmpeg-lgpl/**'
+      - '.github/workflows/ffmpeg-lgpl.yml'
+    tags:
+      - 'ffmpeg-lgpl-v*'
+  pull_request:
+    paths:
+      - 'tooling/ffmpeg-lgpl/**'
+      - '.github/workflows/ffmpeg-lgpl.yml'
+permissions:
+  contents: read
+env:
+  PKG: tooling/ffmpeg-lgpl
+jobs:
+  build-unix:
+    name: build ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: darwin-arm64, runner: macos-latest }
+          - { target: linux-x64, runner: ubuntu-latest }
+          - { target: linux-arm64, runner: ubuntu-24.04-arm }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build (macOS)
+        if: startsWith(matrix.target, 'darwin')
+        run: bash "$PKG/build/build.sh" "${{ matrix.target }}" out
+      - name: Build (static, Alpine)
+        if: startsWith(matrix.target, 'linux')
+        run: |
+          docker run --rm -v "$PWD:/w" -w /w alpine:3.22 sh -c \
+            'apk add --no-cache bash build-base nasm xz curl coreutils diffutils && bash "$0" "$1" out' \
+            "$PKG/build/build.sh" "${{ matrix.target }}"
+          sudo chown -R "$(id -u):$(id -g)" out
+      - name: Dependency rules
+        run: bash "$PKG/build/deps-check.sh" "${{ matrix.target }}" out/bin/ffmpeg
+      - name: License, build configuration and smoke test
+        run: node "$PKG/build/verify.mjs" out/bin/ffmpeg
+      - run: ls -l out/bin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bin-${{ matrix.target }}
+          path: out/bin/ffmpeg
+          if-no-files-found: error
+      - if: matrix.target == 'linux-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: source
+          path: out/ffmpeg-*.tar.xz
+          if-no-files-found: error
+  build-windows:
+    name: build ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: win32-x64, runner: windows-latest, msystem: UCRT64, prefix: mingw-w64-ucrt-x86_64 }
+          - { target: win32-arm64, runner: windows-11-arm, msystem: CLANGARM64, prefix: mingw-w64-clang-aarch64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.msystem }}
+          update: true
+          install: >-
+            make diffutils curl xz
+            ${{ matrix.prefix }}-toolchain
+            ${{ matrix.prefix }}-nasm
+      - name: Build
+        shell: msys2 {0}
+        run: bash "$PKG/build/build.sh" "${{ matrix.target }}" out
+      - name: Dependency rules
+        shell: msys2 {0}
+        run: bash "$PKG/build/deps-check.sh" "${{ matrix.target }}" out/bin/ffmpeg.exe
+      - name: License, build configuration and smoke test
+        shell: pwsh
+        run: node "$env:PKG/build/verify.mjs" out/bin/ffmpeg.exe
+      - run: ls -l out/bin
+        shell: bash
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bin-${{ matrix.target }}
+          path: out/bin/ffmpeg.exe
+          if-no-files-found: error
+  assemble:
+    needs: [build-unix, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          path: dl
+      - name: Assemble archive
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./$PKG/package.json').version")"
+          if [ "${GITHUB_REF_TYPE}" = tag ] && [ "${GITHUB_REF_NAME}" != "ffmpeg-lgpl-v$version" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match package version $version" >&2; exit 1
+          fi
+          stage="$RUNNER_TEMP/stage"
+          mkdir -p "$stage"
+          cp -r "$PKG"/. "$stage"/
+          rm -rf "$stage/build"
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('$stage/package.json','utf8'));delete p.private;fs.writeFileSync('$stage/package.json',JSON.stringify(p,null,2)+'\n')"
+          for target in darwin-arm64 linux-x64 linux-arm64 win32-x64 win32-arm64; do
+            exe=ffmpeg; [ "${target%%-*}" = win32 ] && exe=ffmpeg.exe
+            mkdir -p "$stage/bin/$target"
+            cp "dl/bin-$target/$exe" "$stage/bin/$target/$exe"
+            chmod 755 "$stage/bin/$target/$exe"
+          done
+          mkdir -p release
+          (cd "$stage" && corepack pnpm@10.17.1 pack --pack-destination "$GITHUB_WORKSPACE/release")
+          archive="$(ls release/*.tgz)"
+          tar -tvzf "$archive"
+          for target in darwin-arm64 linux-x64 linux-arm64 win32-x64 win32-arm64; do
+            tar -tvzf "$archive" | grep -E "^-rwx.* package/bin/$target/ffmpeg(\.exe)?$"
+          done
+          tar -tzf "$archive" | grep -qx 'package/LICENSE'
+          tar -tzf "$archive" | grep -qx 'package/NOTICE'
+          cp dl/source/ffmpeg-*.tar.xz release/
+          (cd release && sha256sum -- *.tgz *.tar.xz > SHA256SUMS && cat SHA256SUMS)
+      - name: Check the packed entry point
+        run: |
+          set -euo pipefail
+          mkdir check && tar -xzf release/*.tgz -C check
+          node -e "const {ffmpegPath}=require('./check/package');const p=ffmpegPath('linux','x64');if(!require('fs').existsSync(p))throw new Error(p);try{ffmpegPath('freebsd','x64');throw new Error('no error')}catch(e){if(!/no binary/.test(e.message))throw e}"
+          ./check/package/bin/linux-x64/ffmpeg -version | head -1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-lgpl-release
+          path: release/*
+          if-no-files-found: error
+  release:
+    if: startsWith(github.ref, 'refs/tags/ffmpeg-lgpl-v')
+    needs: assemble
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ffmpeg-lgpl-release
+          path: release
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          (cd release && sha256sum -c SHA256SUMS)
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release already exists; keeping published assets unchanged."
+          else
+            gh release create "$RELEASE_TAG" release/*.tgz release/*.tar.xz release/SHA256SUMS --verify-tag --title "$RELEASE_TAG" \
+              --notes "LGPL-2.1-or-later FFmpeg build for darwin-arm64, win32-x64, win32-arm64, linux-x64 and linux-arm64. The exact FFmpeg source tarball is attached."
+          fi
