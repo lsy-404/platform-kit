@@ -21,7 +21,7 @@ assert.doesNotMatch(license, /GNU General Public License(?! v)|nonfree/i);
 const buildconf = run(["-buildconf"]);
 assert.doesNotMatch(buildconf, /--enable-(gpl|nonfree|version3)/);
 for (const flag of readFileSync(join(here, "configure.args"), "utf8").split(/\r?\n/).filter(Boolean)) {
-  assert.ok(buildconf.includes(flag), `buildconf is missing ${flag}`);
+  assert.ok(buildconf.includes(flag), `buildconf is missing ${flag}: ${buildconf}`);
 }
 
 const dir = mkdtempSync(join(tmpdir(), "ffmpeg-lgpl-"));
