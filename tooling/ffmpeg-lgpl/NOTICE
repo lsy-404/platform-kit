@@ -25,7 +25,7 @@ Common configure flags (build/configure.args):
   --enable-decoder=aac,aac_latm,mp1,mp1float,mp2,mp2float,mp3,mp3float,mp3adu,mp3adufloat,mp3on4,mp3on4float,opus,vorbis,flac,alac,wmav1,wmav2,wmapro,wmalossless,wmavoice,ac3,eac3,amrnb,amrwb,adpcm_ima_wav,adpcm_ms,pcm_s8,pcm_u8,pcm_s16le,pcm_s16be,pcm_s24le,pcm_s24be,pcm_s32le,pcm_s32be,pcm_f32le,pcm_f32be,pcm_f64le,pcm_f64be,pcm_alaw,pcm_mulaw
   --enable-bsf=aac_adtstoasc
   --enable-encoder=aac,pcm_s16le,pcm_f32le
-  --enable-muxer=ipod,mp4,wav,s16le,f32le,null
+  --enable-muxer=ipod,mp4,wav,pcm_s16le,pcm_f32le,null
   --enable-filter=abuffer,abuffersink,aresample,anull,aformat,atrim
 
 Per-target additional flags (build/build.sh):
