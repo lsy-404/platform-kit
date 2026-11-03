@@ -18,10 +18,10 @@ const license = run(["-L"]).split(/\s+/).join(" ");
 assert.match(license, /GNU Lesser General Public License/);
 assert.doesNotMatch(license, /GNU General Public License(?! v)|nonfree/i);
 
-const buildconf = run(["-buildconf"]);
+const buildconf = run(["-buildconf"]).split("'").join("");
 assert.doesNotMatch(buildconf, /--enable-(gpl|nonfree|version3)/);
 for (const flag of readFileSync(join(here, "configure.args"), "utf8").split(/\r?\n/).filter(Boolean)) {
-  assert.ok(buildconf.includes(flag), `buildconf is missing ${flag}: ${buildconf}`);
+  assert.ok(buildconf.includes(flag), `buildconf is missing ${flag}`);
 }
 
 const dir = mkdtempSync(join(tmpdir(), "ffmpeg-lgpl-"));
