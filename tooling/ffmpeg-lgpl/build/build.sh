@@ -15,8 +15,9 @@ cp "$work/ffmpeg.tar.xz" "$out/ffmpeg-$FFMPEG_VERSION.tar.xz"
 tar -xJf "$work/ffmpeg.tar.xz" -C "$work"
 common=()
 while IFS= read -r line; do
+  line="${line%[[:cntrl:]]}"
   [ -z "$line" ] || common+=("$line")
-done < <(tr -d "" < "$here/configure.args")
+done < "$here/configure.args"
 
 exe=ffmpeg
 extra=()
