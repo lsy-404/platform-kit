@@ -128,11 +128,11 @@ jobs:
           archive="release/platform-kit-ffmpeg-lgpl-$version.tgz"
           tar --sort=name --owner=0 --group=0 --numeric-owner --mtime='2026-01-01 00:00:00Z' -C "$RUNNER_TEMP/tgz" -czf "$archive" package
           tar -tvzf "$archive"
+          listing="$(tar -tvzf "$archive")"
           for target in darwin-arm64 linux-x64 linux-arm64 win32-x64 win32-arm64; do
-            tar -tvzf "$archive" | grep -E "^-rwx.* package/bin/$target/ffmpeg(\.exe)?$"
+            grep -E "^-rwx.* package/bin/$target/ffmpeg(\.exe)?$" <<<"$listing"
           done
-          tar -tzf "$archive" | grep -qx 'package/LICENSE'
-          tar -tzf "$archive" | grep -qx 'package/NOTICE'
+          grep -E ' package/(LICENSE|NOTICE)$' <<<"$listing"
           cp dl/source/ffmpeg-*.tar.xz release/
           (cd release && sha256sum -- *.tgz *.tar.xz > SHA256SUMS && cat SHA256SUMS)
       - name: Check the packed entry point
