@@ -1,0 +1,85 @@
+.fluent-segmented {
+  isolation: isolate;
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 2px;
+  padding: 2px;
+  color: var(--fluent-text);
+  background: var(--fluent-control-alt);
+  border: 1px solid var(--fluent-border);
+  border-radius: calc(var(--fluent-radius) + 2px);
+}
+.fluent-segmented__item {
+  position: relative;
+  min-height: 30px;
+  padding: 0 11px;
+  color: var(--fluent-text);
+  font: inherit;
+  font-weight: 400;
+  white-space: nowrap;
+  background: transparent;
+  border: 0;
+  border-radius: var(--fluent-radius);
+  cursor: pointer;
+  transition:
+    background-color var(--fluent-faster) linear,
+    color var(--fluent-faster) linear;
+}
+.fluent-segmented__item[aria-checked="true"] {
+  color: var(--fluent-emphasis-text);
+}
+.fluent-segmented__item:hover:not(:disabled, [aria-checked="true"]) {
+  background: var(--fluent-control-hover);
+}
+.fluent-segmented__item:active:not(:disabled, [aria-checked="true"]) {
+  color: var(--fluent-muted);
+  background: var(--fluent-control-pressed);
+}
+.fluent-segmented__item:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.fluent-segmented__label {
+  position: relative;
+  z-index: 1;
+}
+.fluent-segmented__indicator {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  z-index: 0;
+  width: 100%;
+  background: var(--fluent-emphasis-raised);
+  border: 1px solid var(--fluent-emphasis-edge);
+  border-bottom-color: var(--fluent-emphasis-edge-bottom);
+  border-radius: var(--fluent-radius);
+  box-shadow: var(--fluent-button-highlight);
+  pointer-events: none;
+}
+.fluent-segmented__indicator::after {
+  position: absolute;
+  inset-inline-start: calc(50% - 8px);
+  bottom: 0;
+  width: 16px;
+  height: 3px;
+  content: "";
+  background: var(--fluent-emphasis-bar);
+  border-radius: 1.5px;
+  transition: transform var(--fluent-fast) var(--fluent-ease);
+}
+.fluent-segmented__item[aria-checked="true"]:active:not(:disabled) .fluent-segmented__indicator::after {
+  transform: scaleX(0.5);
+}
+@media (forced-colors: active) {
+  .fluent-segmented__indicator {
+    background: Highlight;
+    border-color: Highlight;
+  }
+  .fluent-segmented__indicator::after {
+    background: HighlightText;
+  }
+  .fluent-segmented__item[aria-checked="true"] {
+    color: HighlightText;
+  }
+}

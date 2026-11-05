@@ -39,6 +39,8 @@ export type {
 } from "./controls.js";
 export type { FluentNavigationItem } from "./navigation.js";
 
+export { FluentSegmented } from "./segmented.js";
+export type { FluentSegmentedOption } from "./segmented.js";
 export { FluentSelect, FluentMenu } from "./selection.js";
 export type { FluentMenuItem } from "./selection.js";
 export { fluentIcon } from "./icon.js";

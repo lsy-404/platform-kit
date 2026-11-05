@@ -12,12 +12,11 @@
   position: relative;
   min-height: 36px;
   padding: 0 12px;
-  overflow: hidden;
+  overflow: visible;
   color: var(--fluent-text);
   font: inherit;
   line-height: 36px;
   text-align: start;
-  text-overflow: ellipsis;
   white-space: nowrap;
   background: transparent;
   border: 0;
@@ -40,19 +39,38 @@
   cursor: default;
 }
 .fluent-navigation__item.is-selected {
-  background: var(--fluent-selection);
+  color: var(--fluent-emphasis-text);
+  background: var(--fluent-emphasis-fill);
 }
 .fluent-navigation__item.is-selected:hover:not(:disabled),
 .fluent-navigation__item.is-selected:active:not(:disabled) {
-  background: var(--fluent-selection);
+  color: var(--fluent-emphasis-text);
+  background: var(--fluent-emphasis-fill);
 }
 .fluent-navigation__item.is-selected::before {
-  content: "";
+  content: none;
+}
+.fluent-navigation__label {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fluent-navigation__indicator {
   position: absolute;
   inset-inline-start: 0;
   top: calc(50% - 8px);
   width: 3px;
   height: 16px;
   border-radius: 2px;
-  background: var(--fluent-accent);
+  background: var(--fluent-emphasis-bar);
+  pointer-events: none;
+}
+@media (forced-colors: active) {
+  .fluent-navigation__item.is-selected {
+    color: HighlightText;
+    background: Highlight;
+  }
+  .fluent-navigation__indicator {
+    background: HighlightText;
+  }
 }
