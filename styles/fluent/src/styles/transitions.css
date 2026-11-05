@@ -7,6 +7,10 @@ html[data-fluent-view-transition]::view-transition-group(*) {
 html[data-fluent-view-transition]::view-transition-image-pair(*) {
   isolation: auto;
 }
+/* The fade style's plus-lighter cross-fade only sums correctly inside an isolated pair. */
+html[data-fluent-view-transition]::view-transition-image-pair(fluent-view) {
+  isolation: isolate;
+}
 html[data-fluent-view-transition]::view-transition-old(*),
 html[data-fluent-view-transition]::view-transition-new(*) {
   inset: 0;
@@ -32,7 +36,7 @@ html[data-fluent-view-transition]::view-transition-new(fluent-view) {
   inset-block-start: 0;
   inline-size: 100%;
   block-size: 100%;
-  mix-blend-mode: plus-lighter;
+  mix-blend-mode: normal;
   animation-duration: var(--fluent-view-duration);
   animation-timing-function: var(--fluent-view-ease);
   animation-fill-mode: both;
@@ -46,9 +50,9 @@ html[data-fluent-view-transition="entrance"]::view-transition-old(fluent-view) {
 }
 html[data-fluent-view-transition="entrance"]::view-transition-new(fluent-view) { animation-name: fluent-view-rise; }
 
-/* fade */
-html[data-fluent-view-transition="fade"]::view-transition-old(fluent-view) { animation-name: fluent-view-out; animation-timing-function: linear; }
-html[data-fluent-view-transition="fade"]::view-transition-new(fluent-view) { animation-name: fluent-view-in; animation-timing-function: linear; }
+/* fade: complementary linear opacities, so plus-lighter keeps the cross-fade from dipping */
+html[data-fluent-view-transition="fade"]::view-transition-old(fluent-view) { animation-name: fluent-view-out; animation-timing-function: linear; mix-blend-mode: plus-lighter; }
+html[data-fluent-view-transition="fade"]::view-transition-new(fluent-view) { animation-name: fluent-view-in; animation-timing-function: linear; mix-blend-mode: plus-lighter; }
 
 /* slide */
 html[data-fluent-view-transition="slide"]::view-transition-old(fluent-view) { animation-name: fluent-view-slide-out-left; }
