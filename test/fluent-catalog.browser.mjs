@@ -35,7 +35,7 @@ try {
   assert.equal(await page.locator(".fluent-progress-bar--snap .fluent-progress-bar__indicator").textContent(), "60%");
   assert.equal(await page.locator(".fluent-progress-bar--snap .fluent-progress-bar__tick").count(), 11);
   assert.equal(await page.locator(".fluent-progress-ring").count(), 4);
-  assert.equal(await page.locator(".fluent-navigation").count(), 1);
+  assert.equal(await page.locator(".catalog-sidebar .fluent-navigation").count(), 1);
   assert.equal(await page.locator("#choices").getByRole("checkbox").count(), 3);
   assert.equal(await page.getByRole("checkbox", { name: "Partially selected" }).evaluate(node => node.indeterminate), true);
   const radioLayout = await page.locator(".fluent-radio").first().evaluate(node => { const input = node.querySelector("input").getBoundingClientRect(); const label = node.querySelector("span").getBoundingClientRect(); return Math.abs((input.top + input.height / 2) - (label.top + label.height / 2)); });
@@ -201,7 +201,7 @@ try {
   await fieldInput.hover(); await waitForHover();
   assert.equal(await background(fieldInput), controlHover, "field hover does not use the reference hover surface");
   assert.notEqual(await background(fieldInput), fieldRest, "field hover has no visual state");
-  const selectedNav = page.locator(".fluent-navigation__item.is-selected");
+  const selectedNav = page.locator(".catalog-sidebar .fluent-navigation__item.is-selected");
   const selectedNavRest = await background(selectedNav);
   await selectedNav.hover(); await waitForHover();
   assert.equal(await background(selectedNav), selectedNavRest, "selected navigation item was overwritten by hover");

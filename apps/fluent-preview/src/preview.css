@@ -3,20 +3,18 @@
 
 .graphics-comparison{display:flex;flex-wrap:wrap;gap:24px}.graphics-comparison p{margin:0 0 8px}.graphics-target{width:96px;height:96px;display:grid;place-items:center;background:var(--fluent-control);border:1px solid var(--fluent-border);border-radius:var(--fluent-control-radius)}.graphics-note{margin:0;max-width:70ch;color:var(--fluent-muted);line-height:1.5}
 
-.catalog-header{flex-wrap:wrap;row-gap:10px;padding-block:12px}
+.catalog-header{padding-block:12px}
 .catalog-header .catalog-kicker{margin:0 0 2px}
 .catalog-header h1{font-size:1.4rem}
 .catalog-header .fluent-select,.pref-bar .fluent-select{display:flex;align-items:center;gap:8px}
-.catalog-header .fluent-select__label{color:var(--fluent-muted);font-size:.8rem;font-weight:400;white-space:nowrap}
-.catalog-header > div:first-child{order:1;flex:1 1 auto}
-.catalog-header .catalog-settings{order:2}
-.catalog-header .pref-bar{order:3;flex:1 1 100%}
+.catalog-header .fluent-select__label,.pref-bar .fluent-select__label{color:var(--fluent-muted);font-size:.8rem;font-weight:400;white-space:nowrap}
 .catalog-sidebar{top:var(--catalog-header-height,86px)}
-.pref-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px}
-.pref-item{display:flex;align-items:center;gap:8px}
+.catalog-main{display:flex;flex-direction:column}
+.pref-bar{position:sticky;top:var(--catalog-header-height,86px);z-index:3;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:8px 12px;background:var(--fluent-surface);border:1px solid var(--fluent-border);border-radius:var(--fluent-panel-radius)}
+.pref-item{display:flex;align-items:center;gap:6px}
 .pref-label,.pref-bar label{color:var(--fluent-muted);font-size:.8rem;white-space:nowrap}
 .pref-bar label{display:flex;align-items:center;gap:8px}
-.pref-bar .fluent-segmented__item{min-height:26px;padding:0 8px;font-size:.85rem}
+.pref-bar .fluent-segmented__item{min-height:26px;padding:0 6px;font-size:.85rem}
 .pref-bar .fluent-select__control{min-height:28px}
 
 .pref-note{margin:0;color:var(--fluent-muted);font-size:.85rem;line-height:1.5}
@@ -24,7 +22,6 @@
 .pref-wide{grid-column:1/-1}
 .pref-placeholder{border:1px dashed var(--fluent-border);border-radius:var(--fluent-panel-radius)}
 .catalog-card h3{margin:0;font-size:1rem}
-#pref-page-transitions{border-style:dashed}
 .motion-probe,.curve-probe{display:none}
 .motion-probe{transition-duration:var(--fluent-faster),var(--fluent-fast),var(--fluent-normal)}
 
@@ -53,4 +50,25 @@
 .corner-sample .fluent-segmented{justify-self:start}
 .corner-panel{padding:12px;background:var(--fluent-surface);border:1px solid var(--fluent-border);border-radius:var(--fluent-panel-radius)}
 
-@media (max-width:760px){.catalog-header{position:static}.catalog-sidebar{top:auto}}
+@media (max-width:760px){.catalog-header,.pref-bar{position:static}.catalog-sidebar{top:auto}}
+
+.transition-controls{display:flex;align-items:center;flex-wrap:wrap;gap:12px}
+.transition-controls .fluent-select{display:flex;align-items:center;gap:8px}
+.transition-demo{display:grid;grid-template-columns:150px minmax(0,1fr);height:360px;overflow:hidden;background:var(--fluent-bg);border:1px solid var(--fluent-border);border-radius:var(--fluent-panel-radius)}
+.transition-demo .fluent-navigation{padding:10px 8px;border-inline-end:1px solid var(--fluent-border)}
+.transition-stage{min-width:0;min-height:0}
+.transition-stage .fluent-transition-view{height:100%;overflow:hidden;background:var(--fluent-surface)}
+.mini-page{display:grid;align-content:start;gap:12px;height:100%;padding:16px}
+.mini-page h4{margin:0;font-size:1rem}
+.mini-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.mini-row{margin:0;padding:10px 0;border-bottom:1px solid var(--fluent-border)}
+.mini-pill{min-height:28px;padding:0 18px;color:var(--fluent-accent-text);font:inherit;font-weight:600;background:var(--fluent-accent);border:0;border-radius:14px;cursor:pointer}
+.mini-compose{display:grid;align-content:start;gap:12px;height:260px;padding:16px;background:var(--fluent-control);border:1px solid var(--fluent-border);border-radius:var(--fluent-panel-radius)}
+.mini-compose__body{color:var(--fluent-muted)}
+.mini-compose .fluent-button{justify-self:start}
+.mini-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.mini-thumb{aspect-ratio:4/3;border:0;border-radius:var(--fluent-radius);cursor:pointer}
+.mini-photo{height:240px;border-radius:var(--fluent-panel-radius)}
+@media (max-width:520px){.transition-demo{grid-template-columns:1fr;grid-template-rows:auto 1fr}}
+
+::view-transition-group(fluent-view){overflow:clip}

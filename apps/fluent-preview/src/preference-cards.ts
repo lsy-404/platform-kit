@@ -1,33 +1,9 @@
-import { defineComponent, h, onBeforeUnmount, onMounted, reactive, ref, watch, type PropType, type VNode } from "vue";
+import { defineComponent, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch, type PropType, type VNode } from "vue";
 import { FluentButton, FluentField, FluentNavigation, FluentSegmented, FluentSwitch, fluentPreferenceOptions, type FluentCorner, type FluentEmphasis, type FluentMotion } from "@platform-kit/fluent/vue";
 import { easingPath, parseEasing } from "./curves.js";
 import { preferenceLabel, preferences } from "./preferences.js";
-
-const card = (id: string, title: string, note: string | null, children: (VNode | VNode[])[], wide = false) => h("section", { class: ["catalog-card", { "pref-wide": wide }], id, "aria-labelledby": `${id}-title` }, [
-  h("h3", { id: `${id}-title` }, title),
-  note ? h("p", { class: "pref-note" }, note) : null,
-  ...children,
-]);
-
-// Selection demos hold animated components, so they only mount once their card scrolls into view.
-const WhenVisible = defineComponent({
-  props: { height: { type: Number, default: 320 } },
-  setup(props, { slots }) {
-    const shown = ref(false);
-    const placeholder = ref<HTMLElement | null>(null);
-    let observer: IntersectionObserver | undefined;
-    onMounted(() => {
-      observer = new IntersectionObserver((entries) => {
-        if (!entries.some((entry) => entry.isIntersecting)) return;
-        shown.value = true;
-        observer?.disconnect();
-      });
-      if (placeholder.value) observer.observe(placeholder.value);
-    });
-    onBeforeUnmount(() => observer?.disconnect());
-    return () => shown.value ? slots.default?.() : h("div", { ref: placeholder, class: "pref-placeholder", style: { minHeight: `${props.height}px` }, "aria-hidden": "true" });
-  },
-});
+import { card } from "./card.js";
+import { TransitionsCard } from "./transition-card.js";
 
 function useMotionDurations() {
   const element = ref<HTMLElement | null>(null);
@@ -130,14 +106,14 @@ const MotionCard = defineComponent({
     onBeforeUnmount(() => clearInterval(timer));
     return () => card("pref-motion", "Selection motion", "How the selection indicator moves between items.", [
       h(FluentSwitch, { modelValue: auto.value, label: "Auto-play", "data-testid": "motion-autoplay", "onUpdate:modelValue": (value: boolean) => { auto.value = value; } }),
-      h(WhenVisible, { height: 640 }, () => h("div", { class: "selection-rows" }, fluentPreferenceOptions.motion.map((name) => row(name, "motion", h(SelectionDemo, { motion: name, tick: tick.value }))))),
+      h("div", { class: "selection-rows" }, fluentPreferenceOptions.motion.map((name) => row(name, "motion", h(SelectionDemo, { motion: name, tick: tick.value })))),
     ], true);
   },
 });
 
 const EmphasisCard = defineComponent({
   setup: () => () => card("pref-emphasis", "Emphasis styles", "Selected-item styling in the current theme and accent.", [
-    h(WhenVisible, { height: 800 }, () => h("div", { class: "selection-rows" }, fluentPreferenceOptions.emphasis.map((name) => row(name, "emphasis", h(SelectionDemo, { emphasis: name }))))),
+    h("div", { class: "selection-rows" }, fluentPreferenceOptions.emphasis.map((name) => row(name, "emphasis", h(SelectionDemo, { emphasis: name })))),
   ], true),
 });
 
@@ -159,14 +135,15 @@ const CornersCard = defineComponent({
   },
 });
 
-const TransitionsPlaceholder = defineComponent({
-  setup: () => () => card("pref-page-transitions", "Page transitions", "Placeholder: previews for the page transition preference will be added here.", [], true),
-});
-
 export const PreferencesSection = defineComponent({
-  setup: () => () => h("section", { class: "catalog-section", id: "preferences" }, [
-    h("h2", "Preferences"),
-    h("p", { class: "pref-note" }, "Every style preference of the kit can be switched from the header and previews live. The state is kept in the address bar so a configuration can be shared."),
-    h("div", { class: "catalog-grid pref-grid" }, [h(CurvesCard), h(MotionCard), h(EmphasisCard), h(CornersCard), h(TransitionsPlaceholder)]),
-  ]),
+  setup() {
+    // Mounting a FluentNavigation scrolls its selected item into view, which would drag the page down to this section.
+    const scrollY = window.scrollY;
+    onMounted(() => void nextTick(() => window.scrollTo({ top: scrollY, behavior: "instant" })));
+    return () => h("section", { class: "catalog-section", id: "preferences" }, [
+      h("h2", "Preferences"),
+      h("p", { class: "pref-note" }, "Every style preference of the kit can be switched from the header and previews live. The state is kept in the address bar so a configuration can be shared."),
+      h("div", { class: "catalog-grid pref-grid" }, [h(CurvesCard), h(MotionCard), h(EmphasisCard), h(CornersCard), h(TransitionsCard)]),
+    ]);
+  },
 });

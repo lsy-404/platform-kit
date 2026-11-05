@@ -1,4 +1,4 @@
-import { defineComponent, h, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { defineComponent, h, onBeforeUnmount, onMounted, reactive, watch } from "vue";
 import { FluentButton, FluentSegmented, FluentSelect, fluentDefaultPreferences, fluentPreferenceOptions, type FluentPreferences } from "@platform-kit/fluent/vue";
 
 export type PreferenceKey = keyof FluentPreferences;
@@ -38,24 +38,23 @@ const segmented: { key: PreferenceKey; label: string; testId: string }[] = [
 const selects: { key: PreferenceKey; label: string; testId: string }[] = [
   { key: "curve", label: "Curve", testId: "pref-curve" },
   { key: "emphasis", label: "Emphasis", testId: "pref-emphasis" },
-  { key: "pageTransition", label: "Page transition", testId: "pref-page-transition" },
+  { key: "pageTransition", label: "Transition", testId: "pref-page-transition" },
 ];
 
 export const PreferenceBar = defineComponent({
   name: "PreferenceBar",
   setup() {
-    const root = ref<HTMLElement | null>(null);
     let observer: ResizeObserver | undefined;
-    // The sidebar sticks below the header, whose height changes as the bar wraps.
+    // The sidebar and toolbar stick below the header, whose height depends on the viewport.
     onMounted(() => {
-      const header = root.value?.closest<HTMLElement>(".catalog-header");
+      const header = document.querySelector<HTMLElement>(".catalog-header");
       if (!header) return;
       observer = new ResizeObserver(() => document.documentElement.style.setProperty("--catalog-header-height", `${header.offsetHeight}px`));
       observer.observe(header);
     });
     onBeforeUnmount(() => observer?.disconnect());
     const update = (key: PreferenceKey) => (value: string | number) => { (preferences as Record<PreferenceKey, string>)[key] = String(value); };
-    return () => h("div", { ref: root, class: "pref-bar", role: "group", "aria-label": "Style preferences" }, [
+    return () => h("div", { class: "pref-bar", role: "group", "aria-label": "Style preferences" }, [
       ...segmented.map(({ key, label, testId }) => h("div", { class: "pref-item", key }, [
         h("span", { class: "pref-label" }, label),
         h(FluentSegmented, { label, "data-testid": testId, modelValue: preferences[key], options: preferenceOptions(key), "onUpdate:modelValue": update(key) }),
