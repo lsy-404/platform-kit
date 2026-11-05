@@ -26,6 +26,11 @@ html[data-fluent-view-transition]::view-transition-new(*) { animation-name: flue
 html[data-fluent-view-transition]::view-transition-old(*):only-child { animation-name: fluent-view-out; }
 html[data-fluent-view-transition]::view-transition-new(*):only-child { animation-name: fluent-view-in; }
 
+/* Sliding or scaling content stays inside the view's own box instead of covering its neighbours. */
+html[data-fluent-view-transition]::view-transition-group(fluent-view) {
+  overflow: clip;
+}
+
 html[data-fluent-view-transition]::view-transition-old(root),
 html[data-fluent-view-transition]::view-transition-new(root) {
   animation: none;

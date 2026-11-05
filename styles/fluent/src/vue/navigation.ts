@@ -43,9 +43,19 @@ export const FluentNavigation = defineComponent({
     const selectedIndex = computed(() =>
       props.items.findIndex((item) => item.key === props.modelValue),
     );
+    // Scrolls only the navigation's own list, so selecting an item never moves the page around it.
+    function reveal(key: string): void {
+      const list = root.value;
+      const item = itemEls.get(key);
+      if (!list || !item || list.scrollHeight <= list.clientHeight) return;
+      const top = item.offsetTop;
+      const bottom = top + item.offsetHeight;
+      if (top < list.scrollTop) list.scrollTop = top;
+      else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight;
+    }
     watch(
       () => props.modelValue,
-      (value) => void nextTick(() => itemEls.get(value)?.scrollIntoView({ block: "nearest" })),
+      (value) => void nextTick(() => reveal(value)),
       { immediate: true },
     );
     function select(item: FluentNavigationItem): void {

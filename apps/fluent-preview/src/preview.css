@@ -70,5 +70,3 @@
 .mini-thumb{aspect-ratio:4/3;border:0;border-radius:var(--fluent-radius);cursor:pointer}
 .mini-photo{height:240px;border-radius:var(--fluent-panel-radius)}
 @media (max-width:520px){.transition-demo{grid-template-columns:1fr;grid-template-rows:auto 1fr}}
-
-::view-transition-group(fluent-view){overflow:clip}

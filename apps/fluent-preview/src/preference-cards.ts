@@ -1,4 +1,4 @@
-import { defineComponent, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch, type PropType, type VNode } from "vue";
+import { defineComponent, h, onBeforeUnmount, onMounted, reactive, ref, watch, type PropType, type VNode } from "vue";
 import { FluentButton, FluentField, FluentNavigation, FluentSegmented, FluentSwitch, fluentPreferenceOptions, type FluentCorner, type FluentEmphasis, type FluentMotion } from "@platform-kit/fluent/vue";
 import { easingPath, parseEasing } from "./curves.js";
 import { preferenceLabel, preferences } from "./preferences.js";
@@ -137,9 +137,6 @@ const CornersCard = defineComponent({
 
 export const PreferencesSection = defineComponent({
   setup() {
-    // Mounting a FluentNavigation scrolls its selected item into view, which would drag the page down to this section.
-    const scrollY = window.scrollY;
-    onMounted(() => void nextTick(() => window.scrollTo({ top: scrollY, behavior: "instant" })));
     return () => h("section", { class: "catalog-section", id: "preferences" }, [
       h("h2", "Preferences"),
       h("p", { class: "pref-note" }, "Every style preference of the kit can be switched from the header and previews live. The state is kept in the address bar so a configuration can be shared."),
