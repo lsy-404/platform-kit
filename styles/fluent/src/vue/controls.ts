@@ -372,6 +372,12 @@ export const FluentSwitch = defineComponent({
   },
 });
 
+function glideDuration(input: HTMLElement | null): number {
+  if (!input || typeof getComputedStyle !== "function") return 0;
+  const scale = Number.parseFloat(getComputedStyle(input).getPropertyValue("--fluent-motion-scale"));
+  return Number.isFinite(scale) && scale > 0 ? 167 * scale : 0;
+}
+
 export const FluentSlider = defineComponent({
   name: "FluentSlider",
   inheritAttrs: false,
@@ -387,7 +393,7 @@ export const FluentSlider = defineComponent({
     tone: { type: String as PropType<FluentSliderTone>, default: "accent" },
     snap: String as PropType<FluentSliderSnap>,
     orientation: { type: String as PropType<FluentSliderOrientation>, default: "horizontal" },
-    tickPlacement: { type: String as PropType<FluentSliderTickPlacement>, default: "outside" },
+    tickPlacement: String as PropType<FluentSliderTickPlacement>,
     formatValue: Function as PropType<(value: number) => string>,
     label: String,
     disabled: Boolean,
@@ -402,6 +408,7 @@ export const FluentSlider = defineComponent({
     const stopValues = () => sliderAvailableValues(props.stops?.map((stop) => stop.value) ?? props.availableValues, props.min, props.max);
     const targetValue = computed(() => sliderValue(props.modelValue, props.min, props.max, snapMode(), enabledValues()));
     const shown = ref(targetValue.value);
+    const inputRef = ref<HTMLInputElement | null>(null);
     const dragging = ref(false);
     let frame = 0;
     const stopAnimation = () => {
@@ -411,11 +418,9 @@ export const FluentSlider = defineComponent({
     watch(targetValue, (to, from) => {
       stopAnimation();
       if (to === shown.value) return;
-      const animate = !dragging.value && typeof requestAnimationFrame === "function"
-        && !(typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches);
-      if (!animate) { shown.value = to; return; }
+      const duration = dragging.value || typeof requestAnimationFrame !== "function" ? 0 : glideDuration(inputRef.value);
+      if (!duration) { shown.value = to; return; }
       const start = performance.now();
-      const duration = 180;
       const step = (now: number) => {
         const t = Math.min(1, (now - start) / duration);
         shown.value = from + (to - from) * (1 - (1 - t) ** 3);
@@ -471,8 +476,11 @@ export const FluentSlider = defineComponent({
       const majorTicks = sliderTicks(props.min, props.max, props.majorTickFrequency, []);
       const ticks = sliderTicks(props.min, props.max, props.tickFrequency, [...available, ...majorTicks]);
       const majorValues = new Set(majorTicks);
-      const hasStartTicks = ticks.length > 0 && props.tickPlacement !== "end";
-      const hasEndTicks = ticks.length > 0 && props.tickPlacement !== "start";
+      const tickPlacement = props.tickPlacement ?? (labelled.length ? "end" : "outside");
+      const hasStartTicks = ticks.length > 0 && tickPlacement !== "end";
+      const hasEndTicks = ticks.length > 0 && tickPlacement !== "start";
+      const activeStop = labelled.find((stop) => stop.value === targetValue.value);
+      const valueText = props.formatValue?.(targetValue.value) ?? activeStop?.label;
       const markPosition = (mark: number) => props.orientation === "vertical"
         ? { bottom: `${sliderPercentage(mark, props.min, props.max)}%` }
         : { insetInlineStart: `${sliderPercentage(mark, props.min, props.max)}%` };
@@ -498,11 +506,9 @@ export const FluentSlider = defineComponent({
       }] }, [
         props.label ? h("span", { class: "fluent-slider__header" }, [
           h("span", { class: "fluent-slider__label" }, props.label),
-          h(
-            "output",
-            { class: "fluent-slider__value" },
-            props.formatValue?.(targetValue.value) ?? String(targetValue.value),
-          ),
+          props.formatValue || !labelled.length
+            ? h("output", { class: "fluent-slider__value" }, props.formatValue?.(targetValue.value) ?? String(targetValue.value))
+            : null,
         ]) : null,
         h("span", { class: ["fluent-slider__rail", {
           "fluent-slider__rail--marked": ticks.length > 0,
@@ -510,6 +516,7 @@ export const FluentSlider = defineComponent({
           "fluent-slider__rail--end": hasEndTicks,
         }] }, [
           h("input", mergeProps(attrs, {
+            ref: inputRef,
             class: ["fluent-slider__input", attrs.class],
             type: "range",
             value,
@@ -520,6 +527,7 @@ export const FluentSlider = defineComponent({
             disabled: props.disabled,
             "aria-label": attrs["aria-label"] ?? props.label,
             "aria-orientation": props.orientation === "vertical" ? "vertical" : undefined,
+            "aria-valuetext": labelled.length ? valueText : undefined,
             style: {
               "--fluent-slider-position": `${sliderPercentage(value, props.min, props.max)}%`,
             },
