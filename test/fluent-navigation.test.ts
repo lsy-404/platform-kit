@@ -22,7 +22,7 @@ describe("Fluent public navigation", () => {
   it("ships an item-owned selection indicator without a separate cover layer", async () => {
     const css = await readFile(new URL("../styles/fluent/src/styles/navigation.css", import.meta.url), "utf8");
     expect(css).toContain(".fluent-navigation__item.is-selected");
-    expect(css).toContain(".fluent-navigation__item.is-selected::before");
+    expect(css).toContain(".fluent-navigation__indicator");
     expect(css).not.toContain(".fluent-navigation__selection");
   });
 });

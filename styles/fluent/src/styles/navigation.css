@@ -47,9 +47,6 @@
   color: var(--fluent-emphasis-text);
   background: var(--fluent-emphasis-fill);
 }
-.fluent-navigation__item.is-selected::before {
-  content: none;
-}
 .fluent-navigation__label {
   display: block;
   overflow: hidden;
