@@ -2,6 +2,7 @@ import {
   computed,
   defineComponent,
   h,
+  inject,
   onBeforeUnmount,
   onMounted,
   onUpdated,
@@ -14,14 +15,59 @@ import {
 } from "vue";
 
 export type FluentThemeMode = "light" | "dark" | "system";
+
+export const fluentPreferenceOptions = {
+  motion: ["slide", "stretch", "fade", "none"],
+  curve: ["decelerate-max", "decelerate-mid", "decelerate-min", "easy-ease", "easy-ease-max", "ease", "linear", "spring"],
+  speed: ["faster", "fast", "normal", "slow", "slower"],
+  reducedMotion: ["system", "reduce"],
+  emphasis: ["indicator", "neutral", "tinted", "filled", "underline"],
+  corner: ["none", "small", "medium", "large"],
+} as const;
+
+export type FluentMotion = (typeof fluentPreferenceOptions.motion)[number];
+export type FluentCurve = (typeof fluentPreferenceOptions.curve)[number];
+export type FluentSpeed = (typeof fluentPreferenceOptions.speed)[number];
+export type FluentReducedMotion = (typeof fluentPreferenceOptions.reducedMotion)[number];
+export type FluentEmphasis = (typeof fluentPreferenceOptions.emphasis)[number];
+export type FluentCorner = (typeof fluentPreferenceOptions.corner)[number];
+
+export interface FluentPreferences {
+  motion: FluentMotion;
+  curve: FluentCurve;
+  speed: FluentSpeed;
+  reducedMotion: FluentReducedMotion;
+  emphasis: FluentEmphasis;
+  corner: FluentCorner;
+}
+
+export const fluentDefaultPreferences: Readonly<FluentPreferences> = {
+  motion: "slide",
+  curve: "decelerate-mid",
+  speed: "normal",
+  reducedMotion: "system",
+  emphasis: "indicator",
+  corner: "medium",
+};
+
 export interface FluentThemeState {
   mode: "light" | "dark";
   accent?: string;
   accentText?: string;
+  preferences: FluentPreferences;
   resolveTokens?: () => Record<string, string>;
 }
 export const fluentThemeKey: InjectionKey<ComputedRef<FluentThemeState>> =
   Symbol("fluent-theme");
+
+const preferenceAttributes: Record<keyof FluentPreferences, string> = {
+  motion: "data-fluent-motion",
+  curve: "data-fluent-curve",
+  speed: "data-fluent-speed",
+  reducedMotion: "data-fluent-reduced-motion",
+  emphasis: "data-fluent-emphasis",
+  corner: "data-fluent-corner",
+};
 
 function accentTextFor(color: string): string | undefined {
   if (typeof document === "undefined") return undefined;
@@ -49,8 +95,26 @@ export const FluentTheme = defineComponent({
     mode: { type: String as PropType<FluentThemeMode>, default: "system" },
     accent: String,
     accentText: String,
+    motion: String as PropType<FluentMotion>,
+    curve: String as PropType<FluentCurve>,
+    speed: String as PropType<FluentSpeed>,
+    reducedMotion: String as PropType<FluentReducedMotion>,
+    emphasis: String as PropType<FluentEmphasis>,
+    corner: String as PropType<FluentCorner>,
   },
   setup(props, { slots, attrs }) {
+    const parent = inject(fluentThemeKey, undefined);
+    const preferences = computed<FluentPreferences>(() => {
+      const inherited = parent?.value.preferences ?? fluentDefaultPreferences;
+      return {
+        motion: props.motion ?? inherited.motion,
+        curve: props.curve ?? inherited.curve,
+        speed: props.speed ?? inherited.speed,
+        reducedMotion: props.reducedMotion ?? inherited.reducedMotion,
+        emphasis: props.emphasis ?? inherited.emphasis,
+        corner: props.corner ?? inherited.corner,
+      };
+    });
     const element = ref<HTMLElement | null>(null);
     const systemDark = ref(false);
     const tokens = shallowRef<Record<string, string>>({});
@@ -87,14 +151,22 @@ export const FluentTheme = defineComponent({
           : props.mode,
       ...(props.accent ? { accent: props.accent } : {}),
       ...(accentText.value ? { accentText: accentText.value } : {}),
+      preferences: preferences.value,
       resolveTokens: () => tokens.value,
     }));
     provide(fluentThemeKey, theme);
+    // Only explicit props become attributes, so an unset preference keeps inheriting through CSS.
+    const preferenceAttrs = () => Object.fromEntries(
+      (Object.keys(preferenceAttributes) as (keyof FluentPreferences)[])
+        .filter((key) => props[key] !== undefined)
+        .map((key) => [preferenceAttributes[key], props[key]]),
+    );
     return () =>
       h(
         "div",
         {
           ...attrs,
+          ...preferenceAttrs(),
           ref: element,
           class: ["fluent-theme", attrs.class],
           "data-fluent-theme": theme.value.mode,

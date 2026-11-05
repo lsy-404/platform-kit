@@ -29,11 +29,18 @@
   --fluent-input-invalid: #c42b1c;
   --fluent-success: #0f7b45;
   --fluent-warning: #9d5d00;
+  --fluent-control-solid: #ffffff;
+  --fluent-control-strong: rgba(0, 0, 0, 0.447);
+  --fluent-control-strong-disabled: rgba(0, 0, 0, 0.318);
+  --fluent-control-alt: rgba(0, 0, 0, 0.024);
+  --fluent-accent-disabled: rgba(0, 0, 0, 0.216);
   --fluent-radius: 4px;
   --fluent-panel-radius: 8px;
   --fluent-shadow: 0 8px 28px rgba(0, 0, 0, 0.16), 0 0 1px rgba(0, 0, 0, 0.2);
-  --fluent-fast: 160ms;
-  --fluent-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --fluent-motion-scale: 1;
+  --fluent-ease: cubic-bezier(0, 0, 0, 1);
+  --fluent-ease-accelerate: cubic-bezier(0.9, 0.1, 1, 0.2);
+  --fluent-indicator-motion: slide;
   --fluent-font:
     "Segoe UI Variable Text", "Segoe UI", system-ui, "Noto Sans SC", sans-serif;
   font: 14px/1.5 var(--fluent-font);
@@ -66,8 +73,94 @@
   --fluent-input-invalid: #ff99a4;
   --fluent-success: #6ccb5f;
   --fluent-warning: #fce100;
+  --fluent-control-solid: #454545;
+  --fluent-control-strong: rgba(255, 255, 255, 0.545);
+  --fluent-control-strong-disabled: rgba(255, 255, 255, 0.247);
+  --fluent-control-alt: rgba(0, 0, 0, 0.098);
+  --fluent-accent-disabled: rgba(255, 255, 255, 0.157);
   --fluent-shadow:
     0 8px 28px rgba(0, 0, 0, 0.36), 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+/* Durations are re-derived wherever the scale can change, because a custom property resolves var() where it is declared. */
+.fluent-theme,
+[data-fluent-theme],
+[data-fluent-speed],
+[data-fluent-reduced-motion] {
+  --fluent-faster: calc(83ms * var(--fluent-motion-scale));
+  --fluent-fast: calc(167ms * var(--fluent-motion-scale));
+  --fluent-normal: calc(250ms * var(--fluent-motion-scale));
+}
+[data-fluent-speed="faster"] { --fluent-motion-scale: 0.5; }
+[data-fluent-speed="fast"] { --fluent-motion-scale: 0.75; }
+[data-fluent-speed="normal"] { --fluent-motion-scale: 1; }
+[data-fluent-speed="slow"] { --fluent-motion-scale: 1.5; }
+[data-fluent-speed="slower"] { --fluent-motion-scale: 2; }
+
+[data-fluent-curve="decelerate-max"] { --fluent-ease: cubic-bezier(0.1, 0.9, 0.2, 1); }
+[data-fluent-curve="decelerate-mid"] { --fluent-ease: cubic-bezier(0, 0, 0, 1); }
+[data-fluent-curve="decelerate-min"] { --fluent-ease: cubic-bezier(0.33, 0, 0.1, 1); }
+[data-fluent-curve="easy-ease"] { --fluent-ease: cubic-bezier(0.33, 0, 0.67, 1); }
+[data-fluent-curve="easy-ease-max"] { --fluent-ease: cubic-bezier(0.8, 0, 0.2, 1); }
+[data-fluent-curve="ease"] { --fluent-ease: cubic-bezier(0.25, 0.1, 0.25, 1); }
+[data-fluent-curve="linear"] { --fluent-ease: linear; }
+/* Damped spring (damping ratio 0.62) sampled at 25 points; it overshoots by about 8%. */
+[data-fluent-curve="spring"] {
+  --fluent-ease: linear(0, 0.079, 0.259, 0.472, 0.672, 0.836, 0.955, 1.031, 1.071, 1.083, 1.079, 1.064, 1.047, 1.03, 1.016, 1.005, 0.998, 0.994, 0.993, 0.993, 0.994, 0.996, 0.997, 0.999, 1);
+}
+
+[data-fluent-motion="slide"] { --fluent-indicator-motion: slide; }
+[data-fluent-motion="stretch"] { --fluent-indicator-motion: stretch; }
+[data-fluent-motion="fade"] { --fluent-indicator-motion: fade; }
+[data-fluent-motion="none"] { --fluent-indicator-motion: none; }
+
+[data-fluent-corner="none"] { --fluent-radius: 0px; --fluent-panel-radius: 0px; }
+[data-fluent-corner="small"] { --fluent-radius: 2px; --fluent-panel-radius: 4px; }
+[data-fluent-corner="medium"] { --fluent-radius: 4px; --fluent-panel-radius: 8px; }
+[data-fluent-corner="large"] { --fluent-radius: 8px; --fluent-panel-radius: 12px; }
+
+/* Selected-item colours for navigation and segmented controls. */
+.fluent-theme,
+[data-fluent-theme],
+[data-fluent-emphasis="indicator"] {
+  --fluent-emphasis-fill: var(--fluent-selection);
+  --fluent-emphasis-raised: var(--fluent-control);
+  --fluent-emphasis-edge: var(--fluent-border);
+  --fluent-emphasis-edge-bottom: var(--fluent-button-edge);
+  --fluent-emphasis-text: var(--fluent-text);
+  --fluent-emphasis-bar: var(--fluent-accent);
+}
+[data-fluent-emphasis="neutral"] {
+  --fluent-emphasis-fill: var(--fluent-selection);
+  --fluent-emphasis-raised: var(--fluent-control);
+  --fluent-emphasis-edge: var(--fluent-border);
+  --fluent-emphasis-edge-bottom: var(--fluent-button-edge);
+  --fluent-emphasis-text: var(--fluent-text);
+  --fluent-emphasis-bar: var(--fluent-text);
+}
+[data-fluent-emphasis="tinted"] {
+  --fluent-emphasis-fill: color-mix(in srgb, var(--fluent-accent) 14%, var(--fluent-control));
+  --fluent-emphasis-raised: color-mix(in srgb, var(--fluent-accent) 14%, var(--fluent-control));
+  --fluent-emphasis-edge: color-mix(in srgb, var(--fluent-accent) 45%, var(--fluent-border));
+  --fluent-emphasis-edge-bottom: color-mix(in srgb, var(--fluent-accent) 60%, var(--fluent-border));
+  --fluent-emphasis-text: var(--fluent-accent-link);
+  --fluent-emphasis-bar: var(--fluent-accent);
+}
+[data-fluent-emphasis="filled"] {
+  --fluent-emphasis-fill: var(--fluent-accent);
+  --fluent-emphasis-raised: var(--fluent-accent);
+  --fluent-emphasis-edge: var(--fluent-accent);
+  --fluent-emphasis-edge-bottom: var(--fluent-accent-pressed);
+  --fluent-emphasis-text: var(--fluent-accent-text);
+  --fluent-emphasis-bar: transparent;
+}
+[data-fluent-emphasis="underline"] {
+  --fluent-emphasis-fill: transparent;
+  --fluent-emphasis-raised: transparent;
+  --fluent-emphasis-edge: transparent;
+  --fluent-emphasis-edge-bottom: transparent;
+  --fluent-emphasis-text: var(--fluent-text);
+  --fluent-emphasis-bar: var(--fluent-accent);
 }
 .fluent-theme *,
 [data-fluent-theme] * {
@@ -86,10 +179,17 @@
   outline-offset: 1px;
   box-shadow: 0 0 0 1px var(--fluent-focus-inner);
 }
+[data-fluent-reduced-motion="reduce"],
+[data-fluent-reduced-motion="reduce"] :is([data-fluent-speed], [data-fluent-motion]) {
+  --fluent-motion-scale: 0;
+  --fluent-indicator-motion: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .fluent-theme,
-  [data-fluent-theme] {
-    --fluent-fast: 0ms;
+  [data-fluent-theme],
+  :is(.fluent-theme, [data-fluent-theme]) :is([data-fluent-speed], [data-fluent-motion]) {
+    --fluent-motion-scale: 0;
+    --fluent-indicator-motion: none;
   }
   .fluent-theme *,
   [data-fluent-theme] * {

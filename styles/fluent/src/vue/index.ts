@@ -1,5 +1,15 @@
-export { FluentTheme, fluentThemeKey } from "../theme.js";
-export type { FluentThemeState, FluentThemeMode } from "../theme.js";
+export { FluentTheme, fluentThemeKey, fluentPreferenceOptions, fluentDefaultPreferences } from "../theme.js";
+export type {
+  FluentThemeState,
+  FluentThemeMode,
+  FluentPreferences,
+  FluentMotion,
+  FluentCurve,
+  FluentSpeed,
+  FluentReducedMotion,
+  FluentEmphasis,
+  FluentCorner,
+} from "../theme.js";
 export {
   FluentButton,
   FluentToggleButton,
