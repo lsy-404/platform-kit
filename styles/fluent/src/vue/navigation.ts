@@ -3,9 +3,12 @@ import {
   defineComponent,
   h,
   nextTick,
+  ref,
   watch,
   type PropType,
 } from "vue";
+import type { FluentEmphasis, FluentMotion } from "../theme.js";
+import { animateSelectionIndicator, captureSelectionIndicator } from "../behavior/selectionIndicator.js";
 
 export interface FluentNavigationItem {
   key: string;
@@ -19,10 +22,24 @@ export const FluentNavigation = defineComponent({
     items: { type: Array as PropType<FluentNavigationItem[]>, required: true },
     modelValue: { type: String, required: true },
     label: { type: String, default: "Navigation" },
+    motion: { type: String as PropType<FluentMotion>, default: undefined },
+    emphasis: { type: String as PropType<FluentEmphasis>, default: undefined },
   },
   emits: ["update:modelValue", "select"],
   setup(props, { emit }) {
     const itemEls = new Map<string, HTMLElement>();
+    const root = ref<HTMLElement | null>(null);
+    let previousRect: DOMRect | null = null;
+    const findIndicator = () => root.value?.querySelector<HTMLElement>(".fluent-navigation__indicator");
+    watch(() => props.modelValue, () => { previousRect = captureSelectionIndicator(findIndicator()); }, { flush: "pre" });
+    watch(
+      () => props.modelValue,
+      () => {
+        animateSelectionIndicator(findIndicator(), "y", previousRect);
+        previousRect = null;
+      },
+      { flush: "post" },
+    );
     const selectedIndex = computed(() =>
       props.items.findIndex((item) => item.key === props.modelValue),
     );
@@ -77,7 +94,10 @@ export const FluentNavigation = defineComponent({
       h(
         "nav",
         {
+          ref: root,
           class: "fluent-navigation",
+          "data-fluent-motion": props.motion,
+          "data-fluent-emphasis": props.emphasis,
           "aria-label": props.label,
           onKeydown,
         },
@@ -97,7 +117,10 @@ export const FluentNavigation = defineComponent({
               "aria-current": selected ? "page" : undefined,
               onClick: () => select(item),
             },
-            item.label,
+            [
+              selected ? h("span", { class: "fluent-navigation__indicator", "aria-hidden": "true" }) : null,
+              h("span", { class: "fluent-navigation__label" }, item.label),
+            ],
           );
         }),
       );
