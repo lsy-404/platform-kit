@@ -1,0 +1,113 @@
+html[data-fluent-view-transition]::view-transition-group(*) {
+  animation-duration: var(--fluent-view-duration);
+  animation-timing-function: var(--fluent-view-ease);
+}
+
+/* Shared and morphing elements: snapshots are never upscaled so text stays crisp, and the new one fades in over the old without blending. */
+html[data-fluent-view-transition]::view-transition-image-pair(*) {
+  isolation: auto;
+}
+/* The fade style's plus-lighter cross-fade only sums correctly inside an isolated pair. */
+html[data-fluent-view-transition]::view-transition-image-pair(fluent-view) {
+  isolation: isolate;
+}
+html[data-fluent-view-transition]::view-transition-old(*),
+html[data-fluent-view-transition]::view-transition-new(*) {
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: scale-down;
+  mix-blend-mode: normal;
+  animation-duration: var(--fluent-view-duration);
+  animation-timing-function: linear;
+}
+html[data-fluent-view-transition]::view-transition-old(*) { animation-name: fluent-view-morph-out; }
+html[data-fluent-view-transition]::view-transition-new(*) { animation-name: fluent-view-morph-in; }
+html[data-fluent-view-transition]::view-transition-old(*):only-child { animation-name: fluent-view-out; }
+html[data-fluent-view-transition]::view-transition-new(*):only-child { animation-name: fluent-view-in; }
+
+html[data-fluent-view-transition]::view-transition-old(root),
+html[data-fluent-view-transition]::view-transition-new(root) {
+  animation: none;
+}
+
+html[data-fluent-view-transition]::view-transition-old(fluent-view),
+html[data-fluent-view-transition]::view-transition-new(fluent-view) {
+  inset-block-start: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  mix-blend-mode: normal;
+  animation-duration: var(--fluent-view-duration);
+  animation-timing-function: var(--fluent-view-ease);
+  animation-fill-mode: both;
+}
+
+/* entrance */
+html[data-fluent-view-transition="entrance"]::view-transition-old(fluent-view) {
+  animation-name: fluent-view-out;
+  animation-duration: calc(var(--fluent-view-duration) * 0.4);
+  animation-timing-function: var(--fluent-view-ease-accelerate);
+}
+html[data-fluent-view-transition="entrance"]::view-transition-new(fluent-view) { animation-name: fluent-view-rise; }
+
+/* fade: complementary linear opacities, so plus-lighter keeps the cross-fade from dipping */
+html[data-fluent-view-transition="fade"]::view-transition-old(fluent-view) { animation-name: fluent-view-out; animation-timing-function: linear; mix-blend-mode: plus-lighter; }
+html[data-fluent-view-transition="fade"]::view-transition-new(fluent-view) { animation-name: fluent-view-in; animation-timing-function: linear; mix-blend-mode: plus-lighter; }
+
+/* slide */
+html[data-fluent-view-transition="slide"]::view-transition-old(fluent-view) { animation-name: fluent-view-slide-out-left; }
+html[data-fluent-view-transition="slide"]::view-transition-new(fluent-view) { animation-name: fluent-view-slide-in-right; }
+html[data-fluent-view-transition="slide"][data-fluent-view-direction="back"]::view-transition-old(fluent-view) { animation-name: fluent-view-slide-out-right; }
+html[data-fluent-view-transition="slide"][data-fluent-view-direction="back"]::view-transition-new(fluent-view) { animation-name: fluent-view-slide-in-left; }
+
+/* scale (drill) */
+html[data-fluent-view-transition="scale"]::view-transition-old(fluent-view) { animation-name: fluent-view-drill-out-in; }
+html[data-fluent-view-transition="scale"]::view-transition-new(fluent-view) { animation-name: fluent-view-drill-in-in; }
+html[data-fluent-view-transition="scale"][data-fluent-view-direction="back"]::view-transition-old(fluent-view) { animation-name: fluent-view-drill-out-back; }
+html[data-fluent-view-transition="scale"][data-fluent-view-direction="back"]::view-transition-new(fluent-view) { animation-name: fluent-view-drill-in-back; }
+
+/* wipe */
+html[data-fluent-view-transition="wipe"]::view-transition-group(fluent-view) { background: var(--fluent-view-wipe-color); }
+html[data-fluent-view-transition="wipe"]::view-transition-old(fluent-view),
+html[data-fluent-view-transition="wipe"]::view-transition-new(fluent-view) {
+  mix-blend-mode: normal;
+  animation-timing-function: linear;
+}
+html[data-fluent-view-transition="wipe"]::view-transition-old(fluent-view) { animation-name: fluent-view-wipe-cover; }
+html[data-fluent-view-transition="wipe"]::view-transition-new(fluent-view) { animation-name: fluent-view-wipe-reveal; }
+html[data-fluent-view-transition="wipe"][data-fluent-view-direction="back"]::view-transition-old(fluent-view) { animation-name: fluent-view-wipe-cover-back; }
+html[data-fluent-view-transition="wipe"][data-fluent-view-direction="back"]::view-transition-new(fluent-view) { animation-name: fluent-view-wipe-reveal-back; }
+
+@keyframes fluent-view-morph-out { from, 30% { opacity: 1; } 30.1%, to { opacity: 0; } }
+@keyframes fluent-view-morph-in { from { opacity: 0; } 30%, to { opacity: 1; } }
+
+@keyframes fluent-view-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fluent-view-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes fluent-view-rise { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: none; } }
+
+@keyframes fluent-view-slide-in-right { from { opacity: 0; transform: translateX(80px); } to { opacity: 1; transform: none; } }
+@keyframes fluent-view-slide-in-left { from { opacity: 0; transform: translateX(-80px); } to { opacity: 1; transform: none; } }
+@keyframes fluent-view-slide-out-left { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateX(-80px); } }
+@keyframes fluent-view-slide-out-right { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateX(80px); } }
+
+@keyframes fluent-view-drill-in-in { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: none; } }
+@keyframes fluent-view-drill-out-in { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(1.06); } }
+@keyframes fluent-view-drill-in-back { from { opacity: 0; transform: scale(1.06); } to { opacity: 1; transform: none; } }
+@keyframes fluent-view-drill-out-back { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(0.94); } }
+
+@keyframes fluent-view-wipe-cover {
+  from { clip-path: inset(0 0 0 0); animation-timing-function: var(--fluent-view-ease); }
+  50%, to { clip-path: inset(0 0 0 100%); }
+}
+@keyframes fluent-view-wipe-reveal {
+  from, 50% { clip-path: inset(0 100% 0 0); animation-timing-function: var(--fluent-view-ease); }
+  to { clip-path: inset(0 0 0 0); }
+}
+@keyframes fluent-view-wipe-cover-back {
+  from { clip-path: inset(0 0 0 0); animation-timing-function: var(--fluent-view-ease); }
+  50%, to { clip-path: inset(0 100% 0 0); }
+}
+@keyframes fluent-view-wipe-reveal-back {
+  from, 50% { clip-path: inset(0 0 0 100%); animation-timing-function: var(--fluent-view-ease); }
+  to { clip-path: inset(0 0 0 0); }
+}
