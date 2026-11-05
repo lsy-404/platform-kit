@@ -11,6 +11,28 @@ The source repository is public and releases are distributed as GitHub Release a
 
 `FluentTheme` supports `light`, `dark`, and `system` modes. Vue is a peer dependency.
 
+### Theme preferences
+
+`FluentTheme` also takes style preferences. Each one you set is written as a `data-fluent-*` attribute and mapped to CSS custom properties, so a nested `FluentTheme` (or the same attribute on any element inside a theme) overrides only its subtree and unset values are inherited. Plain CSS consumers can set the attributes directly.
+
+| Prop | Attribute | Values (default first) |
+| --- | --- | --- |
+| `motion` | `data-fluent-motion` | `slide`, `stretch`, `fade`, `none` — how selection indicators move |
+| `pageTransition` | `data-fluent-page-transition` | `entrance`, `fade`, `slide`, `scale`, `wipe`, `none` — how views swap |
+| `curve` | `data-fluent-curve` | `decelerate-mid`, `decelerate-max`, `decelerate-min`, `easy-ease`, `easy-ease-max`, `ease`, `linear`, `spring` |
+| `speed` | `data-fluent-speed` | `normal`, `faster` (0.5×), `fast` (0.75×), `slow` (1.5×), `slower` (2×) |
+| `reducedMotion` | `data-fluent-reduced-motion` | `system`, `reduce` (forces reduced motion for the subtree) |
+| `emphasis` | `data-fluent-emphasis` | `indicator`, `neutral`, `tinted`, `filled`, `underline` — selected-item style |
+| `corner` | `data-fluent-corner` | `medium`, `none`, `small`, `large` |
+
+The curves follow Fluent 2 motion tokens (`decelerate-mid` is the WinUI control spline `0,0,0,1`); `spring` is a damped spring with about 8% overshoot. Durations (`--fluent-faster`, `--fluent-fast`, `--fluent-normal`) scale with `speed`, every built-in transition uses `--fluent-ease`, and `prefers-reduced-motion: reduce` or `reducedMotion="reduce"` sets the scale to zero and turns indicator motion and page transitions off. `fluentPreferenceOptions` lists every value and `fluentDefaultPreferences` the defaults; the injected theme state carries the resolved `preferences`.
+
+```vue
+<FluentTheme mode="system" motion="stretch" curve="spring" speed="slow" emphasis="tinted" corner="large">
+  <App />
+</FluentTheme>
+```
+
 Controls include buttons, fields, switches, sliders, selects, file pickers, checkboxes, progress indicators, and a scroll viewer. `FluentCheckbox` accepts boolean `v-model` and a label slot. `FluentFilePicker` exposes a Fluent button, selected file list, clear action, `accept`, and `multiple`; the browser file input remains hidden behind the control. `FluentProgressRing` supports `size`, `active`, `value`, `max`, and `indeterminate`; `FluentProgressBar` accepts `value`, `max`, `indeterminate`, `showIndicator`, and `snap` with a configurable `step` (default 10).
 
 Switches and sliders can omit a visible `label` when an `aria-label` is supplied. `FluentScrollViewer` scrolls vertically by default, enables horizontal scrolling with `horizontal`, and exposes `element()` and `scrollTo(options)` through `FluentScrollViewerHandle`. Set `focusable` to false for a non-tab-stop container.

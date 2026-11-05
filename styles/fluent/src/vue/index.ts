@@ -4,6 +4,7 @@ export type {
   FluentThemeMode,
   FluentPreferences,
   FluentMotion,
+  FluentPageTransition,
   FluentCurve,
   FluentSpeed,
   FluentReducedMotion,

@@ -18,6 +18,7 @@ export type FluentThemeMode = "light" | "dark" | "system";
 
 export const fluentPreferenceOptions = {
   motion: ["slide", "stretch", "fade", "none"],
+  pageTransition: ["entrance", "fade", "slide", "scale", "wipe", "none"],
   curve: ["decelerate-max", "decelerate-mid", "decelerate-min", "easy-ease", "easy-ease-max", "ease", "linear", "spring"],
   speed: ["faster", "fast", "normal", "slow", "slower"],
   reducedMotion: ["system", "reduce"],
@@ -26,6 +27,7 @@ export const fluentPreferenceOptions = {
 } as const;
 
 export type FluentMotion = (typeof fluentPreferenceOptions.motion)[number];
+export type FluentPageTransition = (typeof fluentPreferenceOptions.pageTransition)[number];
 export type FluentCurve = (typeof fluentPreferenceOptions.curve)[number];
 export type FluentSpeed = (typeof fluentPreferenceOptions.speed)[number];
 export type FluentReducedMotion = (typeof fluentPreferenceOptions.reducedMotion)[number];
@@ -34,6 +36,7 @@ export type FluentCorner = (typeof fluentPreferenceOptions.corner)[number];
 
 export interface FluentPreferences {
   motion: FluentMotion;
+  pageTransition: FluentPageTransition;
   curve: FluentCurve;
   speed: FluentSpeed;
   reducedMotion: FluentReducedMotion;
@@ -43,6 +46,7 @@ export interface FluentPreferences {
 
 export const fluentDefaultPreferences: Readonly<FluentPreferences> = {
   motion: "slide",
+  pageTransition: "entrance",
   curve: "decelerate-mid",
   speed: "normal",
   reducedMotion: "system",
@@ -62,6 +66,7 @@ export const fluentThemeKey: InjectionKey<ComputedRef<FluentThemeState>> =
 
 const preferenceAttributes: Record<keyof FluentPreferences, string> = {
   motion: "data-fluent-motion",
+  pageTransition: "data-fluent-page-transition",
   curve: "data-fluent-curve",
   speed: "data-fluent-speed",
   reducedMotion: "data-fluent-reduced-motion",
@@ -96,6 +101,7 @@ export const FluentTheme = defineComponent({
     accent: String,
     accentText: String,
     motion: String as PropType<FluentMotion>,
+    pageTransition: String as PropType<FluentPageTransition>,
     curve: String as PropType<FluentCurve>,
     speed: String as PropType<FluentSpeed>,
     reducedMotion: String as PropType<FluentReducedMotion>,
@@ -108,6 +114,7 @@ export const FluentTheme = defineComponent({
       const inherited = parent?.value.preferences ?? fluentDefaultPreferences;
       return {
         motion: props.motion ?? inherited.motion,
+        pageTransition: props.pageTransition ?? inherited.pageTransition,
         curve: props.curve ?? inherited.curve,
         speed: props.speed ?? inherited.speed,
         reducedMotion: props.reducedMotion ?? inherited.reducedMotion,
