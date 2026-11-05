@@ -9,6 +9,7 @@
 .catalog-header .fluent-select,.pref-bar .fluent-select{display:flex;align-items:center;gap:8px}
 .catalog-header .fluent-select__label,.pref-bar .fluent-select__label{color:var(--fluent-muted);font-size:.8rem;font-weight:400;white-space:nowrap}
 .catalog-sidebar{top:var(--catalog-header-height,86px)}
+html{scroll-padding-top:calc(var(--catalog-header-height,86px) + var(--catalog-toolbar-height,0px) + 16px)}
 .catalog-main{display:flex;flex-direction:column}
 .pref-bar{position:sticky;top:var(--catalog-header-height,86px);z-index:3;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:8px 12px;background:var(--fluent-surface);border:1px solid var(--fluent-border);border-radius:var(--fluent-panel-radius)}
 .pref-item{display:flex;align-items:center;gap:6px}
@@ -50,7 +51,7 @@
 .corner-sample .fluent-segmented{justify-self:start}
 .corner-panel{padding:12px;background:var(--fluent-surface);border:1px solid var(--fluent-border);border-radius:var(--fluent-panel-radius)}
 
-@media (max-width:760px){.catalog-header,.pref-bar{position:static}.catalog-sidebar{top:auto}}
+@media (max-width:760px){.catalog-header,.pref-bar{position:static}.catalog-sidebar{top:auto}html{scroll-padding-top:0}}
 
 .transition-controls{display:flex;align-items:center;flex-wrap:wrap;gap:12px}
 .transition-controls .fluent-select{display:flex;align-items:center;gap:8px}
