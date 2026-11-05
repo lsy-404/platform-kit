@@ -65,3 +65,22 @@ Popover controls initialize bundled standard Popover support on mount when the W
 `FluentSegmented` is an equal-width option switch (`role="radiogroup"` with roving tabindex; arrow keys, Home and End move and select, skipping disabled options, with Left/Right swapped in RTL). It takes `modelValue`, `options` (`{ value, label, disabled? }[]`, exported as `FluentSegmentedOption`), `label` (accessible name) and `disabled`, and emits `update:modelValue` and `change`.
 
 `FluentSegmented` and `FluentNavigation` animate a selection indicator that lives inside the selected item. Motion follows the theme's `motion`, `curve` and `speed` preferences (`slide`, `stretch`, `fade`, `none`; no animation under reduced motion), and the selected colours follow `emphasis`. Both components accept optional `motion` and `emphasis` props that override the theme for that component.
+
+### View transitions
+
+`FluentTransitionView` swaps its slot content with the native View Transition API, using the `pageTransition` theme preference (`entrance`, `fade`, `slide`, `scale`, `wipe`, `none`; `none` under reduced motion). Without `document.startViewTransition`, or when the style is `none` or motion is scaled to 0, the content simply changes with no animation.
+
+```vue
+<FluentTransitionView :view-key="page" :order="['home', 'detail']" v-slot="{ viewKey }">
+  <Home v-if="viewKey === 'home'" />
+  <Detail v-else />
+</FluentTransitionView>
+```
+
+Props: `viewKey` (required), `transition` (overrides the theme preference for this view), `direction` (`forward` or `back`; slide, scale and wipe depend on it) and `order` (when `direction` is omitted, moving to a later index is forward). The slot receives the displayed `viewKey`, which changes only when the browser has captured the outgoing view; rapid changes end on the latest key.
+
+Slide moves new content in from the right (forward) or left (back). Scale is the drill transition: forward grows from 0.94 while the old view grows slightly and fades, back reverses. Wipe sweeps an accent-coloured block across the view and then reveals the new content from the same side.
+
+Element-level transitions combine with every style. Give an element in the old view and the matching element in the new view the same name with `v-fluent-shared="'photo'"`; it moves and resizes between them, and elements of different shape (a small rounded button and a large panel) morph into one continuous shape. A name must be unique within each view; an empty value clears it.
+
+`fluentViewTransition(update, { element?, transition?, direction?, onFinish? })` is the framework-free entry point; it resolves once `update` has been applied. Its CSS custom properties and `data-fluent-view-*` attributes are placed on `<html>` for the duration of the transition.
