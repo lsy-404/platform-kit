@@ -103,7 +103,8 @@
 .race-row .curve-track{min-width:0}
 
 .accent-demo{display:grid;gap:16px}
-.accent-demo .fluent-slider{width:min(360px,100%)}
+.accent-demo .fluent-slider,.accent-demo .fluent-progress-bar{width:min(360px,100%)}
+.accent-demo .fluent-progress-ring{justify-self:start}
 
 .transition-styles{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(200px,100%),1fr));gap:10px}
 .transition-style{display:grid;align-content:start;gap:4px;padding:12px 14px;color:var(--fluent-text);text-align:start;background:var(--fluent-control);border:1px solid var(--fluent-border);border-radius:var(--fluent-radius);cursor:pointer}

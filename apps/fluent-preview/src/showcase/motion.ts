@@ -75,7 +75,8 @@ const AccentCard = defineComponent({
           h(FluentRadio, { label: "Month", value: "month", modelValue: radio.value, "onUpdate:modelValue": (value: string) => { radio.value = value; } }),
         ]),
         h(FluentSlider, { label: "Level", modelValue: level.value, formatValue: (value: number) => `${Math.round(value)}%`, "onUpdate:modelValue": (value: number) => { level.value = value; } }),
-        h("div", { class: "progress-row" }, [h(FluentProgressBar, { label: "Level progress", value: level.value }), h(FluentProgressRing, { label: "Level ring", value: level.value, indeterminate: false, size: 32 })]),
+        h(FluentProgressBar, { label: "Level meter", value: level.value }),
+        h(FluentProgressRing, { label: "Level ring", value: level.value, indeterminate: false, size: 32 }),
       ]),
     ], true);
   },

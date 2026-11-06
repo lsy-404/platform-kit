@@ -29,7 +29,7 @@ const HeroSample = defineComponent({
       h("div", { class: "hero-sample__row" }, [h("strong", "Calendar"), h(FluentSegmented, { label: "Calendar view", modelValue: view.value, options: [{ value: "day", label: "Day" }, { value: "week", label: "Week" }, { value: "month", label: "Month" }], "onUpdate:modelValue": (value: string | number) => { view.value = String(value); } })]),
       h(FluentSwitch, { label: "Focus sessions", modelValue: focus.value, "onUpdate:modelValue": (value: boolean) => { focus.value = value; } }),
       h(FluentSlider, { label: "Volume", modelValue: volume.value, formatValue: (value: number) => `${Math.round(value)}%`, "onUpdate:modelValue": (value: number) => { volume.value = value; } }),
-      h(FluentProgressBar, { label: "Sync progress", value: volume.value, showIndicator: true }),
+      h(FluentProgressBar, { label: "Output level", value: volume.value }),
       h("div", { class: "control-row" }, [h(FluentButton, { tone: "primary" }, () => "Save"), h(FluentButton, () => "Cancel")]),
     ]);
   },
