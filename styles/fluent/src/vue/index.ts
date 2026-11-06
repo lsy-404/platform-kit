@@ -26,6 +26,7 @@ export {
   FluentSlider,
   FluentNotice,
 } from "./controls.js";
+export { FluentGauge } from "./gauge.js";
 export { FluentDialog, FluentPopover } from "./overlays.js";
 export { FluentNavigation } from "./navigation.js";
 export { FluentRadio, FluentCheckbox, FluentProgressBar, FluentProgressRing, FluentScrollViewer } from "./feedback.js";

@@ -2,7 +2,7 @@ import { build } from "esbuild";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { readFile, writeFile, mkdir, copyFile } from "node:fs/promises";
-const names = ["tokens", "controls", "graphics", "overlays", "navigation", "selection", "segmented", "native", "transitions"];
+const names = ["tokens", "controls", "graphics", "overlays", "navigation", "selection", "segmented", "native", "transitions", "gauge"];
 const sheets = await Promise.all(names.map(name => readFile(new URL(`src/styles/${name}.css`, import.meta.url), "utf8")));
 await writeFile(new URL("dist/style.css", import.meta.url), sheets.join("\n"));
 
