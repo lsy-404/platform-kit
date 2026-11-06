@@ -68,14 +68,12 @@ export function useModelAuth(host: ModelAuthHost, options: { errorMessage?: stri
       }
       return false;
     }).finally(() => {
-      if (action?.type === "authorize-oauth" && controller.signal.aborted && auth.value.status === "running") {
-        auth.value = { ...auth.value, status: "error", error: "认证已取消。" };
-      }
       busy.value = false; pending = null; authorization = null;
     });
     return pending;
   }
   const unsubscribeAuth = host.subscribeAuthEvents?.((event) => {
+    if (!authorization || authorization.signal.aborted || auth.value.status !== "running") return;
     if (event.type === "provider-auth-prompt") {
       auth.value = { ...auth.value, status: "running", loginId: event.loginId, prompt: { promptId: event.promptId, prompt: event.prompt }, error: null };
     } else {
@@ -88,6 +86,7 @@ export function useModelAuth(host: ModelAuthHost, options: { errorMessage?: stri
     close: () => {
       if (auth.value.loginId) void host.cancelAuth?.(auth.value.loginId);
       authorization?.abort(); open.value = false;
+      auth.value = { status: "idle", loginId: null, notices: [], prompt: null, error: null };
     },
     "authorize-oauth": (providerId: string, cyberAccessProgram?: CyberAccessProgram) => run({ type: "authorize-oauth", providerId, ...(cyberAccessProgram ? { cyberAccessProgram } : {}) }),
     "reconnect-oauth": (providerId: string, credentialId: string, cyberAccessProgram?: CyberAccessProgram) => run({ type: "authorize-oauth", providerId, credentialId, ...(cyberAccessProgram ? { cyberAccessProgram } : {}) }),
@@ -103,7 +102,11 @@ export function useModelAuth(host: ModelAuthHost, options: { errorMessage?: stri
     "update-provider": (payload: ProviderUpdatePayload) => run({ type: "update-provider", payload }),
     "refresh-catalog": () => run({ type: "refresh-catalog" }),
     "respond-auth": (response: ProviderAuthResponseRequest) => host.respondAuth ? host.respondAuth(response).then(() => true, () => false) : Promise.resolve(false),
-    "cancel-auth": (loginId: string) => { void host.cancelAuth?.(loginId); authorization?.abort(); },
+    "cancel-auth": (loginId: string) => {
+      if (loginId) void host.cancelAuth?.(loginId);
+      authorization?.abort();
+      auth.value = { status: "idle", loginId: null, notices: [], prompt: null, error: null };
+    },
     "open-auth-url": (url: string) => { void host.openAuthUrl?.(url); },
   };
   return { open, busy, error, state, props, listeners, refresh: () => run(), perform: (action: ModelAuthAction) => run(action) };

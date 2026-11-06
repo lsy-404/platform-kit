@@ -288,8 +288,7 @@ describe("authentication dialog", () => {
     expect(get('[data-part="move-down"]').getAttribute("aria-label")).toBe("下移 Primary");
     await click('[data-part="move-down"]');
     expect(events.at(-1)).toEqual({ name: "reorder", payload: { providerId: "provider-a", method: "oauth", credentialIds: ["oauth-2", "oauth-1"] } });
-    state.providers[0]!.oauthEnabled = false; await nextTick();
-    expect(get<HTMLButtonElement>('[data-part="authorize"]').disabled).toBe(true);
+    expect(document.querySelector('.model-auth-provider-toggle')).toBeNull();
   });
 
   it("edits per-key extend metadata and exposes a usage query action", async () => {

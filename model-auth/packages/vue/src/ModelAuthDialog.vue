@@ -7,7 +7,7 @@ import { formatPercentage } from "./percentage";
 import { credentialReady, fill, formatCooldown, formatExactTimestamp, usagePlanLabel, windowRemaining } from "./usage";
 import type {
   AddApiKeyPayload, AuthMethod, CredentialExtend, CredentialLoginInput, CredentialReorderPayload, CredentialUpdatePayload, CatalogStatus, ResetVoucher, CyberAccessProgram,
-  ModelAuthProvider, ModelConnectionTarget, ProviderAuthResponseRequest, ProviderAuthState, ProviderCredential, ProviderAuthNotice, ProviderUpdatePayload, Theme, CredentialUsage, CredentialUsageEstimate, CredentialUsageWindow,
+  ModelAuthProvider, ModelConnectionTarget, ProviderAuthResponseRequest, ProviderAuthState, ProviderCredential, ProviderAuthNotice, Theme, CredentialUsage, CredentialUsageEstimate, CredentialUsageWindow,
 } from "./types";
 
 const props = withDefaults(defineProps<{
@@ -38,7 +38,6 @@ const emit = defineEmits<{
   "remove-oauth": [providerId: string, credentialId: string];
   "update-credential": [payload: CredentialUpdatePayload];
   "reorder-credentials": [payload: CredentialReorderPayload];
-  "update-provider": [payload: ProviderUpdatePayload];
   "add-api-key": [payload: AddApiKeyPayload];
   "remove-api-key": [providerId: string, credentialId: string];
   "refresh-catalog": [];
@@ -129,8 +128,7 @@ const credentials = computed<ProviderCredential[]>(() => {
   return (method.value === "oauth" ? provider?.oauthCredentials : provider?.apiKeyCredentials) ?? [];
 });
 const canUseMethod = computed(() => Boolean(selectedProvider.value?.available
-  && selectedProvider.value.authMethods.includes(method.value)
-  && (method.value !== "oauth" || selectedProvider.value.oauthEnabled !== false)));
+  && selectedProvider.value.authMethods.includes(method.value)));
 const eligibleCredentials = computed(() => canUseMethod.value ? credentials.value.filter(credential => credential.enabled && credential.healthy
   && (!credential.cooldownUntilUtc || Date.parse(credential.cooldownUntilUtc) <= Date.now())) : []);
 const authReady = computed(() => eligibleCredentials.value.length > 0);
@@ -203,6 +201,7 @@ function chooseProvider(entry: { provider: ModelAuthProvider; method: AuthMethod
 }
 function back() {
   if (connectionMode.value) return;
+  if (props.auth?.status === "running") emit("cancel-auth", props.auth.loginId ?? "");
   awaitingVerification = false;
   clearSecret(); pendingRemoval.value = ""; localError.value = "";
   transitionName.value = "model-auth-step-backward";
@@ -641,10 +640,6 @@ onBeforeUnmount(() => { clearSecret(); if (closeTimer) clearTimeout(closeTimer);
               <small v-if="credentials.length > 1">{{ text.credentialHint }}</small>
               <button type="button" class="model-auth-primary" data-part="authorize" :disabled="busy || !canUseMethod" @click="authorize()">{{ selectedProvider.authorizeLabel || text.authorize }}</button>
             </div>
-            <label v-if="connectionMode || credentials.length || selectedProvider.oauthEnabled === false" class="model-auth-toggle model-auth-provider-toggle">
-              <input type="checkbox" role="switch" :checked="selectedProvider.oauthEnabled !== false" :disabled="busy" :aria-label="text.oauthEnabled" @change="emit('update-provider', { providerId: selectedProvider.id, oauthEnabled: ($event.target as HTMLInputElement).checked })" />
-              <span class="model-auth-switch-track" aria-hidden="true"></span>{{ text.oauthEnabled }}
-            </label>
           </section>
           <section v-else class="model-auth-credential-section" data-part="api-key-config">
             <form class="model-auth-api-form" part="api-key-form" data-part="api-key-form" @submit.prevent="addApiKey">

@@ -108,11 +108,12 @@ it("forwards Pine-style authentication prompts, notices and cancellation through
   let cancelled = "";
   const binding = useModelAuth({
     async getState() { return { providers: [], catalogStatus: { state: "ready" } }; },
-    async execute() {},
+    async execute() { return new Promise<void>(() => {}); },
     subscribeAuthEvents(listener) { receive = listener; return () => { receive = undefined; }; },
     async respondAuth(value) { response = value; },
     async cancelAuth(loginId) { cancelled = loginId; },
   });
+  const pending = binding.listeners["authorize-oauth"]("provider-a");
   receive?.({ type: "provider-auth-notice", loginId: "login-1", notice: { type: "auth_url", url: "https://auth.example.test/login", instructions: "在浏览器中继续" } });
   receive?.({ type: "provider-auth-prompt", loginId: "login-1", promptId: "prompt-1", prompt: { type: "secret", message: "Code" } });
   expect(binding.props.value.auth).toMatchObject({ status: "running", loginId: "login-1", prompt: { promptId: "prompt-1" } });
@@ -120,6 +121,9 @@ it("forwards Pine-style authentication prompts, notices and cancellation through
   expect(response).toEqual({ loginId: "login-1", promptId: "prompt-1", value: "private-code" });
   binding.listeners["cancel-auth"]("login-1");
   expect(cancelled).toBe("login-1");
+  expect(await pending).toBe(false);
+  receive?.({ type: "provider-auth-notice", loginId: "login-1", notice: { type: "progress", message: "late" } });
+  expect(binding.props.value.auth.status).toBe("idle");
 });
 
 
