@@ -52,6 +52,56 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.fluent-navigation__item {
+  padding-inline-start: calc(12px + var(--fluent-navigation-depth, 0) * 31px);
+}
+.fluent-navigation__item.is-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fluent-navigation__item.is-group .fluent-navigation__label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.fluent-navigation__chevron {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  transition: transform var(--fluent-fast) var(--fluent-ease);
+}
+.fluent-navigation__item[aria-expanded="true"] .fluent-navigation__chevron {
+  transform: rotate(180deg);
+}
+.fluent-navigation__branch {
+  display: flex;
+  flex-direction: column;
+}
+.fluent-navigation__group {
+  display: grid;
+  grid-template-rows: 0fr;
+  visibility: hidden;
+  transition:
+    grid-template-rows var(--fluent-normal) var(--fluent-ease),
+    visibility 0s linear var(--fluent-normal);
+}
+.fluent-navigation__group.is-expanded {
+  grid-template-rows: 1fr;
+  visibility: visible;
+  transition:
+    grid-template-rows var(--fluent-normal) var(--fluent-ease),
+    visibility 0s;
+}
+.fluent-navigation__children {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow: hidden;
+}
+.fluent-navigation__children > :first-child {
+  margin-top: 2px;
+}
 .fluent-navigation__indicator {
   position: absolute;
   inset-inline-start: 0;
