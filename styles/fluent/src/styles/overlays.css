@@ -56,20 +56,67 @@
   border: 1px solid var(--fluent-border);
   border-radius: var(--fluent-panel-radius);
   box-shadow: var(--fluent-shadow);
-  animation: fluent-overlay-in var(--fluent-fast) var(--fluent-ease);
 }
-@keyframes fluent-overlay-in {
+.fluent-popover[data-fluent-menu-motion="slide"] {
+  animation: fluent-popover-slide-bottom var(--fluent-fast) var(--fluent-ease);
+}
+.fluent-popover[data-fluent-menu-motion="slide"][data-side="top"] {
+  animation-name: fluent-popover-slide-top;
+}
+.fluent-popover[data-fluent-menu-motion="fade"] {
+  animation: fluent-fade-in var(--fluent-fast) var(--fluent-ease);
+}
+.fluent-popover[data-fluent-menu-motion="scale"] {
+  transform-origin: top center;
+  animation: fluent-popover-scale var(--fluent-fast) var(--fluent-ease);
+}
+.fluent-popover[data-fluent-menu-motion="scale"][data-side="top"] {
+  transform-origin: bottom center;
+}
+@keyframes fluent-fade-in {
+  from { opacity: 0; }
+}
+@keyframes fluent-popover-slide-bottom {
   from {
     opacity: 0;
-    transform: translateY(-2px) scale(0.985);
+    transform: translateY(-8px);
+    clip-path: inset(0 0 100% 0);
   }
   to {
     opacity: 1;
     transform: none;
+    clip-path: inset(0);
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .fluent-popover {
-    animation: none;
+@keyframes fluent-popover-slide-top {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    clip-path: inset(100% 0 0 0);
   }
+  to {
+    opacity: 1;
+    transform: none;
+    clip-path: inset(0);
+  }
+}
+@keyframes fluent-popover-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+.fluent-dialog[open] {
+  animation:
+    fluent-dialog-scale var(--fluent-normal) var(--fluent-ease),
+    fluent-dialog-fade var(--fluent-faster) linear;
+}
+.fluent-dialog[open]::backdrop {
+  animation: fluent-dialog-fade var(--fluent-faster) linear;
+}
+@keyframes fluent-dialog-scale {
+  from { transform: scale(1.05); }
+}
+@keyframes fluent-dialog-fade {
+  from { opacity: 0; }
 }

@@ -39,6 +39,9 @@ const selects: { key: PreferenceKey; label: string; testId: string }[] = [
   { key: "curve", label: "Curve", testId: "pref-curve" },
   { key: "emphasis", label: "Emphasis", testId: "pref-emphasis" },
   { key: "pageTransition", label: "Transition", testId: "pref-page-transition" },
+  { key: "toggleMotion", label: "Toggle", testId: "pref-toggle-motion" },
+  { key: "checkMotion", label: "Check", testId: "pref-check-motion" },
+  { key: "menuMotion", label: "Menu", testId: "pref-menu-motion" },
 ];
 
 export const PreferenceBar = defineComponent({

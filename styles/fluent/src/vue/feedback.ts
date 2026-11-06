@@ -1,5 +1,6 @@
 import { defineComponent, h, mergeProps, ref } from "vue";
 import { fluentIcon } from "./icon.js";
+import { useFluentPreference } from "../theme.js";
 
 export const FluentCheckbox = defineComponent({
   name: "FluentCheckbox",
@@ -7,6 +8,7 @@ export const FluentCheckbox = defineComponent({
   props: { modelValue: Boolean, indeterminate: Boolean, disabled: Boolean, label: String },
   emits: ["update:modelValue", "update:indeterminate", "change"],
   setup(props, { attrs, emit, slots }) {
+    const checkMotion = useFluentPreference("checkMotion");
     return () => {
       const { class: className, style, ...inputAttrs } = attrs;
       const indicator = props.indeterminate
@@ -14,7 +16,7 @@ export const FluentCheckbox = defineComponent({
         : props.modelValue
           ? fluentIcon("check", "fluent-checkbox__check")
           : undefined;
-      return h("label", { class: ["fluent-checkbox", className], style }, [
+      return h("label", { class: ["fluent-checkbox", className], style, "data-fluent-check-motion": checkMotion.value }, [
         h("input", mergeProps(inputAttrs, {
           class: "fluent-checkbox__input",
           type: "checkbox",
@@ -54,9 +56,10 @@ export const FluentRadio = defineComponent({
   },
   emits: ["update:modelValue", "change"],
   setup(props, { attrs, emit, slots }) {
+    const checkMotion = useFluentPreference("checkMotion");
     return () => {
       const { class: className, style, ...inputAttrs } = attrs;
-      return h("label", { class: ["fluent-radio", className], style }, [
+      return h("label", { class: ["fluent-radio", className], style, "data-fluent-check-motion": checkMotion.value }, [
         h("input", mergeProps(inputAttrs, {
           class: "fluent-radio__input",
           type: "radio",

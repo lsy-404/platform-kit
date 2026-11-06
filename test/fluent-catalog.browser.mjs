@@ -114,7 +114,8 @@ try {
   const switchThumbRest = await transform(switchThumb);
   await switchControl.hover(); await waitForHover();
   assert.equal(await background(switchControl.locator(".fluent-switch__track")), accentHover, "checked switch hover lost its checked accent");
-  assert.equal(await transform(switchThumb), switchThumbRest, "switch hover changed the thumb geometry");
+  assert.equal(switchThumbRest, "matrix(1, 0, 0, 1, 14, 0)");
+  assert.equal(await transform(switchThumb), "matrix(1, 0, 0, 1, 13, 0)", "stretch switch hover did not grow the thumb from its anchored edge");
   const sliderInput = page.getByTestId("fluent-slider");
   for (const theme of ["light", "dark"]) {
     await page.locator(".catalog-theme").evaluate((node, value) => node.setAttribute("data-fluent-theme", value), theme);

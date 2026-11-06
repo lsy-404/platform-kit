@@ -112,6 +112,8 @@
 .fluent-file-picker__file { overflow-wrap: anywhere; }
 
 .fluent-switch {
+  --fluent-switch-thumb-width: 12px;
+  --fluent-switch-thumb-height: 12px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -139,12 +141,15 @@
     border-color var(--fluent-fast) var(--fluent-ease);
 }
 .fluent-switch__thumb {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
+  flex: none;
+  width: var(--fluent-switch-thumb-width);
+  height: var(--fluent-switch-thumb-height);
+  border-radius: 999px;
   background: var(--fluent-muted);
   transition:
     transform var(--fluent-fast) var(--fluent-ease),
+    width var(--fluent-faster) var(--fluent-ease),
+    height var(--fluent-faster) var(--fluent-ease),
     background var(--fluent-fast) var(--fluent-ease);
 }
 .fluent-switch--checked .fluent-switch__track {
@@ -152,7 +157,8 @@
   background: var(--fluent-accent);
 }
 .fluent-switch--checked .fluent-switch__thumb {
-  transform: translateX(14px);
+  /* Content width of the track (26px) minus the thumb keeps the right edge anchored while the thumb resizes. */
+  transform: translateX(calc(26px - var(--fluent-switch-thumb-width)));
   background: var(--fluent-accent-text);
 }
 
@@ -539,6 +545,16 @@ textarea.fluent-field__input {
 }
 .fluent-switch:disabled .fluent-switch__track { border-color: var(--fluent-border); background: var(--fluent-bg); }
 .fluent-switch:disabled .fluent-switch__thumb { background: var(--fluent-muted); }
+.fluent-switch[data-fluent-toggle-motion="stretch"]:hover:not(:disabled) {
+  --fluent-switch-thumb-width: 13px;
+  --fluent-switch-thumb-height: 13px;
+}
+.fluent-switch[data-fluent-toggle-motion="stretch"]:active:not(:disabled) {
+  --fluent-switch-thumb-width: 15px;
+  --fluent-switch-thumb-height: 13px;
+}
+.fluent-switch[data-fluent-toggle-motion="none"] :is(.fluent-switch__track, .fluent-switch__thumb),
+.fluent-toggle-button[data-fluent-toggle-motion="none"] { transition: none; }
 
 
 .fluent-checkbox,
@@ -571,14 +587,29 @@ textarea.fluent-field__input {
   background: var(--fluent-control);
   transition: background var(--fluent-fast) var(--fluent-ease), border-color var(--fluent-fast) var(--fluent-ease);
 }
-.fluent-radio__input::before { width: 8px; height: 8px; content: ""; border-radius: 50%; background: currentColor; transform: scale(0); transition: transform var(--fluent-fast) var(--fluent-ease); }
+.fluent-radio__input::before { width: 8px; height: 8px; content: ""; border-radius: 50%; background: currentColor; transform: scale(0); transition: transform var(--fluent-fast) var(--fluent-ease), opacity var(--fluent-fast) var(--fluent-ease); }
 .fluent-radio__input:checked { border-color: var(--fluent-accent); background: var(--fluent-accent); }
-.fluent-radio__input:checked::before { transform: rotate(-45deg) scale(1); }
 .fluent-radio__input:checked::before { transform: scale(1); }
+.fluent-radio[data-fluent-check-motion="fade"] .fluent-radio__input::before { opacity: 0; transform: scale(0.6); }
+.fluent-radio[data-fluent-check-motion="fade"] .fluent-radio__input:checked::before { opacity: 1; transform: scale(1); }
+.fluent-radio[data-fluent-check-motion="none"] .fluent-radio__input::before { transition: none; }
 .fluent-checkbox__box--checked,
 .fluent-checkbox__box--indeterminate { border-color: var(--fluent-accent); background: var(--fluent-accent); }
 .fluent-checkbox__check { width: 14px; height: 14px; transform: translateY(1px); }
 .fluent-checkbox__indeterminate { width: 9px; height: 2px; border-radius: 999px; background: currentColor; }
+.fluent-checkbox[data-fluent-check-motion="draw"] .fluent-checkbox__check { animation: fluent-check-draw var(--fluent-fast) var(--fluent-ease); }
+.fluent-checkbox[data-fluent-check-motion="draw"] .fluent-checkbox__indeterminate { animation: fluent-check-grow var(--fluent-fast) var(--fluent-ease); }
+.fluent-checkbox[data-fluent-check-motion="fade"] :is(.fluent-checkbox__check, .fluent-checkbox__indeterminate) { animation: fluent-check-fade var(--fluent-fast) var(--fluent-ease); }
+@keyframes fluent-check-draw {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0); }
+}
+@keyframes fluent-check-grow {
+  from { transform: scaleX(0); }
+}
+@keyframes fluent-check-fade {
+  from { opacity: 0; scale: 0.6; }
+}
 .fluent-checkbox:hover .fluent-checkbox__box:not(.fluent-checkbox__box--checked, .fluent-checkbox__box--indeterminate),
 .fluent-radio:hover .fluent-radio__input:not(:disabled, :checked) {
   border-color: var(--fluent-accent);
