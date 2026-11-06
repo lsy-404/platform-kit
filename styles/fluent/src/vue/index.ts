@@ -1,4 +1,4 @@
-export { FluentTheme, fluentThemeKey, fluentPreferenceOptions, fluentDefaultPreferences } from "../theme.js";
+export { FluentTheme, fluentThemeKey, fluentPreferenceOptions, fluentDefaultPreferences, useFluentPreference } from "../theme.js";
 export type {
   FluentThemeState,
   FluentThemeMode,
@@ -10,6 +10,9 @@ export type {
   FluentReducedMotion,
   FluentEmphasis,
   FluentCorner,
+  FluentToggleMotion,
+  FluentCheckMotion,
+  FluentMenuMotion,
 } from "../theme.js";
 export {
   FluentButton,

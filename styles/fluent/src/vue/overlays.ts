@@ -15,7 +15,7 @@ import {
 } from "vue";
 import { placeAnchored } from "../behavior/anchorPosition.js";
 import { registerOverlay, requestCloseTop } from "../behavior/overlayStack.js";
-import { fluentThemeKey } from "../theme.js";
+import { fluentThemeKey, useFluentPreference } from "../theme.js";
 import { ensurePopoverSupport } from "../behavior/popover.js";
 
 type FluentTheme = {
@@ -136,6 +136,7 @@ export const FluentPopover = defineComponent({
   setup(props, { emit, slots, attrs: elementAttrs }) {
     const panel = ref<HTMLElement | null>(null);
     const attrs = themeAttrs(useTheme());
+    const menuMotion = useFluentPreference("menuMotion");
     const position = ref<{
       left: number;
       top: number;
@@ -260,6 +261,7 @@ export const FluentPopover = defineComponent({
           tabindex: -1,
           "aria-label": props.label,
           "data-side": position.value.side,
+          "data-fluent-menu-motion": menuMotion.value,
           "data-fluent-theme": attrs.value["data-fluent-theme"],
           style: [attrs.value.style, style.value],
         }, elementAttrs),

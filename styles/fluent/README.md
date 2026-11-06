@@ -24,6 +24,11 @@ The source repository is public and releases are distributed as GitHub Release a
 | `reducedMotion` | `data-fluent-reduced-motion` | `system`, `reduce` (forces reduced motion for the subtree) |
 | `emphasis` | `data-fluent-emphasis` | `indicator`, `neutral`, `tinted`, `filled`, `underline` — selected-item style |
 | `corner` | `data-fluent-corner` | `medium`, `none`, `small`, `large` |
+| `toggleMotion` | `data-fluent-toggle-motion` | `stretch`, `slide`, `none` — switch thumb and toggle button state change; `stretch` grows the thumb on hover and elongates it while pressed |
+| `checkMotion` | `data-fluent-check-motion` | `draw`, `fade`, `none` — checkbox glyph and radio dot; `draw` reveals the check along its stroke and grows the bar and dot from the centre |
+| `menuMotion` | `data-fluent-menu-motion` | `slide`, `fade`, `scale`, `none` — popover, select and menu panels; `slide` and `scale` start at the anchor edge (`data-side`) |
+
+The three control motions are also written onto each component's own root (switch, toggle button, checkbox, radio, popover panel) from the injected theme state, so they apply to portaled panels and nest correctly; `useFluentPreference(key)` returns the same resolved value as a computed. Unset preferences inherit through CSS from the nearest outer theme, so a nested `FluentTheme` that sets one preference keeps the parent's speed, curve and corners. `FluentDialog` opens with the ContentDialog animation (scale from 1.05 with fade, backdrop fade) and follows speed and reduced motion.
 
 The curves follow Fluent 2 motion tokens (`decelerate-mid` is the WinUI control spline `0,0,0,1`); `spring` is a damped spring with about 8% overshoot. Durations (`--fluent-faster`, `--fluent-fast`, `--fluent-normal`) scale with `speed`, every built-in transition uses `--fluent-ease`, and `prefers-reduced-motion: reduce` or `reducedMotion="reduce"` sets the scale to zero and turns indicator motion and page transitions off. `fluentPreferenceOptions` lists every value and `fluentDefaultPreferences` the defaults; the injected theme state carries the resolved `preferences`.
 

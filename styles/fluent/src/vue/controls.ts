@@ -1,6 +1,7 @@
 import { computed, defineComponent, h, mergeProps, onBeforeUnmount, ref, watch, type PropType } from "vue";
 import { FluentProgressRing } from "./feedback.js";
 import { fluentIcon } from "./icon.js";
+import { useFluentPreference } from "../theme.js";
 
 export type FluentButtonTone = "primary" | "secondary" | "danger" | "subtle";
 export type FluentNoticeTone = "info" | "success" | "warning" | "danger";
@@ -138,10 +139,12 @@ export const FluentToggleButton = defineComponent({
   },
   emits: ["update:modelValue", "change", "click"],
   setup(props, { attrs, emit, slots }) {
+    const toggleMotion = useFluentPreference("toggleMotion");
     return () =>
       h("button", {
         ...attrs,
         type: "button",
+        "data-fluent-toggle-motion": toggleMotion.value,
         class: ["fluent-button", "fluent-toggle-button", `fluent-button--${props.tone}`, attrs.class],
         disabled: props.disabled,
         "aria-pressed": String(props.modelValue),
@@ -341,6 +344,7 @@ export const FluentSwitch = defineComponent({
   },
   emits: ["update:modelValue", "change"],
   setup(props, { attrs, emit }) {
+    const toggleMotion = useFluentPreference("toggleMotion");
     return () =>
       h(
         "button",
@@ -348,6 +352,7 @@ export const FluentSwitch = defineComponent({
           ...attrs,
           type: "button",
           role: "switch",
+          "data-fluent-toggle-motion": toggleMotion.value,
           class: [
             "fluent-switch",
             { "fluent-switch--checked": props.modelValue },

@@ -24,6 +24,9 @@ export const fluentPreferenceOptions = {
   reducedMotion: ["system", "reduce"],
   emphasis: ["indicator", "neutral", "tinted", "filled", "underline"],
   corner: ["none", "small", "medium", "large"],
+  toggleMotion: ["stretch", "slide", "none"],
+  checkMotion: ["draw", "fade", "none"],
+  menuMotion: ["slide", "fade", "scale", "none"],
 } as const;
 
 export type FluentMotion = (typeof fluentPreferenceOptions.motion)[number];
@@ -33,6 +36,9 @@ export type FluentSpeed = (typeof fluentPreferenceOptions.speed)[number];
 export type FluentReducedMotion = (typeof fluentPreferenceOptions.reducedMotion)[number];
 export type FluentEmphasis = (typeof fluentPreferenceOptions.emphasis)[number];
 export type FluentCorner = (typeof fluentPreferenceOptions.corner)[number];
+export type FluentToggleMotion = (typeof fluentPreferenceOptions.toggleMotion)[number];
+export type FluentCheckMotion = (typeof fluentPreferenceOptions.checkMotion)[number];
+export type FluentMenuMotion = (typeof fluentPreferenceOptions.menuMotion)[number];
 
 export interface FluentPreferences {
   motion: FluentMotion;
@@ -42,6 +48,9 @@ export interface FluentPreferences {
   reducedMotion: FluentReducedMotion;
   emphasis: FluentEmphasis;
   corner: FluentCorner;
+  toggleMotion: FluentToggleMotion;
+  checkMotion: FluentCheckMotion;
+  menuMotion: FluentMenuMotion;
 }
 
 export const fluentDefaultPreferences: Readonly<FluentPreferences> = {
@@ -52,6 +61,9 @@ export const fluentDefaultPreferences: Readonly<FluentPreferences> = {
   reducedMotion: "system",
   emphasis: "indicator",
   corner: "medium",
+  toggleMotion: "stretch",
+  checkMotion: "draw",
+  menuMotion: "slide",
 };
 
 export interface FluentThemeState {
@@ -72,7 +84,17 @@ const preferenceAttributes: Record<keyof FluentPreferences, string> = {
   reducedMotion: "data-fluent-reduced-motion",
   emphasis: "data-fluent-emphasis",
   corner: "data-fluent-corner",
+  toggleMotion: "data-fluent-toggle-motion",
+  checkMotion: "data-fluent-check-motion",
+  menuMotion: "data-fluent-menu-motion",
 };
+
+const fallbackTheme = computed<Pick<FluentThemeState, "preferences">>(() => ({ preferences: fluentDefaultPreferences }));
+
+export function useFluentPreference<K extends keyof FluentPreferences>(key: K): ComputedRef<FluentPreferences[K]> {
+  const theme = inject(fluentThemeKey, undefined);
+  return computed(() => (theme?.value ?? fallbackTheme.value).preferences[key]);
+}
 
 function accentTextFor(color: string): string | undefined {
   if (typeof document === "undefined") return undefined;
@@ -107,6 +129,9 @@ export const FluentTheme = defineComponent({
     reducedMotion: String as PropType<FluentReducedMotion>,
     emphasis: String as PropType<FluentEmphasis>,
     corner: String as PropType<FluentCorner>,
+    toggleMotion: String as PropType<FluentToggleMotion>,
+    checkMotion: String as PropType<FluentCheckMotion>,
+    menuMotion: String as PropType<FluentMenuMotion>,
   },
   setup(props, { slots, attrs }) {
     const parent = inject(fluentThemeKey, undefined);
@@ -120,6 +145,9 @@ export const FluentTheme = defineComponent({
         reducedMotion: props.reducedMotion ?? inherited.reducedMotion,
         emphasis: props.emphasis ?? inherited.emphasis,
         corner: props.corner ?? inherited.corner,
+        toggleMotion: props.toggleMotion ?? inherited.toggleMotion,
+        checkMotion: props.checkMotion ?? inherited.checkMotion,
+        menuMotion: props.menuMotion ?? inherited.menuMotion,
       };
     });
     const element = ref<HTMLElement | null>(null);

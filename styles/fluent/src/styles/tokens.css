@@ -34,18 +34,21 @@
   --fluent-control-strong-disabled: rgba(0, 0, 0, 0.318);
   --fluent-control-alt: rgba(0, 0, 0, 0.024);
   --fluent-accent-disabled: rgba(0, 0, 0, 0.216);
+  --fluent-shadow: 0 8px 28px rgba(0, 0, 0, 0.16), 0 0 1px rgba(0, 0, 0, 0.2);
+  --fluent-font:
+    "Segoe UI Variable Text", "Segoe UI", system-ui, "Noto Sans SC", sans-serif;
+  font: 14px/1.5 var(--fluent-font);
+  color: var(--fluent-text);
+}
+/* Preference defaults apply only to the outermost theme so nested themes inherit unset preferences. */
+:where(.fluent-theme, [data-fluent-theme]):not(:where(.fluent-theme, [data-fluent-theme]) *) {
   --fluent-radius: 4px;
   --fluent-panel-radius: 8px;
-  --fluent-shadow: 0 8px 28px rgba(0, 0, 0, 0.16), 0 0 1px rgba(0, 0, 0, 0.2);
   --fluent-motion-scale: 1;
   --fluent-ease: cubic-bezier(0, 0, 0, 1);
   --fluent-ease-accelerate: cubic-bezier(0.9, 0.1, 1, 0.2);
   --fluent-indicator-motion: slide;
   --fluent-page-transition: entrance;
-  --fluent-font:
-    "Segoe UI Variable Text", "Segoe UI", system-ui, "Noto Sans SC", sans-serif;
-  font: 14px/1.5 var(--fluent-font);
-  color: var(--fluent-text);
 }
 [data-fluent-theme="dark"] {
   color-scheme: dark;
@@ -128,8 +131,7 @@
 [data-fluent-corner="large"] { --fluent-radius: 8px; --fluent-panel-radius: 12px; }
 
 /* Selected-item colours for navigation and segmented controls. */
-.fluent-theme,
-[data-fluent-theme],
+:where(.fluent-theme, [data-fluent-theme]):not(:where(.fluent-theme, [data-fluent-theme]) *),
 [data-fluent-emphasis="indicator"] {
   --fluent-emphasis-fill: var(--fluent-selection);
   --fluent-emphasis-raised: var(--fluent-control);
