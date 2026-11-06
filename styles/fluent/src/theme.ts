@@ -27,6 +27,8 @@ export const fluentPreferenceOptions = {
   toggleMotion: ["stretch", "slide", "none"],
   checkMotion: ["draw", "fade", "none"],
   menuMotion: ["slide", "fade", "scale", "none"],
+  ringMotion: ["stretch", "spin", "dots"],
+  barMotion: ["dynamic", "linear", "bounce"],
 } as const;
 
 export type FluentMotion = (typeof fluentPreferenceOptions.motion)[number];
@@ -39,6 +41,8 @@ export type FluentCorner = (typeof fluentPreferenceOptions.corner)[number];
 export type FluentToggleMotion = (typeof fluentPreferenceOptions.toggleMotion)[number];
 export type FluentCheckMotion = (typeof fluentPreferenceOptions.checkMotion)[number];
 export type FluentMenuMotion = (typeof fluentPreferenceOptions.menuMotion)[number];
+export type FluentRingMotion = (typeof fluentPreferenceOptions.ringMotion)[number];
+export type FluentBarMotion = (typeof fluentPreferenceOptions.barMotion)[number];
 
 export interface FluentPreferences {
   motion: FluentMotion;
@@ -51,6 +55,8 @@ export interface FluentPreferences {
   toggleMotion: FluentToggleMotion;
   checkMotion: FluentCheckMotion;
   menuMotion: FluentMenuMotion;
+  ringMotion: FluentRingMotion;
+  barMotion: FluentBarMotion;
 }
 
 export const fluentDefaultPreferences: Readonly<FluentPreferences> = {
@@ -64,6 +70,8 @@ export const fluentDefaultPreferences: Readonly<FluentPreferences> = {
   toggleMotion: "stretch",
   checkMotion: "draw",
   menuMotion: "slide",
+  ringMotion: "stretch",
+  barMotion: "dynamic",
 };
 
 export interface FluentThemeState {
@@ -87,6 +95,8 @@ const preferenceAttributes: Record<keyof FluentPreferences, string> = {
   toggleMotion: "data-fluent-toggle-motion",
   checkMotion: "data-fluent-check-motion",
   menuMotion: "data-fluent-menu-motion",
+  ringMotion: "data-fluent-ring-motion",
+  barMotion: "data-fluent-bar-motion",
 };
 
 const fallbackTheme = computed<Pick<FluentThemeState, "preferences">>(() => ({ preferences: fluentDefaultPreferences }));
@@ -132,6 +142,8 @@ export const FluentTheme = defineComponent({
     toggleMotion: String as PropType<FluentToggleMotion>,
     checkMotion: String as PropType<FluentCheckMotion>,
     menuMotion: String as PropType<FluentMenuMotion>,
+    ringMotion: String as PropType<FluentRingMotion>,
+    barMotion: String as PropType<FluentBarMotion>,
   },
   setup(props, { slots, attrs }) {
     const parent = inject(fluentThemeKey, undefined);
@@ -148,6 +160,8 @@ export const FluentTheme = defineComponent({
         toggleMotion: props.toggleMotion ?? inherited.toggleMotion,
         checkMotion: props.checkMotion ?? inherited.checkMotion,
         menuMotion: props.menuMotion ?? inherited.menuMotion,
+        ringMotion: props.ringMotion ?? inherited.ringMotion,
+        barMotion: props.barMotion ?? inherited.barMotion,
       };
     });
     const element = ref<HTMLElement | null>(null);

@@ -112,6 +112,7 @@ export const FluentProgressBar = defineComponent({
     step: { type: Number, default: 10 },
   },
   setup(props, { attrs }) {
+    const barMotion = useFluentPreference("barMotion");
     return () => {
       const state = progressValues(props.value, props.max, props.step, props.snap);
       const percentage = state.max > 0 ? (state.value / state.max) * 100 : 0;
@@ -124,6 +125,7 @@ export const FluentProgressBar = defineComponent({
           "fluent-progress-bar--snap": props.snap,
         }, attrs.class],
         role: "progressbar",
+        "data-fluent-bar-motion": barMotion.value,
         "aria-label": attrs["aria-label"] ?? props.label,
         "aria-valuemin": 0,
         "aria-valuemax": state.max,
@@ -139,6 +141,7 @@ export const FluentProgressBar = defineComponent({
               h("span", { key: position, class: "fluent-progress-bar__tick", style: { left: `${position}%` } }),
             ))
             : null,
+          props.indeterminate ? h("span", { class: "fluent-progress-bar__secondary" }) : null,
         ]),
         props.showIndicator && !props.indeterminate
           ? h("output", { class: "fluent-progress-bar__indicator" }, `${percentage.toFixed(0)}%`)
@@ -158,6 +161,7 @@ export const FluentProgressRing = defineComponent({
     indeterminate: { type: Boolean, default: true },
   },
   setup(props, { attrs }) {
+    const ringMotion = useFluentPreference("ringMotion");
     return () => {
       if (!props.active) return null;
       const state = progressValues(props.value, props.max);
@@ -166,18 +170,23 @@ export const FluentProgressRing = defineComponent({
         ...attrs,
         class: ["fluent-progress-ring", { "fluent-progress-ring--indeterminate": props.indeterminate }, attrs.class],
         style: [attrs.style, { width: `${size}px`, height: `${size}px` }],
+        "data-fluent-ring-motion": ringMotion.value,
         role: "progressbar",
         "aria-label": attrs["aria-label"] ?? props.label,
         "aria-valuemin": 0,
         "aria-valuemax": state.max,
         "aria-valuenow": props.indeterminate ? undefined : state.value,
-      }, [h("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" }, [
-        h("circle", { class: "fluent-progress-ring__track", cx: 12, cy: 12, r: 10 }),
-        h("circle", {
-          class: "fluent-progress-ring__value", cx: 12, cy: 12, r: 10, pathLength: 100,
-          "stroke-dasharray": `${props.indeterminate ? 72 : state.value / state.max * 100} 100`,
-        }),
-      ])]);
+      }, [h("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" }, props.indeterminate && ringMotion.value === "dots"
+        ? Array.from({ length: 5 }, (_, index) => h("circle", {
+          key: index, class: "fluent-progress-ring__dot", cx: 12, cy: 2, r: 1.7, style: { "--fluent-ring-dot": index },
+        }))
+        : [
+          h("circle", { class: "fluent-progress-ring__track", cx: 12, cy: 12, r: 10 }),
+          h("circle", {
+            class: "fluent-progress-ring__value", cx: 12, cy: 12, r: 10, pathLength: 100,
+            "stroke-dasharray": `${props.indeterminate ? 72 : state.value / state.max * 100} 100`,
+          }),
+        ])]);
     };
   },
 });

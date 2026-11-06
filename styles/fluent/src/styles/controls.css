@@ -403,10 +403,36 @@
   background: var(--fluent-accent);
   transition: width var(--fluent-fast) var(--fluent-ease);
 }
-.fluent-progress-bar--indeterminate .fluent-progress-bar__value {
-  width: 40%;
+.fluent-progress-bar:dir(rtl) { --fluent-bar-dir: -1; }
+.fluent-progress-bar--indeterminate :is(.fluent-progress-bar__value, .fluent-progress-bar__secondary) {
+  position: absolute;
+  top: 0;
+  inset-inline-start: 0;
+  transition: none;
+}
+.fluent-progress-bar__secondary {
+  display: none;
+  height: 100%;
+  border-radius: 999px;
   background: var(--fluent-accent);
-  animation: fluent-progress-slide 1.5s var(--fluent-ease) infinite;
+}
+/* Segment widths and travel follow the WinUI ProgressBar indeterminate template: 40% and 60% bars sharing a 2s loop. */
+[data-fluent-bar-motion="dynamic"].fluent-progress-bar--indeterminate .fluent-progress-bar__value {
+  width: 40%;
+  animation: fluent-progress-dynamic calc(2s * var(--fluent-motion-scale, 1)) infinite;
+}
+[data-fluent-bar-motion="dynamic"].fluent-progress-bar--indeterminate .fluent-progress-bar__secondary {
+  display: block;
+  width: 60%;
+  animation: fluent-progress-dynamic-secondary calc(2s * var(--fluent-motion-scale, 1)) infinite;
+}
+[data-fluent-bar-motion="linear"].fluent-progress-bar--indeterminate .fluent-progress-bar__value {
+  width: 40%;
+  animation: fluent-progress-slide calc(1.5s * var(--fluent-motion-scale, 1)) linear infinite;
+}
+[data-fluent-bar-motion="bounce"].fluent-progress-bar--indeterminate .fluent-progress-bar__value {
+  width: 30%;
+  animation: fluent-progress-bounce calc(1.2s * var(--fluent-motion-scale, 1)) ease-in-out infinite alternate;
 }
 .fluent-progress-bar--with-indicator { grid-template-columns: minmax(0, 1fr) auto; }
 .fluent-progress-bar__indicator {
@@ -435,8 +461,19 @@
 .fluent-progress-ring__track { stroke: var(--fluent-border); }
 .fluent-progress-ring__value { stroke: currentColor; stroke-linecap: round; }
 /* The arc rotates steadily while its head runs ahead and its tail catches up, so its length stretches and shrinks every cycle. */
-.fluent-progress-ring--indeterminate svg { animation: fluent-progress-spin calc(2s * var(--fluent-motion-scale, 1)) linear infinite; }
-.fluent-progress-ring--indeterminate .fluent-progress-ring__value { animation: fluent-progress-arc calc(1.5s * var(--fluent-motion-scale, 1)) cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+[data-fluent-ring-motion="stretch"].fluent-progress-ring--indeterminate svg { animation: fluent-progress-spin calc(2s * var(--fluent-motion-scale, 1)) linear infinite; }
+[data-fluent-ring-motion="stretch"].fluent-progress-ring--indeterminate .fluent-progress-ring__value { animation: fluent-progress-arc calc(1.5s * var(--fluent-motion-scale, 1)) cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+[data-fluent-ring-motion="spin"].fluent-progress-ring--indeterminate svg { animation: fluent-progress-spin calc(1s * var(--fluent-motion-scale, 1)) linear infinite; }
+[data-fluent-ring-motion="spin"].fluent-progress-ring--indeterminate .fluent-progress-ring__value { stroke-dasharray: 25 100; }
+.fluent-progress-ring--indeterminate svg:has(.fluent-progress-ring__dot) { transform: none; animation: none; }
+.fluent-progress-ring .fluent-progress-ring__dot {
+  fill: currentColor;
+  stroke: none;
+  transform-box: view-box;
+  transform-origin: 12px 12px;
+  transform: rotate(calc(var(--fluent-ring-dot, 0) * -22deg));
+  animation: fluent-progress-orbit calc(5.5s * var(--fluent-motion-scale, 1)) calc(var(--fluent-ring-dot, 0) * 240ms * var(--fluent-motion-scale, 1)) infinite backwards;
+}
 .fluent-scroll-viewer {
   min-height: 0;
   min-width: 0;
@@ -453,10 +490,32 @@
   100% { stroke-dasharray: 72 200; stroke-dashoffset: -99; }
 }
 @keyframes fluent-progress-slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@keyframes fluent-progress-dynamic {
+  from { transform: translateX(calc(-100% * var(--fluent-bar-dir, 1))); animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1); }
+  75%, to { transform: translateX(calc(300% * var(--fluent-bar-dir, 1))); }
+}
+@keyframes fluent-progress-dynamic-secondary {
+  from, 37.5% { transform: translateX(calc(-150% * var(--fluent-bar-dir, 1))); animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1); }
+  to { transform: translateX(calc(166% * var(--fluent-bar-dir, 1))); }
+}
+@keyframes fluent-progress-bounce {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(233.333% * var(--fluent-bar-dir, 1))); }
+}
+@keyframes fluent-progress-orbit {
+  0% { transform: rotate(225deg); opacity: 1; animation-timing-function: ease-out; }
+  7% { transform: rotate(345deg); animation-timing-function: linear; }
+  30% { transform: rotate(455deg); animation-timing-function: ease-in-out; }
+  39% { transform: rotate(690deg); animation-timing-function: linear; }
+  70% { transform: rotate(815deg); opacity: 1; animation-timing-function: ease-out; }
+  75% { transform: rotate(945deg); animation-timing-function: ease-out; }
+  76%, 100% { transform: rotate(945deg); opacity: 0; }
+}
 @media (prefers-reduced-motion: reduce) {
   .fluent-progress-ring--indeterminate svg,
   .fluent-progress-ring--indeterminate .fluent-progress-ring__value,
-  .fluent-progress-bar--indeterminate .fluent-progress-bar__value { animation: none; }
+  .fluent-progress-ring__dot,
+  .fluent-progress-bar--indeterminate :is(.fluent-progress-bar__value, .fluent-progress-bar__secondary) { animation: none; }
 }
 
 /* State refinements are scoped to Fluent component classes. */
