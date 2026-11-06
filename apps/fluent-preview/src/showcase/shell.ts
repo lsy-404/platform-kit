@@ -2,23 +2,31 @@ import { defineComponent, h, onBeforeUnmount, onMounted, ref, watch, type Compon
 import { FluentButton, FluentNavigation, FluentTheme, FluentToggleButton, FluentTransitionView } from "@platform-kit/fluent/vue";
 import { version } from "../../../../styles/fluent/package.json";
 import { preferences } from "../preferences.js";
-import { ControlsPage } from "./controls.js";
+import { ControlMotionPage } from "./control-motion.js";
+import { ActionsPage, FormsPage } from "./controls.js";
 import { CustomizePane } from "./customize.js";
-import { FeedbackPage } from "./feedback.js";
+import { ActivityPage, ProgressPage } from "./feedback.js";
 import { menuGlyph, tuneGlyph } from "./icons.js";
-import { EmphasisPage, MotionPage, TransitionsPage } from "./motion.js";
+import { AccentPage, CornersPage, CurvesPage, EmphasisPage, SelectionMotionPage, TransitionsPage } from "./motion.js";
 import { OverviewPage } from "./overview.js";
-import { SlidersPage } from "./sliders.js";
-import { appearance, navigate, pageLabel, pageOrder, pages, syncShowcaseQuery, ui, type PageKey } from "./state.js";
+import { EqualizerPage, SoundDisplayPage } from "./sliders.js";
+import { appearance, navigate, navigation, pageLabel, pageOrder, syncShowcaseQuery, ui, type PageKey } from "./state.js";
 
 const views: Record<PageKey, Component> = {
-  overview: OverviewPage,
-  motion: MotionPage,
-  emphasis: EmphasisPage,
-  transitions: TransitionsPage,
-  controls: ControlsPage,
-  sliders: SlidersPage,
-  feedback: FeedbackPage,
+  "overview": OverviewPage,
+  "motion-curves": CurvesPage,
+  "motion-selection": SelectionMotionPage,
+  "motion-controls": ControlMotionPage,
+  "appearance-accent": AccentPage,
+  "appearance-emphasis": EmphasisPage,
+  "appearance-corners": CornersPage,
+  "transitions": TransitionsPage,
+  "controls-forms": FormsPage,
+  "controls-actions": ActionsPage,
+  "sliders-panels": SoundDisplayPage,
+  "sliders-equalizer": EqualizerPage,
+  "feedback-progress": ProgressPage,
+  "feedback-activity": ActivityPage,
 };
 
 const useMedia = (query: string) => {
@@ -63,7 +71,7 @@ export const Showcase = defineComponent({
       ]),
       h("div", { class: "showcase-body" }, [
         h("div", { id: "showcase-nav", class: "showcase-nav" }, [
-          h(FluentNavigation, { label: "Showcase pages", "data-testid": "showcase-navigation", modelValue: ui.page, items: pages.map(({ key, label }) => ({ key, label })), "onUpdate:modelValue": (key: string) => navigate(key as PageKey) }),
+          h(FluentNavigation, { label: "Showcase pages", "data-testid": "showcase-navigation", modelValue: ui.page, items: navigation, "onUpdate:modelValue": (key: string) => navigate(key as PageKey) }),
           h("p", { class: "showcase-nav__note" }, "Selection motion, emphasis and the page transition all follow Customize."),
         ]),
         h("main", { class: "showcase-content" }, h(FluentTransitionView, { class: "showcase-view", viewKey: ui.page, order: pageOrder, "data-testid": "showcase-view" }, {

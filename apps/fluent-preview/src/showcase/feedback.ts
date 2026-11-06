@@ -2,7 +2,7 @@ import { computed, defineComponent, h, onBeforeUnmount, ref } from "vue";
 import { FluentButton, FluentNotice, FluentProgressBar, FluentProgressRing, FluentScrollViewer } from "@platform-kit/fluent/vue";
 import { card } from "../card.js";
 import { GraphicsPreview } from "../graphics.js";
-import { PageFrame } from "./frame.js";
+import { pageFrame } from "./frame.js";
 
 const activity = Array.from({ length: 24 }, (_, index) => {
   const minute = String(59 - index * 2).padStart(2, "0");
@@ -10,7 +10,7 @@ const activity = Array.from({ length: 24 }, (_, index) => {
   return { time: `09:${minute}`, text: events[index % events.length]! };
 });
 
-export const FeedbackPage = defineComponent({
+export const ProgressPage = defineComponent({
   setup() {
     const progress = ref(35);
     const running = ref(false);
@@ -27,7 +27,7 @@ export const FeedbackPage = defineComponent({
     onBeforeUnmount(stop);
     const done = computed(() => progress.value >= 100);
 
-    return () => h(PageFrame, { title: "Feedback and graphics", lead: "Notices, progress, a scroll viewer and optically centred SVG icons." }, () => [
+    return () => pageFrame("feedback-progress", "Notices, determinate and indeterminate progress, and rings.", () => [
       card("showcase-notices", "Notices", null, [
         h(FluentNotice, { tone: "info" }, () => "A new version of the workspace app is available."),
         h(FluentNotice, { tone: "success" }, () => "Your changes were saved."),
@@ -53,11 +53,16 @@ export const FeedbackPage = defineComponent({
           h(FluentProgressBar, { label: "Preparing", indeterminate: true }),
           h("div", { class: "progress-row" }, [h(FluentProgressRing, { label: "Loading", size: 20 }), h(FluentProgressRing, { label: "Loading larger", size: 32 }), h(FluentProgressRing, { label: "Loading largest", size: 48 })]),
         ]),
-        card("showcase-activity", "Activity", null, [
-          h(FluentScrollViewer, { class: "activity-log", "aria-label": "Recent activity" }, () => h("ol", { class: "activity-list" }, activity.map((entry) => h("li", { key: entry.time }, [h("time", entry.time), h("span", entry.text)])))),
-        ]),
       ]),
-      h(GraphicsPreview),
     ]);
   },
+});
+
+export const ActivityPage = defineComponent({
+  setup: () => () => pageFrame("feedback-activity", "A scroll viewer and optically centred SVG icons.", () => [
+    card("showcase-activity", "Activity", null, [
+      h(FluentScrollViewer, { class: "activity-log", "aria-label": "Recent activity" }, () => h("ol", { class: "activity-list" }, activity.map((entry) => h("li", { key: entry.time }, [h("time", entry.time), h("span", entry.text)])))),
+    ]),
+    h(GraphicsPreview),
+  ]),
 });

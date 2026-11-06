@@ -1,7 +1,7 @@
 import { computed, defineComponent, h, reactive, ref } from "vue";
 import { FluentSegmented, FluentSlider, FluentSwitch } from "@platform-kit/fluent/vue";
 import { card } from "../card.js";
-import { PageFrame } from "./frame.js";
+import { pageFrame } from "./frame.js";
 
 const bands = ["60 Hz", "150 Hz", "400 Hz", "1 kHz", "2.4 kHz", "6 kHz", "15 kHz"];
 const equalizerPresets: Record<string, number[]> = {
@@ -15,16 +15,13 @@ const equalizerOptions = [{ value: "flat", label: "Flat" }, { value: "bass", lab
 const signedDb = (value: number) => `${value > 0 ? "+" : ""}${Math.round(value)} dB`;
 const bitrates = [64, 96, 128, 192, 256, 320];
 
-export const SlidersPage = defineComponent({
+export const SoundDisplayPage = defineComponent({
   setup() {
     const sound = reactive({ volume: 64, balance: 0, bitrate: 192 });
     const display = reactive({ brightness: 70, nightLight: false, warmth: 40, scale: 1 });
     const power = ref(1), quality = ref(2);
-    const gains = ref([...equalizerPresets.flat!]);
-    const preset = computed(() => Object.entries(equalizerPresets).find(([, values]) => values.every((value, index) => value === gains.value[index]))?.[0]);
-    const setGain = (index: number, value: number) => { gains.value = gains.value.map((gain, at) => at === index ? value : gain); };
 
-    return () => h(PageFrame, { title: "Sliders", lead: "Thin WinUI tracks with a round thumb, ticks, snapping and labelled stops. Changing a value from code glides the thumb with the current curve and speed." }, () => [
+    return () => pageFrame("sliders-panels", "Thin WinUI tracks with a round thumb, ticks, snapping and labelled stops.", () => [
       h("div", { class: "showcase-columns" }, [
         card("showcase-sound", "Sound", null, [
           h(FluentSlider, { label: "Volume", modelValue: sound.volume, formatValue: (value: number) => `${Math.round(value)}%`, "onUpdate:modelValue": (value: number) => { sound.volume = value; } }),
@@ -42,6 +39,17 @@ export const SlidersPage = defineComponent({
           h(FluentSlider, { label: "Render quality", min: 0, max: 3, snap: "available", stops: ["Low", "Medium", "High", "Ultra"].map((label, value) => ({ value, label })), modelValue: quality.value, "onUpdate:modelValue": (value: number) => { quality.value = value; } }),
         ]),
       ]),
+    ]);
+  },
+});
+
+export const EqualizerPage = defineComponent({
+  setup() {
+    const gains = ref([...equalizerPresets.flat!]);
+    const preset = computed(() => Object.entries(equalizerPresets).find(([, values]) => values.every((value, index) => value === gains.value[index]))?.[0]);
+    const setGain = (index: number, value: number) => { gains.value = gains.value.map((gain, at) => at === index ? value : gain); };
+
+    return () => pageFrame("sliders-equalizer", "Changing a value from code glides the thumb with the current curve and speed.", () => [
       card("showcase-equalizer", "Equalizer", "Vertical sliders with major ticks at the ends and the centre. Pick a preset to watch every thumb glide to its new value.", [
         h(FluentSegmented, { label: "Equalizer preset", "data-testid": "showcase-eq-preset", modelValue: preset.value ?? "", options: equalizerOptions, "onUpdate:modelValue": (value: string | number) => { gains.value = [...equalizerPresets[String(value)]!]; } }),
         h("div", { class: "equalizer" }, bands.map((band, index) => h("div", { class: "equalizer__band", key: band }, [

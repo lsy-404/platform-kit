@@ -23,6 +23,7 @@
 
 .showcase-page{display:grid;align-content:start;gap:24px;max-width:1120px;margin:0 auto;padding:28px clamp(16px,4vw,40px) 56px}
 .showcase-page__header{display:grid;gap:6px}
+.showcase-page__section{margin:0;color:var(--fluent-muted);font-size:.85rem}
 .showcase-page__title{margin:0;font-size:1.75rem;font-weight:600;line-height:1.2}
 .showcase-page__lead{margin:0;max-width:72ch;color:var(--fluent-muted);line-height:1.55}
 .showcase-stack{display:grid;gap:20px}
@@ -31,7 +32,7 @@
 .showcase-section>h3{margin:0;font-size:1.15rem;font-weight:600}
 
 .showcase-pane{display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:4px;width:352px;min-height:0;padding:8px 16px 24px;overflow:auto;background:var(--fluent-surface);border-inline-start:1px solid var(--fluent-border)}
-.pane-header{position:sticky;top:-8px;z-index:1;display:flex;align-items:center;gap:4px;margin:-8px -16px 0;padding:12px 8px 8px 16px;background:var(--fluent-surface)}
+.pane-header{position:sticky;top:-8px;z-index:2;display:flex;align-items:center;gap:4px;margin:-8px -16px 0;padding:12px 8px 8px 16px;background:var(--fluent-surface)}
 .pane-header h2{flex:1;margin:0;font-size:1.1rem;font-weight:600}
 .showcase-pane .pane-close.fluent-button{display:none}
 .pane-group{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;padding:14px 0;border-top:1px solid var(--fluent-border)}
@@ -102,6 +103,8 @@
 .race-row__name{font-size:.875rem}
 .race-row .curve-track{min-width:0}
 
+.row-badge{padding:1px 8px;color:var(--fluent-accent-text);font-size:.72rem;background:var(--fluent-accent);border-radius:999px}
+.selection-row.is-current{border-color:var(--fluent-accent)}
 .accent-demo{display:grid;gap:16px}
 .accent-demo .fluent-slider,.accent-demo .fluent-progress-bar{width:min(360px,100%)}
 .accent-demo .fluent-progress-ring{justify-self:start}

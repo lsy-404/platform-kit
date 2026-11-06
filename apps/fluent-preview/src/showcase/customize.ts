@@ -67,8 +67,6 @@ export const CustomizePane = defineComponent({
         h(AccentPicker),
       ]),
       group("Motion", [
-        field("Selection motion", h(FluentSegmented, { label: "Selection motion", "data-testid": "showcase-motion", modelValue: preferences.motion, options: preferenceOptions("motion"), "onUpdate:modelValue": update("motion") })),
-        h(FluentSelect, { label: "Page transition", "data-testid": "showcase-page-transition", modelValue: preferences.pageTransition, options: preferenceOptions("pageTransition"), "onUpdate:modelValue": update("pageTransition") }),
         h("div", { class: "pane-row" }, [
           h(FluentSelect, { label: "Curve", "data-testid": "showcase-curve", modelValue: preferences.curve, options: preferenceOptions("curve"), "onUpdate:modelValue": update("curve") }),
           h(CurvePreview),
@@ -80,6 +78,13 @@ export const CustomizePane = defineComponent({
           "onUpdate:modelValue": (value: number) => { preferences.speed = speeds[Math.round(value)] as FluentSpeed; },
         }),
         h(FluentSwitch, { label: "Reduce motion", "data-testid": "showcase-reduced-motion", modelValue: preferences.reducedMotion === "reduce", "onUpdate:modelValue": (on: boolean) => { preferences.reducedMotion = on ? "reduce" : "system"; } }),
+      ]),
+      group("Component motion", [
+        field("Selection indicator", h(FluentSegmented, { label: "Selection indicator", "data-testid": "showcase-motion", modelValue: preferences.motion, options: preferenceOptions("motion"), "onUpdate:modelValue": update("motion") })),
+        field("Switches and toggle buttons", h(FluentSegmented, { label: "Switches and toggle buttons", "data-testid": "showcase-toggle-motion", modelValue: preferences.toggleMotion, options: preferenceOptions("toggleMotion"), "onUpdate:modelValue": update("toggleMotion") })),
+        field("Checkboxes and radios", h(FluentSegmented, { label: "Checkboxes and radios", "data-testid": "showcase-check-motion", modelValue: preferences.checkMotion, options: preferenceOptions("checkMotion"), "onUpdate:modelValue": update("checkMotion") })),
+        field("Dropdowns and menus", h(FluentSegmented, { label: "Dropdowns and menus", "data-testid": "showcase-menu-motion", modelValue: preferences.menuMotion, options: preferenceOptions("menuMotion"), "onUpdate:modelValue": update("menuMotion") })),
+        h(FluentSelect, { label: "Page transition", "data-testid": "showcase-page-transition", modelValue: preferences.pageTransition, options: preferenceOptions("pageTransition"), "onUpdate:modelValue": update("pageTransition") }),
       ]),
       group("Emphasis and shape", [
         h(FluentSelect, { label: "Selected item", "data-testid": "showcase-emphasis", modelValue: preferences.emphasis, options: preferenceOptions("emphasis"), "onUpdate:modelValue": update("emphasis") }),

@@ -4,7 +4,7 @@ import { card } from "../card.js";
 import { CornersCard, CurvesCard, EmphasisCard, MotionCard, useMotionDurations } from "../preference-cards.js";
 import { preferenceLabel, preferences } from "../preferences.js";
 import { TransitionsCard } from "../transition-card.js";
-import { PageFrame } from "./frame.js";
+import { pageFrame } from "./frame.js";
 import { navigate, pageLabel, pageOrder } from "./state.js";
 import { arrowGlyph } from "./icons.js";
 
@@ -51,11 +51,15 @@ const CurveRace = defineComponent({
   },
 });
 
-export const MotionPage = defineComponent({
-  setup: () => () => h(PageFrame, { title: "Motion", lead: "Durations come from the speed preference, easing from the curve preference, and the selection indicator from the motion preference. Everything here re-reads them live." }, () => [
+export const CurvesPage = defineComponent({
+  setup: () => () => pageFrame("motion-curves", "Durations come from the speed preference and easing from the curve preference. Everything here re-reads them live.", () => [
     h(DurationStats),
-    h("div", { class: "showcase-stack" }, [h(CurveRace), h(CurvesCard), h(MotionCard)]),
+    h("div", { class: "showcase-stack" }, [h(CurveRace), h(CurvesCard)]),
   ]),
+});
+
+export const SelectionMotionPage = defineComponent({
+  setup: () => () => pageFrame("motion-selection", "How the indicator travels between segments and menu items, including this side menu.", () => [h(MotionCard)]),
 });
 
 const AccentCard = defineComponent({
@@ -66,7 +70,7 @@ const AccentCard = defineComponent({
         h("div", { class: "control-row" }, [
           h(FluentButton, { tone: "primary" }, () => "Primary"),
           h(FluentToggleButton, { modelValue: pinned.value, "onUpdate:modelValue": (value: boolean) => { pinned.value = value; } }, () => pinned.value ? "Pinned" : "Pin"),
-          h(FluentSegmented, { label: "Layout", emphasis: "filled", modelValue: view.value, options: [{ value: "list", label: "List" }, { value: "grid", label: "Grid" }], "onUpdate:modelValue": (value: string | number) => { view.value = String(value); } }),
+          h(FluentSegmented, { label: "Layout", modelValue: view.value, options: [{ value: "list", label: "List" }, { value: "grid", label: "Grid" }], "onUpdate:modelValue": (value: string | number) => { view.value = String(value); } }),
         ]),
         h("div", { class: "control-row" }, [
           h(FluentSwitch, { label: "Switch", modelValue: on.value, "onUpdate:modelValue": (value: boolean) => { on.value = value; } }),
@@ -82,10 +86,16 @@ const AccentCard = defineComponent({
   },
 });
 
+export const AccentPage = defineComponent({
+  setup: () => () => pageFrame("appearance-accent", "Pick an accent in Customize; every accent surface below follows it.", () => [h(AccentCard)]),
+});
+
 export const EmphasisPage = defineComponent({
-  setup: () => () => h(PageFrame, { title: "Emphasis and shape", lead: "Emphasis decides how a selected segment or menu item is marked; corners set the radius of controls and panels. Both nest, so one region can differ from the rest." }, () => [
-    h("div", { class: "showcase-stack" }, [h(AccentCard), h(EmphasisCard), h(CornersCard)]),
-  ]),
+  setup: () => () => pageFrame("appearance-emphasis", "How a selected segment or menu item is marked. Emphasis nests, so one region can differ from the rest.", () => [h(EmphasisCard)]),
+});
+
+export const CornersPage = defineComponent({
+  setup: () => () => pageFrame("appearance-corners", "Control and panel radii, from square to rounded, with the current scaled durations.", () => [h(CornersCard)]),
 });
 
 const transitionNotes: Record<FluentPageTransition, string> = {
@@ -101,7 +111,7 @@ export const TransitionsPage = defineComponent({
   setup() {
     const index = pageOrder.indexOf("transitions");
     const previous = pageOrder[index - 1]!, next = pageOrder[index + 1]!;
-    return () => h(PageFrame, { title: "Page transitions", lead: "This app switches pages with the View Transition API. Pick a style, then move through the side menu: pages further down slide or drill forward, pages further up go back." }, () => [
+    return () => pageFrame("transitions", "This app switches pages with the View Transition API. Pick a style, then move through the side menu: pages further down slide or drill forward, pages further up go back.", () => [
       h("div", { class: "showcase-stack" }, [
         card("showcase-transition-styles", "App navigation", null, [
           h("div", { class: "transition-styles" }, fluentPreferenceOptions.pageTransition.map((style) => h("button", {

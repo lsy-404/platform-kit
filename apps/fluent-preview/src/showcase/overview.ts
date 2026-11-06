@@ -6,16 +6,19 @@ import { applyPreset, isActivePreset, navigate, openCustomize, presets, type Pag
 import { arrowGlyph, tuneGlyph } from "./icons.js";
 
 const preferenceTiles: { key: PreferenceKey; name: string; summary: string; page: PageKey }[] = [
-  { key: "motion", name: "Selection motion", summary: "How the indicator travels between menu items and segments.", page: "motion" },
-  { key: "curve", name: "Curve", summary: "The easing every control animation and page transition uses.", page: "motion" },
-  { key: "speed", name: "Speed", summary: "Scales every duration, from hover fades to page transitions.", page: "motion" },
-  { key: "reducedMotion", name: "Reduced motion", summary: "Follows the system setting or turns motion off for this theme.", page: "motion" },
-  { key: "emphasis", name: "Emphasis", summary: "How a selected menu item or segment is marked.", page: "emphasis" },
-  { key: "corner", name: "Corners", summary: "Control and panel radii, from square to rounded.", page: "emphasis" },
+  { key: "speed", name: "Speed", summary: "Scales every duration, from hover fades to page transitions.", page: "motion-curves" },
+  { key: "curve", name: "Curve", summary: "The easing every control animation and page transition uses.", page: "motion-curves" },
+  { key: "reducedMotion", name: "Reduced motion", summary: "Follows the system setting or turns motion off for this theme.", page: "motion-curves" },
+  { key: "motion", name: "Selection motion", summary: "How the indicator travels between menu items and segments.", page: "motion-selection" },
+  { key: "toggleMotion", name: "Toggle motion", summary: "How switch knobs and toggle buttons change state.", page: "motion-controls" },
+  { key: "checkMotion", name: "Check motion", summary: "How check marks, the indeterminate bar and radio dots appear.", page: "motion-controls" },
+  { key: "menuMotion", name: "Dropdown motion", summary: "How dropdowns, menus and popovers open from their anchor.", page: "motion-controls" },
   { key: "pageTransition", name: "Page transition", summary: "How one page replaces another, with shared elements.", page: "transitions" },
+  { key: "emphasis", name: "Emphasis", summary: "How a selected menu item or segment is marked.", page: "appearance-emphasis" },
+  { key: "corner", name: "Corners", summary: "Control and panel radii, from square to rounded.", page: "appearance-corners" },
 ];
 
-const chipNames: Record<PreferenceKey, string> = { motion: "Indicator", pageTransition: "Pages", curve: "Curve", speed: "Speed", reducedMotion: "Motion", emphasis: "Selection", corner: "Corners" };
+const chipNames: Record<PreferenceKey, string> = { motion: "Indicator", toggleMotion: "Toggles", checkMotion: "Checks", menuMotion: "Dropdowns", pageTransition: "Pages", curve: "Curve", speed: "Speed", reducedMotion: "Motion", emphasis: "Selection", corner: "Corners" };
 
 const presetChips = (preset: ShowcasePreset) => {
   const entries = (Object.entries(preset.preferences) as [PreferenceKey, string][]).map(([key, value]) => `${chipNames[key]}: ${preferenceLabel(value)}`);
@@ -45,7 +48,7 @@ export const OverviewPage = defineComponent({
           h("p", "Pick a preset or adjust each preference. The side menu, the segmented controls and the page you land on all animate with the values you choose."),
           h("div", { class: "control-row" }, [
             h(FluentButton, { tone: "primary", "data-testid": "showcase-open-customize", onClick: openCustomize }, () => [tuneGlyph(), "Customize"]),
-            h(FluentButton, { onClick: () => navigate("motion") }, () => ["See the motion", arrowGlyph()]),
+            h(FluentButton, { onClick: () => navigate("motion-curves") }, () => ["See the motion", arrowGlyph()]),
           ]),
         ]),
         h(HeroSample),
@@ -67,7 +70,7 @@ export const OverviewPage = defineComponent({
         })),
       ]),
       h("section", { class: "showcase-section", "aria-labelledby": "showcase-preferences" }, [
-        h("h3", { id: "showcase-preferences" }, "Seven preferences"),
+        h("h3", { id: "showcase-preferences" }, `${preferenceTiles.length} preferences`),
         h("div", { class: "preference-tiles" }, preferenceTiles.map((tile) => h("article", { class: "preference-tile", key: tile.key }, [
           h("span", { class: "preference-tile__name" }, tile.name),
           h("strong", { class: "preference-tile__value" }, preferenceLabel(preferences[tile.key])),

@@ -9,14 +9,14 @@ Run `pnpm --filter @platform-kit/fluent build`, then `pnpm --filter @platform-ki
 
 ## Showcase
 
-The showcase is one `FluentTheme` around a title bar, a `FluentNavigation` side menu and a `FluentTransitionView` that switches pages with the current page transition. The page is kept in the URL hash (`#overview`, `#motion`, `#emphasis`, `#transitions`, `#controls`, `#sliders`, `#feedback`), and theme, accent and preferences are kept in the query string with the same keys as the catalog.
+The showcase is one `FluentTheme` around a title bar, a two-level `FluentNavigation` side menu and a `FluentTransitionView` that switches pages with the current page transition. Each leaf page is kept in the URL hash (for example `#motion-controls`), and theme, accent and preferences are kept in the query string with the same keys as the catalog.
 
-- **Customize** holds every preference as a real control: theme, accent swatches with a custom color, selection motion, page transition, curve with a live plot, speed as a labelled slider, reduced motion, emphasis and corners. It is docked from 1180px and opens as a drawer below that.
+- **Customize** holds every preference as a real control: theme and accent (swatches and a custom color); speed, curve and reduced motion; selection indicator, toggle, check and dropdown motion and the page transition; emphasis and corners. It is docked from 1180px and opens as a drawer below that.
 - **Overview** has presets that set several preferences and an accent at once, and a tile for each preference.
-- **Motion** shows the scaled durations, races every curve side by side, and reuses the catalog's curve and selection motion cards.
-- **Emphasis and shape** shows the accent on every control type, plus the catalog's emphasis and corner cards.
+- **Motion**: curves and speed (scaled durations, a race of every curve), selection motion, and control motion, where every toggle, check and dropdown motion value sits in its own nested `FluentTheme` row for comparison.
+- **Appearance**: the accent on every control type, emphasis styles and corners.
 - **Page transitions** picks the app's own transition and holds the shared-element mini app.
-- **Controls**, **Sliders** and **Feedback and graphics** compose every export into a settings form, sound and display panels with an equalizer of vertical sliders, and upload progress.
+- **Controls**, **Sliders** and **Feedback** compose every export into forms, actions and overlays, sound and display panels, an equalizer of vertical sliders, upload progress and activity.
 
 Below 760px the side menu becomes a drawer behind the menu button.
 
