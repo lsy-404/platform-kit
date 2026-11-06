@@ -3,8 +3,9 @@
 .fluent-gauge__track,
 .fluent-gauge__value { fill: none; stroke-width: 8; stroke-linecap: round; }
 .fluent-gauge__track { stroke: color-mix(in srgb, var(--fluent-control-strong) 35%, transparent); }
-.fluent-gauge__value { stroke: var(--fluent-accent); transition: stroke-dashoffset var(--fluent-normal) var(--fluent-ease); }
-.fluent-gauge__value[hidden] { display: none; }
+.fluent-gauge__value { stroke: var(--fluent-accent); transition: stroke-dashoffset var(--fluent-normal) var(--fluent-ease), opacity 0s; }
+/* An empty arc would still draw a round cap, so it is hidden once the sweep down to zero has finished. */
+.fluent-gauge__value.is-empty { opacity: 0; transition: stroke-dashoffset var(--fluent-normal) var(--fluent-ease), opacity 0s linear var(--fluent-normal); }
 .fluent-gauge__content { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .fluent-gauge__number { font-size: calc(var(--fluent-gauge-size) * 0.22); font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
 .fluent-gauge__caption { position: absolute; left: 0; right: 0; top: 66%; text-align: center; font-size: max(10px, calc(var(--fluent-gauge-size) * 0.1)); line-height: 1.2; color: var(--fluent-muted); }

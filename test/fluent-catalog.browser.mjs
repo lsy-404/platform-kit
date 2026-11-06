@@ -50,7 +50,7 @@ try {
   }, name);
   const controlHover = await resolveThemeColor("--fluent-control-hover");
   const accentHover = await resolveThemeColor("--fluent-accent-hover");
-  const waitForHover = () => page.waitForTimeout(180);
+  const waitForHover = () => page.waitForTimeout(250);
   const background = (locator) => locator.evaluate(node => getComputedStyle(node).backgroundColor);
   const transform = (locator) => locator.evaluate(node => getComputedStyle(node).transform);
   const secondary = page.getByRole("button", { name: "Secondary", exact: true });

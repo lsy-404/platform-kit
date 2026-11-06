@@ -63,11 +63,10 @@ export const FluentGauge = defineComponent({
         h("svg", { viewBox: "0 0 100 100", "aria-hidden": "true", focusable: "false" }, [
           h("path", { class: "fluent-gauge__track", d: GAUGE_ARC, pathLength: 100 }),
           h("path", {
-            class: "fluent-gauge__value",
+            class: ["fluent-gauge__value", { "is-empty": fraction.value <= 0 }],
             d: GAUGE_ARC,
             pathLength: 100,
             style: { strokeDasharray: "100 100", strokeDashoffset: 100 - fraction.value * 100 },
-            hidden: fraction.value <= 0 ? true : undefined,
           }),
         ]),
         h("div", { class: "fluent-gauge__content" }, [
