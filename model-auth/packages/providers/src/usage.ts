@@ -103,6 +103,9 @@ export interface ProviderUsageCredential {
 }
 
 export interface AnthropicOAuthMetadata {
+  readonly userId?: string;
+  readonly email?: string;
+  readonly displayName?: string;
   readonly organizationId?: string;
   readonly subscriptionType?: string;
   readonly billingInterval?: string;
@@ -576,12 +579,22 @@ async function fetchAnthropicProfile(state: UsageHttpState, options: ProviderUsa
 export function parseAnthropicOAuthProfile(payload: unknown): AnthropicOAuthMetadata {
   const root = record(payload);
   const organization = record(root.organization ?? root.org);
+  const account = record(root.account);
+  const accountId = stringValue(account.uuid);
+  const userId = accountId && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(accountId) ? accountId : null;
+  const emailValue = stringValue(account.email);
+  const email = emailValue && emailValue.length <= 320 && !/[\x00-\x1f\x7f]/.test(emailValue) ? emailValue : null;
+  const nameValue = stringValue(account.display_name);
+  const displayName = nameValue && nameValue.length <= 256 && !/[\x00-\x1f\x7f]/.test(nameValue) ? nameValue : null;
   const organizationId = stringValue(root.organization_id, root.organizationId, root.org_id, organization.id, organization.uuid);
   const rawSubscriptionType = stringValue(root.organization_type, root.organizationType, organization.type, organization.organization_type)?.toLowerCase();
   const prefixSeparator = rawSubscriptionType?.indexOf("_") ?? -1;
   const subscriptionType = rawSubscriptionType && prefixSeparator >= 0 ? rawSubscriptionType.slice(prefixSeparator + 1) : rawSubscriptionType;
   const rateLimitTier = stringValue(root.rate_limit_tier, root.rateLimitTier, organization.rate_limit_tier);
   return {
+    ...(userId ? { userId } : {}),
+    ...(email ? { email } : {}),
+    ...(displayName ? { displayName } : {}),
     ...(organizationId ? { organizationId } : {}),
     ...(subscriptionType && ["pro", "max", "team", "enterprise"].includes(subscriptionType) ? { subscriptionType } : {}),
     ...(rateLimitTier ? { rateLimitTier } : {}),
