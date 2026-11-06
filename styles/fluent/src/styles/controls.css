@@ -434,7 +434,9 @@
 .fluent-progress-ring circle { fill: none; stroke-width: 2; }
 .fluent-progress-ring__track { stroke: var(--fluent-border); }
 .fluent-progress-ring__value { stroke: currentColor; stroke-linecap: round; }
-.fluent-progress-ring--indeterminate svg { animation: fluent-progress-spin 1s linear infinite; }
+/* The arc rotates steadily while its head runs ahead and its tail catches up, so its length stretches and shrinks every cycle. */
+.fluent-progress-ring--indeterminate svg { animation: fluent-progress-spin calc(2s * var(--fluent-motion-scale, 1)) linear infinite; }
+.fluent-progress-ring--indeterminate .fluent-progress-ring__value { animation: fluent-progress-arc calc(1.5s * var(--fluent-motion-scale, 1)) cubic-bezier(0.4, 0, 0.2, 1) infinite; }
 .fluent-scroll-viewer {
   min-height: 0;
   min-width: 0;
@@ -444,10 +446,16 @@
   scrollbar-color: var(--fluent-muted) transparent;
 }
 .fluent-scroll-viewer--horizontal { overflow-x: auto; }
-@keyframes fluent-progress-spin { to { transform: rotate(270deg); } }
+@keyframes fluent-progress-spin { from { transform: rotate(-90deg); } to { transform: rotate(270deg); } }
+@keyframes fluent-progress-arc {
+  0% { stroke-dasharray: 1 200; stroke-dashoffset: 0; }
+  50% { stroke-dasharray: 72 200; stroke-dashoffset: -28; }
+  100% { stroke-dasharray: 72 200; stroke-dashoffset: -99; }
+}
 @keyframes fluent-progress-slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
 @media (prefers-reduced-motion: reduce) {
   .fluent-progress-ring--indeterminate svg,
+  .fluent-progress-ring--indeterminate .fluent-progress-ring__value,
   .fluent-progress-bar--indeterminate .fluent-progress-bar__value { animation: none; }
 }
 

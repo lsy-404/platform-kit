@@ -38,7 +38,7 @@ The curves follow Fluent 2 motion tokens (`decelerate-mid` is the WinUI control 
 </FluentTheme>
 ```
 
-Controls include buttons, fields, switches, sliders, selects, file pickers, checkboxes, progress indicators, and a scroll viewer. `FluentCheckbox` accepts boolean `v-model` and a label slot. `FluentFilePicker` exposes a Fluent button, selected file list, clear action, `accept`, and `multiple`; the browser file input remains hidden behind the control. `FluentProgressRing` supports `size`, `active`, `value`, `max`, and `indeterminate`; `FluentProgressBar` accepts `value`, `max`, `indeterminate`, `showIndicator`, and `snap` with a configurable `step` (default 10).
+Controls include buttons, fields, switches, sliders, selects, file pickers, checkboxes, progress indicators, and a scroll viewer. `FluentCheckbox` accepts boolean `v-model` and a label slot. `FluentFilePicker` exposes a Fluent button, selected file list, clear action, `accept`, and `multiple`; the browser file input remains hidden behind the control. `FluentProgressRing` supports `size`, `active`, `value`, `max`, and `indeterminate` (the indeterminate arc rotates while its length stretches and shrinks, timed by the theme speed; reduced motion leaves a still arc); `FluentProgressBar` accepts `value`, `max`, `indeterminate`, `showIndicator`, and `snap` with a configurable `step` (default 10).
 
 Switches and sliders can omit a visible `label` when an `aria-label` is supplied. `FluentScrollViewer` scrolls vertically by default, enables horizontal scrolling with `horizontal`, and exposes `element()` and `scrollTo(options)` through `FluentScrollViewerHandle`. Set `focusable` to false for a non-tab-stop container.
 
