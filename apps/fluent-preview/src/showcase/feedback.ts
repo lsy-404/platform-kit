@@ -3,6 +3,8 @@ import { FluentButton, FluentNotice, FluentProgressBar, FluentProgressRing, Flue
 import { card } from "../card.js";
 import { GraphicsPreview } from "../graphics.js";
 import { pageFrame } from "./frame.js";
+import { GaugeDashboardCard, SpinnerCard } from "./gauges.js";
+import { VisualWeightCard } from "./visual-weight.js";
 
 const activity = Array.from({ length: 24 }, (_, index) => {
   const minute = String(59 - index * 2).padStart(2, "0");
@@ -27,7 +29,7 @@ export const ProgressPage = defineComponent({
     onBeforeUnmount(stop);
     const done = computed(() => progress.value >= 100);
 
-    return () => pageFrame("feedback-progress", "Notices, determinate and indeterminate progress, and rings.", () => [
+    return () => pageFrame("feedback-progress", "Notices, determinate and indeterminate progress, spinning rings and gauges.", () => [
       card("showcase-notices", "Notices", null, [
         h(FluentNotice, { tone: "info" }, () => "A new version of the workspace app is available."),
         h(FluentNotice, { tone: "success" }, () => "Your changes were saved."),
@@ -49,20 +51,20 @@ export const ProgressPage = defineComponent({
           ]),
           ...(done.value ? [h(FluentNotice, { tone: "success" }, () => "All files uploaded.")] : []),
         ]),
-        card("showcase-waiting", "Waiting", null, [
-          h(FluentProgressBar, { label: "Preparing", indeterminate: true }),
-          h("div", { class: "progress-row" }, [h(FluentProgressRing, { label: "Loading", size: 20 }), h(FluentProgressRing, { label: "Loading larger", size: 32 }), h(FluentProgressRing, { label: "Loading largest", size: 48 })]),
-        ]),
+        h(SpinnerCard),
       ]),
+      h(GaugeDashboardCard),
+      card("showcase-waiting", "Indeterminate bar", null, [h(FluentProgressBar, { label: "Preparing", indeterminate: true })], true),
     ]);
   },
 });
 
 export const ActivityPage = defineComponent({
-  setup: () => () => pageFrame("feedback-activity", "A scroll viewer and optically centred SVG icons.", () => [
+  setup: () => () => pageFrame("feedback-activity", "A scroll viewer, optically centred SVG icons, and how colour changes the visual weight they are centred by.", () => [
     card("showcase-activity", "Activity", null, [
       h(FluentScrollViewer, { class: "activity-log", "aria-label": "Recent activity" }, () => h("ol", { class: "activity-list" }, activity.map((entry) => h("li", { key: entry.time }, [h("time", entry.time), h("span", entry.text)])))),
     ]),
     h(GraphicsPreview),
+    h(VisualWeightCard),
   ]),
 });
