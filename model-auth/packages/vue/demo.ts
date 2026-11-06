@@ -59,9 +59,6 @@ createApp({
           const list = provider[key] ?? [];
           provider[key] = payload.credentialIds.map(id => list.find(item => item.id === id)!) as never;
         },
-        onUpdateProvider: (payload: { providerId: string; oauthEnabled: boolean }) => {
-          providers.value.find(item => item.id === payload.providerId)!.oauthEnabled = payload.oauthEnabled;
-        },
         onUpdateProviderStrategy: (payload) => { providers.value.find(item => item.id === payload.providerId)!.loadStrategy = payload.strategy; },
         onRemoveOauth: (id: string, credentialId: string) => {
           const provider = providers.value.find(item => item.id === id)!;

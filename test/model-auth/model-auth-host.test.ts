@@ -9,10 +9,10 @@ it("keeps the dialog open after the host saves and refreshes successfully", asyn
     async execute() { if (fail) throw new Error("failed"); },
   });
   binding.open.value = true;
-  expect(await binding.listeners["update-provider"]({ providerId: "sample", oauthEnabled: true })).toBe(false);
+  expect(await binding.listeners["update-credential"]({ providerId: "sample", credentialId: "account", enabled: true })).toBe(false);
   expect(binding.open.value).toBe(true);
   fail = false;
-  expect(await binding.listeners["update-provider"]({ providerId: "sample", oauthEnabled: true })).toBe(true);
+  expect(await binding.listeners["update-credential"]({ providerId: "sample", credentialId: "account", enabled: true })).toBe(true);
   expect(binding.open.value).toBe(true);
 });
 
@@ -23,7 +23,7 @@ it("a late confirmation cannot close a newly opened dialog", async () => {
     async execute() { await new Promise<void>(resolve => { finish = resolve; }); },
   });
   binding.open.value = true;
-  const pending = binding.listeners["update-provider"]({ providerId: "sample", oauthEnabled: true });
+  const pending = binding.listeners["update-credential"]({ providerId: "sample", credentialId: "account", enabled: true });
   await Promise.resolve();
   binding.listeners.close();
   binding.open.value = true;

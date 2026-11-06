@@ -166,7 +166,6 @@ export interface ModelAuthProvider {
   authMethods: AuthMethod[];
   available: boolean;
   unavailableReason?: string | null;
-  oauthEnabled?: boolean;
   loadStrategy?: LoadStrategy;
   mark?: string;
   iconUrl?: string;
@@ -186,4 +185,3 @@ export interface AddApiKeyPayload { providerId: string; label: string; apiKey: s
 export interface CredentialLoginInput { username: string; password?: string }
 export interface CredentialUpdatePayload { providerId: string; credentialId: string; enabled: boolean; extend?: CredentialExtend; secret?: string; label?: string; login?: CredentialLoginInput | null; allowExtraUsage?: boolean }
 export interface CredentialReorderPayload { providerId: string; method: AuthMethod; credentialIds: string[] }
-export interface ProviderUpdatePayload { providerId: string; oauthEnabled: boolean }

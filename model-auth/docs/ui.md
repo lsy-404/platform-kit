@@ -38,7 +38,7 @@ The same composable can be used in each Vue host. It never logs action payloads 
 
 The provider step groups entries as sign-in, API key and unavailable, with providers that already have credentials first and the host order otherwise. Each group shows its first eight entries behind a show-all toggle, the unavailable group starts collapsed, and a non-empty search lists every match. The refresh action appears only when no provider matches the search. The built-in Ollama mark is an embedded PNG, so hosts with a Content Security Policy need `img-src data:` for it to render.
 
-An available provider can support browser authentication, API keys or both. `oauthEnabled=false` disables the provider's browser authentication independently of its individual credential preferences. Set `usageEnabled` or `logoutEnabled` only when the host handles those actions. Credential order is the array order supplied by the host and is the priority order; each credential has `enabled`, health state, optional `usage`, and optional scalar `extend` metadata. The models listed for a connection are the deduplicated union of the provider's method models (or catalog `models`) and every credential's `models`. The list is read-only and there is no current-model state; the host decides which model is used. Set `secret` on a credential to show its API key or serialised OAuth token in the credential row; the dialog shows it in plain text by default, lets the user hide and edit it, and reports the change through `update-credential`. `@model-auth/core` stays metadata-only: the host owns secret persistence and decides whether to supply `secret` at all. Credentials without `secret` show no field.
+An available provider can support browser authentication, API keys or both. Set `usageEnabled` or `logoutEnabled` only when the host handles those actions. Credential order is the array order supplied by the host and is the priority order; each credential has `enabled`, health state, optional `usage`, and optional scalar `extend` metadata. The models listed for a connection are the deduplicated union of the provider's method models (or catalog `models`) and every credential's `models`. The list is read-only and there is no current-model state; the host decides which model is used. Set `secret` on a credential to show its API key or serialised OAuth token in the credential row; the dialog shows it in plain text by default, lets the user hide and edit it, and reports the change through `update-credential`. `@model-auth/core` stays metadata-only: the host owns secret persistence and decides whether to supply `secret` at all. Credentials without `secret` show no field.
 
 ## Events
 
@@ -57,7 +57,6 @@ An available provider can support browser authentication, API keys or both. `oau
 | `respond-auth` | { loginId, promptId, value } |
 | `cancel-auth` | loginId |
 | `open-auth-url` | url; host validates and opens it |
-| `update-provider` | { providerId, oauthEnabled } |
 | `update-provider-strategy` | { providerId, strategy } |
 | `update-strategy` | strategy; use for hosts with one shared strategy |
 
