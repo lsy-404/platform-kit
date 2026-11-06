@@ -25,7 +25,7 @@ const contrast = (a, b) => { const [hi, lo] = [luminance(a), luminance(b)].sort(
 const rgb = value => { const parts = value.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number); return value.startsWith("color(") ? parts.map(part => part * 255) : parts; };
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, colorScheme: "dark", reducedMotion: "no-preference" });
-  await page.goto(`http://127.0.0.1:${port}/?theme=dark&accent=%230067c0`, { waitUntil: "networkidle" });
+  await page.goto(`http://127.0.0.1:${port}/catalog.html?theme=dark&accent=%230067c0`, { waitUntil: "networkidle" });
 
   const primary = page.getByTestId("button-primary");
   const { color, background } = await primary.evaluate(el => { const style = getComputedStyle(el); return { color: style.color, background: style.backgroundColor }; });

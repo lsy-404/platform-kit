@@ -18,7 +18,7 @@ test("built Fluent preview supports trimming, theme changes, RTL and narrow layo
     for (const theme of ["light", "dark"]) {
       for (const width of [1280, 390]) {
         await page.setViewportSize({ width, height: 900 });
-        await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?theme=${theme}`);
+        await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/catalog.html?theme=${theme}`);
         const section = page.locator("#graphics");
         await section.scrollIntoViewIfNeeded();
         await page.waitForFunction(() => {

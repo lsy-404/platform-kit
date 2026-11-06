@@ -5,7 +5,7 @@ import { preferenceLabel, preferences } from "./preferences.js";
 import { card } from "./card.js";
 import { TransitionsCard } from "./transition-card.js";
 
-function useMotionDurations() {
+export function useMotionDurations() {
   const element = ref<HTMLElement | null>(null);
   const durations = reactive({ faster: 0, fast: 0, normal: 0 });
   const read = () => {
@@ -23,7 +23,7 @@ const formatMs = (value: number) => `${Math.round(value)} ms`;
 const plot = { width: 104, height: 64, left: 8, top: 8, min: -0.05, max: 1.15 };
 const plotY = (value: number) => plot.top + plot.height * (1 - (value - plot.min) / (plot.max - plot.min));
 
-const CurvesCard = defineComponent({
+export const CurvesCard = defineComponent({
   setup() {
     const probes = new Map<string, HTMLElement>();
     const paths = ref<Record<string, string>>({});
@@ -95,7 +95,7 @@ const row = (name: string, attribute: string, demo: VNode) => h("div", { class: 
   demo,
 ]);
 
-const MotionCard = defineComponent({
+export const MotionCard = defineComponent({
   setup() {
     const auto = ref(false), tick = ref(0);
     let timer: ReturnType<typeof setInterval> | undefined;
@@ -111,13 +111,13 @@ const MotionCard = defineComponent({
   },
 });
 
-const EmphasisCard = defineComponent({
+export const EmphasisCard = defineComponent({
   setup: () => () => card("pref-emphasis", "Emphasis styles", "Selected-item styling in the current theme and accent.", [
     h("div", { class: "selection-rows" }, fluentPreferenceOptions.emphasis.map((name) => row(name, "emphasis", h(SelectionDemo, { emphasis: name })))),
   ], true),
 });
 
-const CornersCard = defineComponent({
+export const CornersCard = defineComponent({
   setup() {
     const { durations, probe } = useMotionDurations();
     const sample = (corner: FluentCorner) => h("div", { class: "corner-sample", key: corner, "data-fluent-corner": corner, "data-testid": `corner-${corner}` }, [

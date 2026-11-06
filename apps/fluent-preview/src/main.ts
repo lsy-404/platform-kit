@@ -2,6 +2,7 @@ import { version } from "../../../styles/fluent/package.json";
 import { FluentButton, FluentCheckbox, FluentDialog, FluentField, FluentFilePicker, FluentMenu, FluentNavigation, FluentNotice, FluentNumberField, FluentPasswordField, FluentPopover, FluentProgressBar, FluentProgressRing, FluentRadio, FluentScrollViewer, FluentSegmented, FluentSelect, FluentSlider, FluentSwitch, FluentTextArea, FluentTheme, FluentToggleButton } from "@platform-kit/fluent/vue";
 import "@platform-kit/fluent/style.css";
 import { createApp, defineComponent, h, ref, type ComponentPublicInstance } from "vue";
+import "./cards.css";
 import "./preview.css";
 import { GraphicsPreview } from "./graphics.js";
 import { PreferenceBar, preferences, syncQuery } from "./preferences.js";
@@ -27,6 +28,7 @@ const Catalog = defineComponent({
     const anchor = (target: typeof menuAnchor | typeof popoverAnchor) => (element: Element | ComponentPublicInstance | null) => target.value = element instanceof HTMLElement ? element : null;
     return () => h(FluentTheme, { mode: theme.value, accent: accent.value, ...preferences, class: "catalog-theme" }, { default: () => h("div", { class: "catalog-page" }, [
       h("header", { class: "catalog-header" }, [h("div", [h("p", { class: "catalog-kicker" }, `@platform-kit/fluent ${version}`), h("h1", "Fluent control catalog")]), h("div", { class: "catalog-settings", "aria-label": "Catalog settings" }, [
+        h("a", { class: "catalog-showcase-link", href: "index.html" }, "Open the showcase"),
         h(FluentSelect, { label: "Theme", "data-testid": "theme-mode", modelValue: theme.value, options: [{ value: "light", label: "Light" }, { value: "dark", label: "Dark" }, { value: "system", label: "System" }], "onUpdate:modelValue": (value: string) => theme.value = value as ThemeMode }),
         h(FluentSelect, { label: "Accent", "data-testid": "accent-select", modelValue: accent.value ?? "", options: [{ value: "", label: "Default" }, ...accents.map(value => ({ value, label: value }))], "onUpdate:modelValue": (value: string) => accent.value = value || undefined })
       ])]),

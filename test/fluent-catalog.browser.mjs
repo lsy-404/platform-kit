@@ -22,7 +22,7 @@ const artifact = join(root, "test/artifacts");
 await mkdir(artifact, { recursive: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, colorScheme: "light", reducedMotion: "no-preference" });
-  await page.goto(`http://127.0.0.1:${port}`, { waitUntil: "networkidle" });
+  await page.goto(`http://127.0.0.1:${port}/catalog.html`, { waitUntil: "networkidle" });
   for (const name of ["button-primary", "toggle-button", "switch", "fluent-slider", "slider-continuous", "slider-range", "slider-integer", "slider-available", "slider-free-available", "slider-vertical", "fluent-select", "menu-trigger", "file-picker", "scroll-viewer", "dialog-trigger", "popover-trigger", "theme-mode", "accent-select", "details"]) assert.equal(await page.getByTestId(name).count(), 1, `missing ${name}`);
   for (const type of ["text", "search", "email", "url", "tel", "password", "number", "color", "date", "time", "datetime-local", "month", "week"]) assert.ok(await page.locator(`input[type="${type}"]`).count() >= 1, `missing native ${type}`);
   assert.equal(await page.locator(".fluent-file-picker").count(), 1);
@@ -258,8 +258,8 @@ try {
   assert.equal(await page.locator(".catalog-theme").getAttribute("data-fluent-theme"), "dark");
   await page.screenshot({ path: join(artifact, "fluent-catalog-dark.png"), fullPage: true });
   const forced = await browser.newPage({ viewport: { width: 1280, height: 900 }, forcedColors: "active" });
-  await forced.goto(`http://127.0.0.1:${port}`); await forced.screenshot({ path: join(artifact, "fluent-catalog-forced-colors.png"), fullPage: true }); await forced.close();
+  await forced.goto(`http://127.0.0.1:${port}/catalog.html`); await forced.screenshot({ path: join(artifact, "fluent-catalog-forced-colors.png"), fullPage: true }); await forced.close();
   const reduced = await browser.newPage({ viewport: { width: 1280, height: 900 }, reducedMotion: "reduce" });
-  await reduced.goto(`http://127.0.0.1:${port}`); assert.equal(await reduced.emulateMedia({ reducedMotion: "reduce" }), undefined); await reduced.screenshot({ path: join(artifact, "fluent-catalog-reduced-motion.png"), fullPage: true }); await reduced.close();
+  await reduced.goto(`http://127.0.0.1:${port}/catalog.html`); assert.equal(await reduced.emulateMedia({ reducedMotion: "reduce" }), undefined); await reduced.screenshot({ path: join(artifact, "fluent-catalog-reduced-motion.png"), fullPage: true }); await reduced.close();
   console.log("Fluent catalog browser coverage passed: slider variants, 14 native input types, four preference screenshots");
 } finally { await browser.close(); await new Promise((resolve) => server.close(resolve)); }
