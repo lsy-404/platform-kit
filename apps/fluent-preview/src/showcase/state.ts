@@ -34,9 +34,9 @@ export interface ShowcasePreset {
 
 export const presets: ShowcasePreset[] = [
   { id: "default", name: "Default", description: "The kit defaults: a sliding indicator, the page entrance and the mid decelerate curve.", preferences: {} },
-  { id: "snappy", name: "Snappy", description: "Short durations, a strong decelerate, plain toggles and quick fading dropdowns.", preferences: { pageTransition: "slide", toggleMotion: "slide", menuMotion: "fade", curve: "decelerate-max", speed: "fast", corner: "small" } },
+  { id: "snappy", name: "Snappy", description: "Short durations, a strong decelerate, plain toggles and spinners, and quick fading dropdowns.", preferences: { pageTransition: "slide", toggleMotion: "slide", menuMotion: "fade", ringMotion: "spin", barMotion: "linear", curve: "decelerate-max", speed: "fast", corner: "small" } },
   { id: "calm", name: "Calm", description: "Cross-fades everywhere, an even curve, slower timing and a tinted selection.", preferences: { motion: "fade", pageTransition: "fade", checkMotion: "fade", menuMotion: "fade", curve: "easy-ease", speed: "slow", emphasis: "tinted", corner: "large" }, accent: "#038387" },
-  { id: "playful", name: "Playful", description: "A stretching indicator, drill-in pages, scaling dropdowns and a spring that overshoots.", preferences: { motion: "stretch", pageTransition: "scale", menuMotion: "scale", curve: "spring", emphasis: "filled", corner: "large" }, accent: "#b146c2" },
+  { id: "playful", name: "Playful", description: "A stretching indicator, drill-in pages, scaling dropdowns, orbiting dots and a spring that overshoots.", preferences: { motion: "stretch", pageTransition: "scale", menuMotion: "scale", ringMotion: "dots", barMotion: "bounce", curve: "spring", emphasis: "filled", corner: "large" }, accent: "#b146c2" },
   { id: "editorial", name: "Editorial", description: "Underlined selection, square corners and an accent wipe between pages.", preferences: { pageTransition: "wipe", curve: "easy-ease-max", emphasis: "underline", corner: "none" }, accent: "#ca5010" },
   { id: "still", name: "Still", description: "Reduced motion: indicators jump, controls change instantly and pages switch without animating.", preferences: { reducedMotion: "reduce" } },
 ];

@@ -46,7 +46,7 @@ export const GaugeDashboardCard = defineComponent({
 export const SpinnerCard = defineComponent({
   setup() {
     const busy = ref(false);
-    return () => card("showcase-spinners", "Progress rings", `While spinning, the arc's head runs ahead and its tail catches up, so its length stretches and shrinks every turn. The loop follows the speed preference (now ${preferenceLabel(preferences.speed)}); reduced motion leaves a still arc.`, [
+    return () => card("showcase-spinners", "Progress rings", `Showing the ${preferenceLabel(preferences.ringMotion)} style from Customize. Stretch lets the arc grow and shrink while it turns, Spin turns a fixed arc at constant speed, and Dots orbits five dots. Every style follows the speed preference (now ${preferenceLabel(preferences.speed)}); reduced motion keeps them still.`, [
       h("div", { class: "spinner-row" }, [16, 24, 32, 48, 64].map((size) => h("figure", { class: "spinner-sample", key: size }, [
         h(FluentProgressRing, { label: `Loading, ${size} pixels`, size }),
         h("figcaption", `${size} px`),

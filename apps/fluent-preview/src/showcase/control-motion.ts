@@ -1,12 +1,12 @@
 import { defineComponent, h, onBeforeUnmount, reactive, ref, watch, type VNode } from "vue";
-import { FluentCheckbox, FluentRadio, FluentSelect, FluentSwitch, FluentTheme, FluentToggleButton, fluentPreferenceOptions } from "@platform-kit/fluent/vue";
+import { FluentButton, FluentCheckbox, FluentProgressBar, FluentProgressRing, FluentRadio, FluentSelect, FluentSwitch, FluentTheme, FluentToggleButton, fluentPreferenceOptions } from "@platform-kit/fluent/vue";
 import { card } from "../card.js";
 import { preferenceLabel, preferences } from "../preferences.js";
 import { pageFrame } from "./frame.js";
 import { appearance } from "./state.js";
 
-type Family = "toggleMotion" | "checkMotion" | "menuMotion";
-const testIds: Record<Family, string> = { toggleMotion: "toggle-motion", checkMotion: "check-motion", menuMotion: "menu-motion" };
+type Family = "toggleMotion" | "checkMotion" | "menuMotion" | "ringMotion" | "barMotion";
+const testIds: Record<Family, string> = { toggleMotion: "toggle-motion", checkMotion: "check-motion", menuMotion: "menu-motion", ringMotion: "ring-motion", barMotion: "bar-motion" };
 const folders = ["Inbox", "Drafts", "Sent", "Archive"].map((label) => ({ value: label.toLowerCase(), label }));
 
 // Each row nests a FluentTheme that sets only this family, so speed, curve and the other preferences still come from Customize.
@@ -37,7 +37,7 @@ export const ControlMotionPage = defineComponent({
     watch(auto, (on) => { clearInterval(timer); if (on) timer = setInterval(flip, 1400); });
     onBeforeUnmount(() => clearInterval(timer));
 
-    return () => pageFrame("motion-controls", "Toggles, check controls and dropdowns each have their own motion preference. Every row below pins one value; Customize decides the value the rest of the app uses.", () => [
+    return () => pageFrame("motion-controls", "Toggles, check controls, dropdowns, progress rings and indeterminate bars each have their own motion preference. Every row below pins one value; Customize decides the value the rest of the app uses.", () => [
       h(FluentSwitch, { label: "Auto-play toggles and checks", "data-testid": "control-motion-autoplay", modelValue: auto.value, "onUpdate:modelValue": (value: boolean) => { auto.value = value; } }),
       card("showcase-toggle-motion", "Toggles", "Switches and toggle buttons. Hold the pointer down on a switch to see the stretch.", [
         h("div", { class: "selection-rows" }, fluentPreferenceOptions.toggleMotion.map((value) => row("toggleMotion", value, [
@@ -56,6 +56,17 @@ export const ControlMotionPage = defineComponent({
       card("showcase-menu-motion", "Dropdowns", "Open each dropdown to compare how the list arrives from its anchor.", [
         h("div", { class: "selection-rows" }, fluentPreferenceOptions.menuMotion.map((value) => row("menuMotion", value, [
           h(FluentSelect, { label: `${preferenceLabel(value)} folder`, modelValue: folder[value], options: folders, "onUpdate:modelValue": (next: string) => { folder[value] = next; } }),
+        ]))),
+      ], true),
+      card("showcase-ring-motion", "Progress rings", "Indeterminate rings at three sizes and inside a busy button.", [
+        h("div", { class: "selection-rows" }, fluentPreferenceOptions.ringMotion.map((value) => row("ringMotion", value, [
+          ...[20, 32, 48].map((size) => h(FluentProgressRing, { key: size, label: `Loading, ${preferenceLabel(value)} style`, size })),
+          h(FluentButton, { tone: "primary", busy: true }, () => "Syncing"),
+        ]))),
+      ], true),
+      card("showcase-bar-motion", "Indeterminate progress bars", "The same indeterminate bar in each style.", [
+        h("div", { class: "selection-rows" }, fluentPreferenceOptions.barMotion.map((value) => row("barMotion", value, [
+          h(FluentProgressBar, { class: "motion-bar", label: `Preparing, ${preferenceLabel(value)} style`, indeterminate: true }),
         ]))),
       ], true),
     ]);

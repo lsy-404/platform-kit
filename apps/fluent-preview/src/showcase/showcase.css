@@ -178,3 +178,4 @@
 .gauge-drive{display:flex;flex-wrap:wrap;align-items:center;gap:20px 32px;padding-top:12px;border-top:1px solid var(--fluent-border)}
 .gauge-drive__controls{display:grid;flex:1 1 260px;gap:12px}
 .gauge-drive__controls .fluent-slider{width:min(360px,100%)}
+.motion-bar{flex:1 1 220px}

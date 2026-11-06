@@ -11,12 +11,12 @@ Run `pnpm --filter @platform-kit/fluent build`, then `pnpm --filter @platform-ki
 
 The showcase is one `FluentTheme` around a title bar, a two-level `FluentNavigation` side menu and a `FluentTransitionView` that switches pages with the current page transition. Each leaf page is kept in the URL hash (for example `#motion-controls`), and theme, accent and preferences are kept in the query string with the same keys as the catalog.
 
-- **Customize** holds every preference as a real control: theme and accent (swatches and a custom color); speed, curve and reduced motion; selection indicator, toggle, check and dropdown motion and the page transition; emphasis and corners. It is docked from 1180px and opens as a drawer below that.
+- **Customize** holds every preference as a real control: theme and accent (swatches and a custom color); speed, curve and reduced motion; selection indicator, toggle, check, dropdown, progress ring and indeterminate bar motion and the page transition; emphasis and corners. It is docked from 1180px and opens as a drawer below that.
 - **Overview** has presets that set several preferences and an accent at once, and a tile for each preference.
-- **Motion**: curves and speed (scaled durations, a race of every curve), selection motion, and control motion, where every toggle, check and dropdown motion value sits in its own nested `FluentTheme` row for comparison.
+- **Motion**: curves and speed (scaled durations, a race of every curve), selection motion, and control motion, where every toggle, check, dropdown, progress ring and progress bar motion value sits in its own nested `FluentTheme` row for comparison.
 - **Appearance**: the accent on every control type, emphasis styles and corners.
 - **Page transitions** picks the app's own transition and holds the shared-element mini app.
-- **Controls**, **Sliders** and **Feedback** compose every export into forms, actions and overlays, sound and display panels, an equalizer of vertical sliders, upload progress and activity.
+- **Controls**, **Sliders** and **Feedback** compose every export into forms, actions and overlays, sound and display panels, an equalizer of vertical sliders, upload progress, progress rings, live gauges, activity, and a comparison of how colour and surface move the visual centre of an icon.
 
 Below 760px the side menu becomes a drawer behind the menu button.
 

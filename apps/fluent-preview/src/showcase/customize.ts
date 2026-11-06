@@ -84,6 +84,8 @@ export const CustomizePane = defineComponent({
         field("Switches and toggle buttons", h(FluentSegmented, { label: "Switches and toggle buttons", "data-testid": "showcase-toggle-motion", modelValue: preferences.toggleMotion, options: preferenceOptions("toggleMotion"), "onUpdate:modelValue": update("toggleMotion") })),
         field("Checkboxes and radios", h(FluentSegmented, { label: "Checkboxes and radios", "data-testid": "showcase-check-motion", modelValue: preferences.checkMotion, options: preferenceOptions("checkMotion"), "onUpdate:modelValue": update("checkMotion") })),
         field("Dropdowns and menus", h(FluentSegmented, { label: "Dropdowns and menus", "data-testid": "showcase-menu-motion", modelValue: preferences.menuMotion, options: preferenceOptions("menuMotion"), "onUpdate:modelValue": update("menuMotion") })),
+        field("Progress rings", h(FluentSegmented, { label: "Progress rings", "data-testid": "showcase-ring-motion", modelValue: preferences.ringMotion, options: preferenceOptions("ringMotion"), "onUpdate:modelValue": update("ringMotion") })),
+        field("Indeterminate progress bars", h(FluentSegmented, { label: "Indeterminate progress bars", "data-testid": "showcase-bar-motion", modelValue: preferences.barMotion, options: preferenceOptions("barMotion"), "onUpdate:modelValue": update("barMotion") })),
         h(FluentSelect, { label: "Page transition", "data-testid": "showcase-page-transition", modelValue: preferences.pageTransition, options: preferenceOptions("pageTransition"), "onUpdate:modelValue": update("pageTransition") }),
       ]),
       group("Emphasis and shape", [

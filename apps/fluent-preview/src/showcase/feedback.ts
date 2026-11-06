@@ -1,6 +1,7 @@
 import { computed, defineComponent, h, onBeforeUnmount, ref } from "vue";
 import { FluentButton, FluentNotice, FluentProgressBar, FluentProgressRing, FluentScrollViewer } from "@platform-kit/fluent/vue";
 import { card } from "../card.js";
+import { preferenceLabel, preferences } from "../preferences.js";
 import { GraphicsPreview } from "../graphics.js";
 import { pageFrame } from "./frame.js";
 import { GaugeDashboardCard, SpinnerCard } from "./gauges.js";
@@ -54,7 +55,7 @@ export const ProgressPage = defineComponent({
         h(SpinnerCard),
       ]),
       h(GaugeDashboardCard),
-      card("showcase-waiting", "Indeterminate bar", null, [h(FluentProgressBar, { label: "Preparing", indeterminate: true })], true),
+      card("showcase-waiting", "Indeterminate bar", `Showing the ${preferenceLabel(preferences.barMotion)} style from Customize; compare every style on Control motion.`, [h(FluentProgressBar, { label: "Preparing", indeterminate: true })], true),
     ]);
   },
 });

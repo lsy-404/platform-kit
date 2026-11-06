@@ -13,12 +13,14 @@ const preferenceTiles: { key: PreferenceKey; name: string; summary: string; page
   { key: "toggleMotion", name: "Toggle motion", summary: "How switch knobs and toggle buttons change state.", page: "motion-controls" },
   { key: "checkMotion", name: "Check motion", summary: "How check marks, the indeterminate bar and radio dots appear.", page: "motion-controls" },
   { key: "menuMotion", name: "Dropdown motion", summary: "How dropdowns, menus and popovers open from their anchor.", page: "motion-controls" },
+  { key: "ringMotion", name: "Progress ring", summary: "A stretching arc, a plain spinning arc or orbiting dots.", page: "motion-controls" },
+  { key: "barMotion", name: "Indeterminate bar", summary: "Two growing segments, a constant sweep or a back-and-forth glide.", page: "motion-controls" },
   { key: "pageTransition", name: "Page transition", summary: "How one page replaces another, with shared elements.", page: "transitions" },
   { key: "emphasis", name: "Emphasis", summary: "How a selected menu item or segment is marked.", page: "appearance-emphasis" },
   { key: "corner", name: "Corners", summary: "Control and panel radii, from square to rounded.", page: "appearance-corners" },
 ];
 
-const chipNames: Record<PreferenceKey, string> = { motion: "Indicator", toggleMotion: "Toggles", checkMotion: "Checks", menuMotion: "Dropdowns", pageTransition: "Pages", curve: "Curve", speed: "Speed", reducedMotion: "Motion", emphasis: "Selection", corner: "Corners" };
+const chipNames: Record<PreferenceKey, string> = { motion: "Indicator", toggleMotion: "Toggles", checkMotion: "Checks", menuMotion: "Dropdowns", ringMotion: "Rings", barMotion: "Bars", pageTransition: "Pages", curve: "Curve", speed: "Speed", reducedMotion: "Motion", emphasis: "Selection", corner: "Corners" };
 
 const presetChips = (preset: ShowcasePreset) => {
   const entries = (Object.entries(preset.preferences) as [PreferenceKey, string][]).map(([key, value]) => `${chipNames[key]}: ${preferenceLabel(value)}`);
