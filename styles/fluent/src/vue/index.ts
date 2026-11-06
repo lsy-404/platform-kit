@@ -13,6 +13,8 @@ export type {
   FluentToggleMotion,
   FluentCheckMotion,
   FluentMenuMotion,
+  FluentRingMotion,
+  FluentBarMotion,
 } from "../theme.js";
 export {
   FluentButton,
