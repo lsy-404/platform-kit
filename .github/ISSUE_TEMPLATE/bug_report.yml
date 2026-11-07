@@ -1,0 +1,53 @@
+name: Bug report
+description: Something in a package does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Code contributions are not accepted; this report is the way to get a fix. Never include tokens, cookies, private keys or production data.
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      options:
+        - "@platform-kit/fluent"
+        - "@platform-kit/visual-center"
+        - "@platform-kit/ui-tokens"
+        - "@platform-kit/toast"
+        - "@platform-kit/liquid-glass"
+        - "@platform-kit/appearance-check"
+        - "@platform-kit/ffmpeg-lgpl"
+        - "@model-auth/core"
+        - "@model-auth/providers"
+        - "@model-auth/vue"
+        - "model-auth-native"
+        - Fluent preview site
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Release tag
+      placeholder: fluent-v0.3.2
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: A minimal snippet, or the control in the Fluent preview that shows the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behaviour
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: Chrome 142, Windows 11, Node.js 24

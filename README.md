@@ -2,9 +2,11 @@
 
 Apache-2.0 theme and public AI access packages, distributed directly through this repository's GitHub Releases.
 
+**Fluent preview:** [showcase](https://lsy-404.github.io/platform-kit/) · [control catalog](https://lsy-404.github.io/platform-kit/catalog.html) — deployed to GitHub Pages from `main` and every `fluent-v*` release.
+
 | Package | Contents |
 | --- | --- |
-| `@platform-kit/fluent` | Native Fluent themes, Vue controls, navigation and overlays |
+| `@platform-kit/fluent` | Native Fluent themes, Vue controls, navigation and overlays; [usage](styles/fluent/README.md), [preview](https://lsy-404.github.io/platform-kit/) |
 | `@platform-kit/visual-center` | Background-aware pixel/SVG centroid estimates; [usage](tooling/visual-center/README.md) |
 | `@platform-kit/ui-tokens` | Lightweight CSS theme variables |
 | `@platform-kit/toast` | Transient notifications with Vue and framework-free hosts; [usage](styles/toast/README.md) |
@@ -23,10 +25,10 @@ Use public release archive URLs in `package.json`. No private registry token or 
 ```json
 {
   "dependencies": {
-    "@lsypkg/fluent": "https://github.com/lsy-404/platform-kit/releases/download/fluent-v0.2.8/platform-kit-fluent-0.2.8.tgz",
+    "@lsypkg/fluent": "https://github.com/lsy-404/platform-kit/releases/download/fluent-v0.3.2/platform-kit-fluent-0.3.2.tgz",
     "@model-auth/core": "https://github.com/lsy-404/platform-kit/releases/download/model-auth-core-v0.11.1/model-auth-core-0.11.1.tgz",
-    "@model-auth/providers": "https://github.com/lsy-404/platform-kit/releases/download/model-auth-providers-v0.22.1/model-auth-providers-0.22.1.tgz",
-    "@model-auth/vue": "https://github.com/lsy-404/platform-kit/releases/download/model-auth-vue-v0.13.0/model-auth-vue-0.13.0.tgz"
+    "@model-auth/providers": "https://github.com/lsy-404/platform-kit/releases/download/model-auth-providers-v0.24.3/model-auth-providers-0.24.3.tgz",
+    "@model-auth/vue": "https://github.com/lsy-404/platform-kit/releases/download/model-auth-vue-v0.14.2/model-auth-vue-0.14.2.tgz"
   }
 }
 ```
@@ -59,7 +61,11 @@ node test/release-consumer.mjs
 
 See [Fluent](styles/fluent/README.md) and [AI access](model-auth/README.md) for their APIs. Provider authentication and usage queries run in a trusted host; credentials and API keys never belong in this repository.
 
-Pushing a package tag such as `fluent-v0.2.8` runs the same verification pipeline and publishes only that package archive with a package-specific SHA-256 checksum. The generated `release/` directory groups archives as `release/<package-name>/<package-name>-<version>.*`; package archive basenames remain unchanged. There is no root `platform-kit` release version or main release tag. Third-party dependencies retain their own licenses; applicable bundled-code notices ship with the corresponding package.
+Pushing a package tag such as `fluent-v0.3.2` runs the same verification pipeline and publishes only that package archive with a package-specific SHA-256 checksum. The generated `release/` directory groups archives as `release/<package-name>/<package-name>-<version>.*`; package archive basenames remain unchanged. There is no root `platform-kit` release version or main release tag. Third-party dependencies retain their own licenses; applicable bundled-code notices ship with the corresponding package.
+
+## Feedback
+
+This repository does not accept code contributions; pull requests are limited to maintainers. Bug reports and suggestions are welcome through [Issues](https://github.com/lsy-404/platform-kit/issues/new/choose). See [CONTRIBUTING](CONTRIBUTING.md) for what to include, and [SECURITY](SECURITY.md) for credential exposure.
 
 ## License
 

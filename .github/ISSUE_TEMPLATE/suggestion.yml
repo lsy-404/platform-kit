@@ -1,0 +1,28 @@
+name: Suggestion
+description: Propose a new control, option or behaviour change.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Code contributions are not accepted. Code sketches here are welcome as illustration and are read as ideas, not patches.
+  - type: input
+    id: package
+    attributes:
+      label: Package
+      placeholder: "@platform-kit/fluent"
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: What you are trying to do and what gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+    validations:
+      required: true
