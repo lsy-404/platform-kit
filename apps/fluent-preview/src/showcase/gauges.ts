@@ -1,7 +1,8 @@
 import { defineComponent, h, onBeforeUnmount, reactive, ref } from "vue";
-import { FluentButton, FluentGauge, FluentProgressRing, FluentSlider, FluentSwitch } from "@platform-kit/fluent/vue";
+import { FluentButton, FluentGauge, FluentSegmented, FluentSlider, FluentSwitch } from "@platform-kit/fluent/vue";
 import { card } from "../card.js";
-import { preferenceLabel, preferences } from "../preferences.js";
+import { preferenceLabel, preferenceOptions, preferences } from "../preferences.js";
+import { barRows, ringRows } from "./control-motion.js";
 
 const drift = (value: number, spread: number, min: number, max: number) => Math.min(max, Math.max(min, value + (Math.random() - 0.5) * spread));
 
@@ -43,18 +44,21 @@ export const GaugeDashboardCard = defineComponent({
   },
 });
 
+const picker = (key: "ringMotion" | "barMotion", label: string) => h("div", { class: "motion-picker" }, [
+  h("span", { class: "pane-label" }, label),
+  h(FluentSegmented, { label, "data-testid": `showcase-pick-${key === "ringMotion" ? "ring" : "bar"}`, modelValue: preferences[key], options: preferenceOptions(key), "onUpdate:modelValue": (value: string | number) => { (preferences as Record<string, string>)[key] = String(value); } }),
+]);
+
 export const SpinnerCard = defineComponent({
-  setup() {
-    const busy = ref(false);
-    return () => card("showcase-spinners", "Progress rings", `Showing the ${preferenceLabel(preferences.ringMotion)} style from Customize. Stretch lets the arc grow and shrink while it turns, Spin turns a fixed arc at constant speed, and Dots orbits five dots. Every style follows the speed preference (now ${preferenceLabel(preferences.speed)}); reduced motion keeps them still.`, [
-      h("div", { class: "spinner-row" }, [16, 24, 32, 48, 64].map((size) => h("figure", { class: "spinner-sample", key: size }, [
-        h(FluentProgressRing, { label: `Loading, ${size} pixels`, size }),
-        h("figcaption", `${size} px`),
-      ]))),
-      h("div", { class: "control-row" }, [
-        h(FluentButton, { tone: "primary", busy: busy.value, onClick: () => { busy.value = true; setTimeout(() => { busy.value = false; }, 2400); } }, () => busy.value ? "Syncing" : "Sync now"),
-        h("span", { class: "pref-note" }, "Busy buttons use the same ring."),
-      ]),
-    ]);
-  },
+  setup: () => () => card("showcase-spinners", "Progress rings", `Lines: Stretch lets the arc grow and shrink while it turns, Spin turns a fixed arc at constant speed. Dots orbits five dots. Every style follows the speed preference (now ${preferenceLabel(preferences.speed)}); reduced motion keeps them still.`, [
+    picker("ringMotion", "Ring style for the app"),
+    ringRows([16, 24, 32, 48]),
+  ], true),
+});
+
+export const BarCard = defineComponent({
+  setup: () => () => card("showcase-waiting", "Indeterminate progress bars", "Dynamic sweeps two segments one after the other, Linear sweeps at constant speed and Bounce glides back and forth.", [
+    picker("barMotion", "Bar style for the app"),
+    barRows(),
+  ], true),
 });

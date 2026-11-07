@@ -122,6 +122,9 @@ function useMeasurement(props: { svg: string; size: number; trim: boolean; optic
   return {result,status};
 }
 
+// 0 keeps the geometric centre, 1 uses the full colour-weighted estimate.
+function opticalWeight(strength: number): number { return Number.isFinite(strength) ? Math.min(1, Math.max(0, strength)) : 1; }
+
 function finiteSize(size: number): number { return Number.isFinite(size) && size > 0 ? size : 16; }
 
 export const FluentSvgIcon = defineComponent({
@@ -130,6 +133,7 @@ export const FluentSvgIcon = defineComponent({
   props: {
     svg: { type: String, required: true }, size: { type: Number, default: 16 }, trim: { type: Boolean, default: true },
     scale: { type: String as PropType<FluentGraphicScale>, default: "fill" },
+    opticalStrength: { type: Number, default: 1 },
     optical: { type: Boolean, default: true }, foreground: String, background: String, label: String,
   },
   emits: ["ready", "error"],
@@ -141,9 +145,11 @@ export const FluentSvgIcon = defineComponent({
       const data = result.value?.measurement;
       const bounds = data?.bounds;
       const sourceWidth = data?.width ?? size, sourceHeight = data?.height ?? size;
-      const center = props.optical && data?.center ? data.center
-        : props.trim && bounds ? {x:bounds.x+bounds.width/2,y:bounds.y+bounds.height/2}
-        : {x:sourceWidth/2,y:sourceHeight/2};
+      const geometric = props.trim && bounds ? {x:bounds.x+bounds.width/2,y:bounds.y+bounds.height/2} : {x:sourceWidth/2,y:sourceHeight/2};
+      const strength = opticalWeight(props.opticalStrength);
+      const center = props.optical && data?.center
+        ? {x:geometric.x+(data.center.x-geometric.x)*strength,y:geometric.y+(data.center.y-geometric.y)*strength}
+        : geometric;
       const extent = bounds ? Math.max(center.x-bounds.x,bounds.x+bounds.width-center.x,center.y-bounds.y,bounds.y+bounds.height-center.y) : 0;
       const baseScale = size / Math.max(sourceWidth,sourceHeight);
       const containedScale = extent > 0 ? size / (2*extent) : baseScale;
@@ -162,6 +168,7 @@ export const FluentIconText = defineComponent({
   props: {
     svg: { type: String, required: true }, size: { type: Number, default: 16 }, trim: { type: Boolean, default: true },
     scale: { type: String as PropType<FluentGraphicScale>, default: "fill" },
+    opticalStrength: { type: Number, default: 1 },
     optical: { type: Boolean, default: true }, foreground: String, background: String,
   },
   emits: ["ready", "error"],
@@ -174,8 +181,8 @@ export const FluentIconText = defineComponent({
       const data = result.value?.measurement;
       const bounds = data?.bounds;
       const sourceWidth = data?.width ?? size, sourceHeight = data?.height ?? size;
-      const center = props.optical && data?.center ? data.center.y
-        : props.trim && bounds ? bounds.y + bounds.height / 2 : sourceHeight / 2;
+      const geometric = props.trim && bounds ? bounds.y + bounds.height / 2 : sourceHeight / 2;
+      const center = props.optical && data?.center ? geometric + (data.center.y - geometric) * opticalWeight(props.opticalStrength) : geometric;
       const extent = bounds ? Math.max(center-bounds.y,bounds.y+bounds.height-center) : sourceHeight/2;
       const paintWidth = props.trim && bounds ? bounds.width : sourceWidth;
       const containedScale = size / Math.max(paintWidth,2*extent);

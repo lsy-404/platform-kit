@@ -10,7 +10,7 @@ const testIds: Record<Family, string> = { toggleMotion: "toggle-motion", checkMo
 const folders = ["Inbox", "Drafts", "Sent", "Archive"].map((label) => ({ value: label.toLowerCase(), label }));
 
 // Each row nests a FluentTheme that sets only this family, so speed, curve and the other preferences still come from Customize.
-const row = (family: Family, value: string, demo: VNode[]) => h(FluentTheme, {
+export const motionRow = (family: Family, value: string, demo: VNode[]) => h(FluentTheme, {
   key: value, mode: appearance.mode, accent: appearance.accent, [family]: value,
   class: ["selection-row", { "is-current": preferences[family] === value }], "data-testid": `${testIds[family]}-${value}`,
 }, () => [
@@ -40,13 +40,13 @@ export const ControlMotionPage = defineComponent({
     return () => pageFrame("motion-controls", "Toggles, check controls, dropdowns, progress rings and indeterminate bars each have their own motion preference. Every row below pins one value; Customize decides the value the rest of the app uses.", () => [
       h(FluentSwitch, { label: "Auto-play toggles and checks", "data-testid": "control-motion-autoplay", modelValue: auto.value, "onUpdate:modelValue": (value: boolean) => { auto.value = value; } }),
       card("showcase-toggle-motion", "Toggles", "Switches and toggle buttons. Hold the pointer down on a switch to see the stretch.", [
-        h("div", { class: "selection-rows" }, fluentPreferenceOptions.toggleMotion.map((value) => row("toggleMotion", value, [
+        h("div", { class: "selection-rows" }, fluentPreferenceOptions.toggleMotion.map((value) => motionRow("toggleMotion", value, [
           h(FluentSwitch, { label: "Wi-Fi", modelValue: state.on, "onUpdate:modelValue": (next: boolean) => { state.on = next; } }),
           h(FluentToggleButton, { modelValue: state.pinned, "onUpdate:modelValue": (next: boolean) => { state.pinned = next; } }, () => state.pinned ? "Pinned" : "Pin"),
         ]))),
       ], true),
       card("showcase-check-motion", "Check controls", "Checkboxes, the indeterminate state and radio buttons.", [
-        h("div", { class: "selection-rows" }, fluentPreferenceOptions.checkMotion.map((value) => row("checkMotion", value, [
+        h("div", { class: "selection-rows" }, fluentPreferenceOptions.checkMotion.map((value) => motionRow("checkMotion", value, [
           h(FluentCheckbox, { label: "Remember me", modelValue: state.checked, "onUpdate:modelValue": (next: boolean) => { state.checked = next; } }),
           h(FluentCheckbox, { label: "Some", modelValue: false, indeterminate: !state.checked, "onUpdate:modelValue": (next: boolean) => { state.checked = next; } }),
           h(FluentRadio, { label: "Week", value: "week", modelValue: state.choice, "onUpdate:modelValue": (next: string) => { state.choice = next; } }),
@@ -54,21 +54,21 @@ export const ControlMotionPage = defineComponent({
         ]))),
       ], true),
       card("showcase-menu-motion", "Dropdowns", "Open each dropdown to compare how the list arrives from its anchor.", [
-        h("div", { class: "selection-rows" }, fluentPreferenceOptions.menuMotion.map((value) => row("menuMotion", value, [
+        h("div", { class: "selection-rows" }, fluentPreferenceOptions.menuMotion.map((value) => motionRow("menuMotion", value, [
           h(FluentSelect, { label: `${preferenceLabel(value)} folder`, modelValue: folder[value], options: folders, "onUpdate:modelValue": (next: string) => { folder[value] = next; } }),
         ]))),
       ], true),
-      card("showcase-ring-motion", "Progress rings", "Indeterminate rings at three sizes and inside a busy button.", [
-        h("div", { class: "selection-rows" }, fluentPreferenceOptions.ringMotion.map((value) => row("ringMotion", value, [
-          ...[20, 32, 48].map((size) => h(FluentProgressRing, { key: size, label: `Loading, ${preferenceLabel(value)} style`, size })),
-          h(FluentButton, { tone: "primary", busy: true }, () => "Syncing"),
-        ]))),
-      ], true),
-      card("showcase-bar-motion", "Indeterminate progress bars", "The same indeterminate bar in each style.", [
-        h("div", { class: "selection-rows" }, fluentPreferenceOptions.barMotion.map((value) => row("barMotion", value, [
-          h(FluentProgressBar, { class: "motion-bar", label: `Preparing, ${preferenceLabel(value)} style`, indeterminate: true }),
-        ]))),
-      ], true),
+      card("showcase-ring-motion", "Progress rings", "Indeterminate rings at three sizes and inside a busy button.", [ringRows()], true),
+      card("showcase-bar-motion", "Indeterminate progress bars", "The same indeterminate bar in each style.", [barRows()], true),
     ]);
   },
 });
+
+export const ringRows = (sizes: number[] = [20, 32, 48]) => h("div", { class: "selection-rows" }, fluentPreferenceOptions.ringMotion.map((value) => motionRow("ringMotion", value, [
+  ...sizes.map((size) => h(FluentProgressRing, { key: size, label: `Loading, ${preferenceLabel(value)} style`, size })),
+  h(FluentButton, { tone: "primary", busy: true }, () => "Syncing"),
+])));
+
+export const barRows = () => h("div", { class: "selection-rows" }, fluentPreferenceOptions.barMotion.map((value) => motionRow("barMotion", value, [
+  h(FluentProgressBar, { class: "motion-bar", label: `Preparing, ${preferenceLabel(value)} style`, indeterminate: true }),
+])));

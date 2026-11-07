@@ -1,10 +1,9 @@
 import { computed, defineComponent, h, onBeforeUnmount, ref } from "vue";
 import { FluentButton, FluentNotice, FluentProgressBar, FluentProgressRing, FluentScrollViewer } from "@platform-kit/fluent/vue";
 import { card } from "../card.js";
-import { preferenceLabel, preferences } from "../preferences.js";
 import { GraphicsPreview } from "../graphics.js";
 import { pageFrame } from "./frame.js";
-import { GaugeDashboardCard, SpinnerCard } from "./gauges.js";
+import { BarCard, GaugeDashboardCard, SpinnerCard } from "./gauges.js";
 import { VisualWeightCard } from "./visual-weight.js";
 
 const activity = Array.from({ length: 24 }, (_, index) => {
@@ -52,10 +51,10 @@ export const ProgressPage = defineComponent({
           ]),
           ...(done.value ? [h(FluentNotice, { tone: "success" }, () => "All files uploaded.")] : []),
         ]),
-        h(SpinnerCard),
       ]),
+      h(SpinnerCard),
+      h(BarCard),
       h(GaugeDashboardCard),
-      card("showcase-waiting", "Indeterminate bar", `Showing the ${preferenceLabel(preferences.barMotion)} style from Customize; compare every style on Control motion.`, [h(FluentProgressBar, { label: "Preparing", indeterminate: true })], true),
     ]);
   },
 });

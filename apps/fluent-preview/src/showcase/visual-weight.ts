@@ -1,5 +1,5 @@
 import { computed, defineComponent, h, nextTick, reactive, ref, watch, type PropType } from "vue";
-import { FluentSegmented, FluentSvgIcon, type FluentGraphicScale } from "@platform-kit/fluent/vue";
+import { FluentSegmented, FluentSlider, FluentSvgIcon, type FluentGraphicScale } from "@platform-kit/fluent/vue";
 import { card } from "../card.js";
 
 type Point = { x: number; y: number };
@@ -52,7 +52,7 @@ const paintTransform = (element: HTMLElement | null) => {
 };
 
 const WeightSample = defineComponent({
-  props: { pair: { type: Object as PropType<Pair>, required: true }, scale: { type: String as PropType<FluentGraphicScale>, required: true }, name: String },
+  props: { pair: { type: Object as PropType<Pair>, required: true }, scale: { type: String as PropType<FluentGraphicScale>, required: true }, strength: { type: Number, required: true }, name: String },
   setup(props) {
     const measurement = ref<Measurement>();
     const aligned = ref<HTMLElement | null>(null);
@@ -69,7 +69,7 @@ const WeightSample = defineComponent({
       const place = (point: Point) => ({ x: transform.dx + point.x * transform.scale, y: transform.dy + point.y * transform.scale });
       alignedMarkers.value = { geometric: place(markers.geometric), weighted: place(markers.weighted) };
     };
-    watch(() => [props.scale, measured.value], placeAligned);
+    watch(() => [props.scale, props.strength, measured.value], placeAligned);
     const box = (caption: string, children: unknown[], target = false) => h("figure", { class: "weight-box" }, [
       h("div", { class: ["weight-box__surface", { "weight-box__surface--target": target }], style: { background: props.pair.background } }, children as never),
       h("figcaption", caption),
@@ -81,7 +81,7 @@ const WeightSample = defineComponent({
           overlay(measured.value, props.pair.background),
         ]),
         box("Centred", [
-          h("div", { ref: aligned, class: "weight-box__icon" }, h(FluentSvgIcon, { svg: svg.value, size, scale: props.scale, background: props.pair.background, label: `${props.name ?? "Custom"} centred on its weighted centre`, onReady: placeAligned })),
+          h("div", { ref: aligned, class: "weight-box__icon" }, h(FluentSvgIcon, { svg: svg.value, size, scale: props.scale, opticalStrength: props.strength, background: props.pair.background, label: `${props.name ?? "Custom"} centred on its weighted centre`, onReady: placeAligned })),
           overlay(alignedMarkers.value, props.pair.background),
         ], true),
       ]),
@@ -96,6 +96,7 @@ export const VisualWeightCard = defineComponent({
   setup() {
     const custom = reactive<Pair>({ left: "#744da9", right: "#ffb900", background: "#ffffff" });
     const scale = ref<FluentGraphicScale>("fill");
+    const strength = ref(100);
     const picker = (key: keyof Pair, label: string) => h("label", { class: "weight-picker" }, [
       h("input", { type: "color", value: custom[key], onInput: (event: Event) => { custom[key] = (event.target as HTMLInputElement).value; } }),
       label,
@@ -106,21 +107,24 @@ export const VisualWeightCard = defineComponent({
           h("span", [h("svg", { viewBox: "0 0 16 16", width: 16, height: 16 }, h("circle", { class: "weight-overlay__geometric", cx: 8, cy: 8, r: 6 })), "Geometric centre"]),
           h("span", [h("svg", { viewBox: "0 0 16 16", width: 16, height: 16 }, h("circle", { class: "weight-overlay__weighted", cx: 8, cy: 8, r: 3 })), "Weighted centre"]),
         ]),
+        h("div", { class: "weight-strength" }, [
+          h(FluentSlider, { label: "Adjustment strength", "data-testid": "showcase-weight-strength", min: 0, max: 100, tickFrequency: 25, modelValue: strength.value, formatValue: (value: number) => `${Math.round(value)}%`, "onUpdate:modelValue": (value: number) => { strength.value = value; } }),
+        ]),
         h("div", { class: "weight-scale" }, [
           h("span", { class: "pane-label" }, "Centred scale"),
           h(FluentSegmented, { label: "Centred scale", "data-testid": "showcase-weight-scale", modelValue: scale.value, options: scaleOptions.map(({ value, label }) => ({ value, label })), "onUpdate:modelValue": (value: string | number) => { scale.value = value as FluentGraphicScale; } }),
         ]),
       ]),
-      h("p", { class: "pref-note" }, `${scaleOptions.find((option) => option.value === scale.value)!.note} In Centred the dot sits in the middle of the slot.`),
+      h("p", { class: "pref-note" }, `${scaleOptions.find((option) => option.value === scale.value)!.note} At 100% strength the dot lands in the middle of the Centred slot; 0% keeps the geometric centre there and values in between stop part of the way.`),
       h("div", { class: "weight-grid" }, [
         ...examples.map((example) => h("article", { class: "weight-card", key: example.name }, [
           h("div", { class: "weight-card__head" }, [h("strong", example.name), h("div", { class: "weight-card__chips" }, [chip(example.left, "Left"), chip(example.right, "Right"), chip(example.background, "Surface")])]),
-          h(WeightSample, { pair: example, scale: scale.value, name: example.name }),
+          h(WeightSample, { pair: example, scale: scale.value, strength: strength.value / 100, name: example.name }),
           h("p", { class: "pref-note" }, example.note),
         ])),
         h("article", { class: "weight-card weight-card--custom", "data-testid": "showcase-weight-custom" }, [
           h("div", { class: "weight-card__head" }, [h("strong", "Try your own"), h("div", { class: "weight-card__chips" }, [picker("left", "Left"), picker("right", "Right"), picker("background", "Surface")])]),
-          h(WeightSample, { pair: custom, scale: scale.value }),
+          h(WeightSample, { pair: custom, scale: scale.value, strength: strength.value / 100 }),
           h("p", { class: "pref-note" }, "Pick colours to watch the weighted centre move."),
         ]),
       ]),

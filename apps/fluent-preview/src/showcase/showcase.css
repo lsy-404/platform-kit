@@ -184,3 +184,5 @@
 .weight-legend .weight-overlay__geometric{fill:none;stroke:var(--fluent-text);stroke-width:1.5}
 .weight-legend .weight-overlay__weighted{fill:var(--fluent-text)}
 .weight-scale{display:flex;align-items:center;gap:10px}
+.motion-picker{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.weight-strength{flex:1 1 220px;max-width:320px}
