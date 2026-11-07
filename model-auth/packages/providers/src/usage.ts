@@ -111,6 +111,8 @@ export interface AnthropicOAuthMetadata {
   readonly billingInterval?: string;
   readonly subscriptionRenewsAt?: number;
   readonly subscriptionExpires?: number;
+  readonly subscriptionRenewsAtIsDateOnly?: boolean;
+  readonly subscriptionExpiresIsDateOnly?: boolean;
   readonly rateLimitTier?: string;
 }
 
@@ -601,25 +603,31 @@ export function parseAnthropicOAuthProfile(payload: unknown): AnthropicOAuthMeta
   };
 }
 
-export function parseAnthropicSubscriptionDetails(payload: unknown): Pick<AnthropicOAuthMetadata, "billingInterval" | "subscriptionRenewsAt" | "subscriptionExpires"> {
+export function parseAnthropicSubscriptionDetails(payload: unknown): Pick<AnthropicOAuthMetadata, "billingInterval" | "subscriptionRenewsAt" | "subscriptionExpires" | "subscriptionRenewsAtIsDateOnly" | "subscriptionExpiresIsDateOnly"> {
   const root = record(payload);
   const subscription = record(root.subscription ?? root.subscription_details ?? root.billing);
-  const currentPeriodEnd = timestamp(subscription.current_period_end ?? root.current_period_end);
-  const subscriptionRenewsAt = timestamp(subscription.next_charge_at ?? subscription.next_charge_date ?? subscription.next_renewal_at ?? subscription.next_renewal_date ?? subscription.next_invoice_date
-    ?? root.next_charge_at ?? root.next_charge_date ?? root.next_renewal_at ?? root.next_renewal_date ?? root.next_invoice_date);
-  const explicitExpiry = timestamp(subscription.plan_ending_at ?? subscription.plan_ending_before ?? subscription.expires_at ?? subscription.ends_at ?? subscription.cancel_at
-    ?? root.plan_ending_at ?? root.plan_ending_before ?? root.expires_at ?? root.ends_at ?? root.cancel_at);
+  const periodEndValue = subscription.current_period_end ?? root.current_period_end;
+  const renewalValue = subscription.next_charge_at ?? subscription.next_charge_date ?? subscription.next_renewal_at ?? subscription.next_renewal_date ?? subscription.next_invoice_date
+    ?? root.next_charge_at ?? root.next_charge_date ?? root.next_renewal_at ?? root.next_renewal_date ?? root.next_invoice_date;
+  const expiryValue = subscription.plan_ending_at ?? subscription.plan_ending_before ?? subscription.expires_at ?? subscription.ends_at ?? subscription.cancel_at
+    ?? root.plan_ending_at ?? root.plan_ending_before ?? root.expires_at ?? root.ends_at ?? root.cancel_at;
+  const currentPeriodEnd = timestamp(periodEndValue);
+  const subscriptionRenewsAt = timestamp(renewalValue);
+  const explicitExpiry = timestamp(expiryValue);
   const cancelAtPeriodEnd = booleanValue(subscription.cancel_at_period_end ?? subscription.cancelAtPeriodEnd
     ?? root.cancel_at_period_end ?? root.cancelAtPeriodEnd) === true;
   const willRenew = booleanValue(subscription.will_renew ?? subscription.willRenew ?? root.will_renew ?? root.willRenew);
   const subscriptionExpires = explicitExpiry ?? ((cancelAtPeriodEnd || willRenew === false) ? currentPeriodEnd : null);
-  const renewal = explicitExpiry ? null : subscriptionRenewsAt ?? (!(cancelAtPeriodEnd || willRenew === false) ? currentPeriodEnd : null);
+  const renewal = subscriptionExpires ? null : subscriptionRenewsAt ?? (!(cancelAtPeriodEnd || willRenew === false) ? currentPeriodEnd : null);
   const interval = normalizeBillingInterval(subscription.billing_interval ?? subscription.billingInterval ?? subscription.interval
     ?? root.billing_interval ?? root.billingInterval ?? root.interval);
+  const dateOnly = (value: unknown): boolean => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.trim());
   return {
     ...(interval ? { billingInterval: interval } : {}),
     ...(renewal ? { subscriptionRenewsAt: renewal } : {}),
     ...(subscriptionExpires ? { subscriptionExpires } : {}),
+    ...(renewal && dateOnly(subscriptionRenewsAt ? renewalValue : periodEndValue) ? { subscriptionRenewsAtIsDateOnly: true } : {}),
+    ...(subscriptionExpires && dateOnly(explicitExpiry ? expiryValue : periodEndValue) ? { subscriptionExpiresIsDateOnly: true } : {}),
   };
 }
 
