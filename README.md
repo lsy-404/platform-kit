@@ -65,7 +65,7 @@ Pushing a package tag such as `fluent-v0.3.2` runs the same verification pipelin
 
 ## Feedback
 
-This repository does not accept code contributions; pull requests are limited to maintainers. Bug reports and suggestions are welcome through [Issues](https://github.com/lsy-404/platform-kit/issues/new/choose). See [CONTRIBUTING](CONTRIBUTING.md) for what to include, and [SECURITY](SECURITY.md) for credential exposure.
+This repository does not accept code contributions; pull requests are limited to maintainers. Bug reports and suggestions are welcome through [Issues](https://github.com/lsy-404/platform-kit/issues/new/choose). See [CONTRIBUTING](.github/CONTRIBUTING.md) for what to include, and [SECURITY](SECURITY.md) for credential exposure.
 
 ## License
 

@@ -19,8 +19,8 @@ Open a [suggestion](https://github.com/lsy-404/platform-kit/issues/new?template=
 
 ## Security
 
-Never paste access tokens, refresh tokens, cookies, private keys or production data into an issue. See [SECURITY](SECURITY.md).
+Never paste access tokens, refresh tokens, cookies, private keys or production data into an issue. See [SECURITY](../SECURITY.md).
 
 ## License
 
-Apache-2.0; see [LICENSE](LICENSE).
+Apache-2.0; see [LICENSE](../LICENSE).
