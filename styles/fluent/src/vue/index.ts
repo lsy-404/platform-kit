@@ -53,5 +53,6 @@ export type { FluentMenuItem } from "./selection.js";
 export { fluentIcon } from "./icon.js";
 export type { FluentIconName } from "./icon.js";
 export { FluentSvgIcon, FluentIconText } from "./graphics.js";
+export type { FluentGraphicScale } from "./graphics.js";
 export { FluentTransitionView, vFluentShared, fluentViewTransition } from "./transition.js";
 export type { FluentViewDirection, FluentViewTransitionOptions } from "./transition.js";

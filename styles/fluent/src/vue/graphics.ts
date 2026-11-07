@@ -1,4 +1,4 @@
-import { defineComponent, h, inject, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { defineComponent, h, inject, onBeforeUnmount, onMounted, ref, watch, type PropType } from "vue";
 import { measureSvg } from "../behavior/visual-center.js";
 import { fluentThemeKey } from "../theme.js";
 
@@ -6,6 +6,12 @@ type GraphicPoint = { x: number; y: number };
 type GraphicBounds = GraphicPoint & { width: number; height: number };
 type GraphicMeasurement = { width: number; height: number; bounds: GraphicBounds | null; center: GraphicPoint | null; offset: GraphicPoint | null; status: "estimated" | "empty" | "no-contrast"; svg: string };
 type GraphicsResult = { measurement: GraphicMeasurement; referenceMiddle: number };
+export type FluentGraphicScale = "fill" | "fit" | "none";
+
+// fill grows the paint to the largest size that stays in the slot, fit only shrinks it when needed, none keeps the source scale.
+function pickScale(mode: FluentGraphicScale, base: number, contained: number): number {
+  return mode === "fill" ? contained : mode === "fit" ? Math.min(base, contained) : base;
+}
 
 function resolvedColor(element: HTMLElement, value: string | undefined, property: "color" | "backgroundColor"): string {
   const canvas = document.createElement("canvas").getContext("2d");
@@ -123,6 +129,7 @@ export const FluentSvgIcon = defineComponent({
   inheritAttrs: false,
   props: {
     svg: { type: String, required: true }, size: { type: Number, default: 16 }, trim: { type: Boolean, default: true },
+    scale: { type: String as PropType<FluentGraphicScale>, default: "fill" },
     optical: { type: Boolean, default: true }, foreground: String, background: String, label: String,
   },
   emits: ["ready", "error"],
@@ -140,7 +147,7 @@ export const FluentSvgIcon = defineComponent({
       const extent = bounds ? Math.max(center.x-bounds.x,bounds.x+bounds.width-center.x,center.y-bounds.y,bounds.y+bounds.height-center.y) : 0;
       const baseScale = size / Math.max(sourceWidth,sourceHeight);
       const containedScale = extent > 0 ? size / (2*extent) : baseScale;
-      const scale = props.trim && bounds ? containedScale : Math.min(baseScale,containedScale);
+      const scale = bounds ? pickScale(props.scale, baseScale, containedScale) : baseScale;
       const dx = size/2-center.x*scale, dy = size/2-center.y*scale;
       return h("span", { ...attrs, ref: root, class: ["fluent-svg-icon", attrs.class], "data-status": status.value, style: [{ "--fluent-graphic-size": `${size}px` }, attrs.style], role: props.label ? "img" : undefined, "aria-label": props.label, "aria-hidden": props.label ? undefined : "true" }, [
         h("span", { class: "fluent-svg-icon__paint", style: { width: `${data?.width ?? size}px`, height: `${data?.height ?? size}px`, transform: `translate(${dx}px, ${dy}px) scale(${scale})` } }, data ? [h("img", { src: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(data.svg)}`, alt: "", draggable: false })] : []),
@@ -154,6 +161,7 @@ export const FluentIconText = defineComponent({
   inheritAttrs: false,
   props: {
     svg: { type: String, required: true }, size: { type: Number, default: 16 }, trim: { type: Boolean, default: true },
+    scale: { type: String as PropType<FluentGraphicScale>, default: "fill" },
     optical: { type: Boolean, default: true }, foreground: String, background: String,
   },
   emits: ["ready", "error"],
@@ -171,7 +179,7 @@ export const FluentIconText = defineComponent({
       const extent = bounds ? Math.max(center-bounds.y,bounds.y+bounds.height-center) : sourceHeight/2;
       const paintWidth = props.trim && bounds ? bounds.width : sourceWidth;
       const containedScale = size / Math.max(paintWidth,2*extent);
-      const scale = props.trim && bounds ? containedScale : Math.min(size/Math.max(sourceWidth,sourceHeight),containedScale);
+      const scale = bounds ? pickScale(props.scale, size/Math.max(sourceWidth,sourceHeight), containedScale) : size/Math.max(sourceWidth,sourceHeight);
       const dx = props.trim && bounds ? -bounds.x * scale : 0;
       const referenceMiddle = result.value?.referenceMiddle ?? size/2;
       const y = size/2 - center * scale;
