@@ -605,15 +605,15 @@ export function parseAnthropicSubscriptionDetails(payload: unknown): Pick<Anthro
   const root = record(payload);
   const subscription = record(root.subscription ?? root.subscription_details ?? root.billing);
   const currentPeriodEnd = timestamp(subscription.current_period_end ?? root.current_period_end);
-  const subscriptionRenewsAt = timestamp(subscription.next_renewal_at ?? subscription.next_renewal_date ?? subscription.next_invoice_date
-    ?? root.next_renewal_at ?? root.next_renewal_date ?? root.next_invoice_date);
-  const explicitExpiry = timestamp(subscription.expires_at ?? subscription.ends_at ?? subscription.cancel_at
-    ?? root.expires_at ?? root.ends_at ?? root.cancel_at);
+  const subscriptionRenewsAt = timestamp(subscription.next_charge_at ?? subscription.next_charge_date ?? subscription.next_renewal_at ?? subscription.next_renewal_date ?? subscription.next_invoice_date
+    ?? root.next_charge_at ?? root.next_charge_date ?? root.next_renewal_at ?? root.next_renewal_date ?? root.next_invoice_date);
+  const explicitExpiry = timestamp(subscription.plan_ending_at ?? subscription.plan_ending_before ?? subscription.expires_at ?? subscription.ends_at ?? subscription.cancel_at
+    ?? root.plan_ending_at ?? root.plan_ending_before ?? root.expires_at ?? root.ends_at ?? root.cancel_at);
   const cancelAtPeriodEnd = booleanValue(subscription.cancel_at_period_end ?? subscription.cancelAtPeriodEnd
     ?? root.cancel_at_period_end ?? root.cancelAtPeriodEnd) === true;
   const willRenew = booleanValue(subscription.will_renew ?? subscription.willRenew ?? root.will_renew ?? root.willRenew);
   const subscriptionExpires = explicitExpiry ?? ((cancelAtPeriodEnd || willRenew === false) ? currentPeriodEnd : null);
-  const renewal = subscriptionRenewsAt ?? (!(cancelAtPeriodEnd || willRenew === false) ? currentPeriodEnd : null);
+  const renewal = explicitExpiry ? null : subscriptionRenewsAt ?? (!(cancelAtPeriodEnd || willRenew === false) ? currentPeriodEnd : null);
   const interval = normalizeBillingInterval(subscription.billing_interval ?? subscription.billingInterval ?? subscription.interval
     ?? root.billing_interval ?? root.billingInterval ?? root.interval);
   return {
