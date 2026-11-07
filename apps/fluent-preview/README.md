@@ -7,6 +7,8 @@ Two pages for `@platform-kit/fluent`:
 
 Run `pnpm --filter @platform-kit/fluent build`, then `pnpm --filter @platform-kit/fluent-preview dev`. The build uses relative asset paths, so `dist` can be served from any directory.
 
+The `Publish Fluent preview` workflow builds this app on every push to `main` and every `fluent-v*` tag and deploys `dist` to GitHub Pages at https://lsy-404.github.io/platform-kit/.
+
 ## Showcase
 
 The showcase is one `FluentTheme` around a title bar, a two-level `FluentNavigation` side menu and a `FluentTransitionView` that switches pages with the current page transition. Each leaf page is kept in the URL hash (for example `#motion-controls`), and theme, accent and preferences are kept in the query string with the same keys as the catalog.

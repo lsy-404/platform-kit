@@ -2,6 +2,8 @@
 
 Apache-2.0 Fluent-style CSS with Vue controls, navigation, and browser-native overlays.
 
+Live preview: [showcase](https://lsy-404.github.io/platform-kit/) and [control catalog](https://lsy-404.github.io/platform-kit/catalog.html), rebuilt from `main` and every `fluent-v*` release.
+
 ```ts
 import { FluentButton, FluentTheme } from "@platform-kit/fluent/vue";
 import "@platform-kit/fluent/style.css";
