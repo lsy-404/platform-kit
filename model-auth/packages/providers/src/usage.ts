@@ -527,7 +527,7 @@ export async function queryProviderUsage(
   return usageSnapshot(provider, options.credentialId ?? credential.accountId ?? provider, data);
 }
 
-type AnthropicProfileResult = { metadata: AnthropicOAuthMetadata; error: string | null; billingUnavailable: boolean };
+type AnthropicProfileResult = { metadata: AnthropicOAuthMetadata; error: string | null };
 
 const PROFILE_CACHE_TTL_MS = 6 * 3600 * 1000;
 const profileCache = new Map<string, { at: number; result: AnthropicProfileResult }>();
@@ -545,15 +545,14 @@ export async function queryAnthropicUsage(credential: ProviderUsageCredential, o
     queryAnthropicOAuthMetadata(credential, cacheKey, state, options),
   ]);
   const usage = parseAnthropicUsage(payload);
-  const metadata = profile.billingUnavailable ? {} : credential;
   return {
-    ...mergeAnthropicUsageMetadata(usage, profile.metadata, metadata),
-    metadataError: profile.billingUnavailable ? null : profile.error,
+    ...mergeAnthropicUsageMetadata(usage, profile.metadata, {}),
+    metadataError: profile.error,
     ...(profile.metadata.organizationId ? { identity: profile.metadata.organizationId } : {}),
   };
 }
 
-/** Profile and subscription lookup; results, including failures, are cached for six hours per credential. */
+/** Profile lookup; results, including failures, are cached for six hours per credential. */
 export async function queryAnthropicOAuthMetadata(
   credential: ProviderUsageCredential,
   cacheKey: string | undefined,
@@ -572,20 +571,10 @@ async function fetchAnthropicProfile(state: UsageHttpState, options: ProviderUsa
   try {
     metadata = parseAnthropicOAuthProfile(await usageGet("https://api.anthropic.com/api/oauth/profile", access => anthropicHeaders(access, options), state, options));
   } catch (error) {
-    return { metadata: {}, error: error instanceof Error ? error.message : "Anthropic profile metadata is unavailable.", billingUnavailable: false };
+    return { metadata: {}, error: error instanceof Error ? error.message : "Anthropic profile metadata is unavailable." };
   }
-  if (!metadata.organizationId) return { metadata, error: "Anthropic OAuth profile did not return an organization id.", billingUnavailable: true };
-  try {
-    const details = await usageGet(`https://api.anthropic.com/api/organizations/${encodeURIComponent(metadata.organizationId)}/subscription_details`, access => anthropicHeaders(access, options), state, options);
-    return { metadata: { ...metadata, ...parseAnthropicSubscriptionDetails(details) }, error: null, billingUnavailable: false };
-  } catch (error) {
-    const status = error instanceof UsageRequestError ? error.httpStatus : undefined;
-    return {
-      metadata,
-      error: error instanceof Error ? error.message : "Anthropic subscription metadata is unavailable.",
-      billingUnavailable: status === 401 || status === 403 || status === 404,
-    };
-  }
+  if (!metadata.organizationId) return { metadata, error: "Anthropic OAuth profile did not return an organization id." };
+  return { metadata, error: null };
 }
 
 export function parseAnthropicOAuthProfile(payload: unknown): AnthropicOAuthMetadata {

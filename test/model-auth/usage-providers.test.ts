@@ -76,15 +76,17 @@ describe("provider usage adapters", () => {
     });
     expect(codex.windows[0]).toMatchObject({ id: "primary", usedPercent: 9 });
 
-    const anthropic = await queryAnthropicUsage({ access: "anthropic-access", accountId: "org-query" }, {
+    const anthropic = await queryAnthropicUsage({ access: "anthropic-access", accountId: "org-query", billingInterval: "year", subscriptionRenewsAt: Date.parse("2030-01-01") }, {
       fetchImpl: async (url, init) => {
         expect(new Headers(init?.headers).get("authorization")).toBe("Bearer anthropic-access");
         if (String(url).endsWith("/usage")) return new Response(JSON.stringify({ five_hour: { utilization: 13 } }));
         if (String(url).endsWith("/profile")) return new Response(JSON.stringify({ organization_id: "org-query", organization_type: "anthropic_max" }));
-        return new Response(JSON.stringify({ subscription: { interval: "monthly", current_period_end: "2030-10-01T00:00:00Z" } }));
+        throw new Error(`Unexpected Anthropic OAuth endpoint: ${String(url)}`);
       },
     });
-    expect(anthropic).toMatchObject({ plan: "max", billingInterval: "month", subscriptionRenewsAt: Date.parse("2030-10-01T00:00:00Z") });
+    expect(anthropic).toMatchObject({ plan: "max", identity: "org-query" });
+    expect(anthropic).not.toHaveProperty("billingInterval");
+    expect(anthropic).not.toHaveProperty("subscriptionRenewsAt");
     expect(anthropic.metadataError).toBeNull();
 
     const shared = await queryProviderUsage("openai-codex", { access: "codex-access", accountId: "provider-account" }, {

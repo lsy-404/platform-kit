@@ -43,7 +43,7 @@ describe("default client versions", () => {
     expect(headers).toEqual({ "user-agent": "claude-cli/2.1.293 (external, sdk-cli)", "x-app": "cli" });
     expect(seen.map(item => item.url)).toEqual([
       "https://platform.claude.com/v1/oauth/token", "https://api.anthropic.com/api/oauth/usage",
-      "https://api.anthropic.com/api/oauth/profile", "https://api.anthropic.com/api/organizations/org/subscription_details",
+      "https://api.anthropic.com/api/oauth/profile",
     ]);
     expect(seen.every(item => item.headers.get("user-agent") === headers["user-agent"] && item.headers.get("x-app") === "cli")).toBe(true);
     expect(seen[0]!.headers.get("content-type")).toBe("application/json");
