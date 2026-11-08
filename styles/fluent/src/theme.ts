@@ -125,6 +125,38 @@ function accentTextFor(color: string): string | undefined {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.179 ? "#fff" : "#000";
 }
 
+const declaredTokens = new Set<string>();
+let scannedSheets = -1;
+
+function collectDeclared(rules: CSSRuleList | undefined): void {
+  if (!rules) return;
+  for (const rule of Array.from(rules)) {
+    const style = (rule as CSSStyleRule).style;
+    if (style) for (let index = 0; index < style.length; index++) {
+      const name = style.item(index);
+      if (name.startsWith("--fluent-")) declaredTokens.add(name);
+    }
+    collectDeclared((rule as CSSGroupingRule).cssRules);
+  }
+}
+
+// Older Chromium (Electron 37) leaves custom properties out of computed-style enumeration, so token names also come from the loaded stylesheets.
+function fluentTokenNames(style: CSSStyleDeclaration): Set<string> {
+  const sheets = document.styleSheets;
+  if (sheets.length !== scannedSheets) {
+    scannedSheets = sheets.length;
+    for (const sheet of Array.from(sheets)) {
+      try { collectDeclared(sheet.cssRules); } catch { /* Cross-origin sheets cannot be read. */ }
+    }
+  }
+  const names = new Set(declaredTokens);
+  for (let index = 0; index < style.length; index++) {
+    const name = style.item(index);
+    if (name.startsWith("--fluent-")) names.add(name);
+  }
+  return names;
+}
+
 export const FluentTheme = defineComponent({
   name: "FluentTheme",
   inheritAttrs: false,
@@ -171,9 +203,9 @@ export const FluentTheme = defineComponent({
       if (!element.value) return;
       const style = getComputedStyle(element.value);
       const values: Record<string, string> = {};
-      for (let index = 0; index < style.length; index++) {
-        const name = style.item(index);
-        if (name.startsWith("--fluent-")) values[name] = style.getPropertyValue(name);
+      for (const name of fluentTokenNames(style)) {
+        const value = style.getPropertyValue(name);
+        if (value !== "") values[name] = value;
       }
       if (Object.keys(values).length !== Object.keys(tokens.value).length
         || Object.entries(values).some(([name, value]) => tokens.value[name] !== value)) tokens.value = values;
