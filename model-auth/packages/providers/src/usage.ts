@@ -66,11 +66,14 @@ export function normalizeModelFamilyId(value: string): string {
 export interface ProviderUsageData {
   readonly status?: ProviderUsageStatus;
   readonly plan: string | null;
+  readonly renewalPlan?: string | null;
   readonly planMultiplier?: number | null;
   readonly planTier?: string | null;
   readonly billingInterval?: string | null;
   readonly subscriptionRenewsAt?: number | null;
   readonly subscriptionExpiresAt?: number | null;
+  readonly subscriptionRenewsAtIsDateOnly?: boolean;
+  readonly subscriptionExpiresAtIsDateOnly?: boolean;
   readonly metadataError?: string | null;
   readonly windows: readonly ProviderUsageWindow[];
   readonly balance: ProviderUsageBalance | null;
@@ -108,6 +111,7 @@ export interface AnthropicOAuthMetadata {
   readonly displayName?: string;
   readonly organizationId?: string;
   readonly subscriptionType?: string;
+  readonly renewalPlan?: string | null;
   readonly billingInterval?: string;
   readonly subscriptionRenewsAt?: number;
   readonly subscriptionExpires?: number;
@@ -116,18 +120,24 @@ export interface AnthropicOAuthMetadata {
   readonly rateLimitTier?: string;
 }
 
-export function usageSnapshot(providerId: string, credentialId: string, data: ProviderUsageData): ProviderUsageSnapshot {
+export type ProviderUsageSnapshotWithSubscription = ProviderUsageSnapshot & Pick<ProviderUsageData,
+  "renewalPlan" | "subscriptionRenewsAtIsDateOnly" | "subscriptionExpiresAtIsDateOnly">;
+
+export function usageSnapshot(providerId: string, credentialId: string, data: ProviderUsageData): ProviderUsageSnapshotWithSubscription {
   const status = data.status ?? (data.error ? "error" : data.windows.length || data.balance ? "ok" : "unknown");
   return {
     providerId,
     credentialId,
     status,
     plan: data.plan,
+    ...(data.renewalPlan !== undefined ? { renewalPlan: data.renewalPlan } : {}),
     ...(data.planMultiplier !== undefined ? { planMultiplier: data.planMultiplier } : {}),
     ...(data.planTier !== undefined ? { planTier: data.planTier } : {}),
     ...(data.billingInterval !== undefined ? { billingInterval: data.billingInterval } : {}),
     ...(data.subscriptionRenewsAt !== undefined ? { subscriptionRenewsAt: data.subscriptionRenewsAt } : {}),
     ...(data.subscriptionExpiresAt !== undefined ? { subscriptionExpiresAt: data.subscriptionExpiresAt } : {}),
+    ...(data.subscriptionRenewsAtIsDateOnly !== undefined ? { subscriptionRenewsAtIsDateOnly: data.subscriptionRenewsAtIsDateOnly } : {}),
+    ...(data.subscriptionExpiresAtIsDateOnly !== undefined ? { subscriptionExpiresAtIsDateOnly: data.subscriptionExpiresAtIsDateOnly } : {}),
     ...(data.metadataError !== undefined ? { metadataError: data.metadataError } : {}),
     windows: data.windows.map((window) => ({
       ...window,
@@ -512,7 +522,7 @@ export async function queryProviderUsage(
   provider: UsageProvider,
   credential: ProviderUsageCredential,
   options: ProviderUsageRequestOptions = {},
-): Promise<ProviderUsageSnapshot> {
+): Promise<ProviderUsageSnapshotWithSubscription> {
   const data = provider === "openai-codex" ? await queryCodexUsage(credential, options) : await queryAnthropicUsage(credential, options);
   return usageSnapshot(provider, options.credentialId ?? credential.accountId ?? provider, data);
 }
@@ -603,7 +613,7 @@ export function parseAnthropicOAuthProfile(payload: unknown): AnthropicOAuthMeta
   };
 }
 
-export function parseAnthropicSubscriptionDetails(payload: unknown): Pick<AnthropicOAuthMetadata, "billingInterval" | "subscriptionRenewsAt" | "subscriptionExpires" | "subscriptionRenewsAtIsDateOnly" | "subscriptionExpiresIsDateOnly"> {
+export function parseAnthropicSubscriptionDetails(payload: unknown): Pick<AnthropicOAuthMetadata, "renewalPlan" | "billingInterval" | "subscriptionRenewsAt" | "subscriptionExpires" | "subscriptionRenewsAtIsDateOnly" | "subscriptionExpiresIsDateOnly"> {
   const root = record(payload);
   const subscription = record(root.subscription ?? root.subscription_details ?? root.billing);
   const periodEndValue = subscription.current_period_end ?? root.current_period_end;
@@ -619,16 +629,27 @@ export function parseAnthropicSubscriptionDetails(payload: unknown): Pick<Anthro
   const willRenew = booleanValue(subscription.will_renew ?? subscription.willRenew ?? root.will_renew ?? root.willRenew);
   const subscriptionExpires = explicitExpiry ?? ((cancelAtPeriodEnd || willRenew === false) ? currentPeriodEnd : null);
   const renewal = subscriptionExpires ? null : subscriptionRenewsAt ?? (!(cancelAtPeriodEnd || willRenew === false) ? currentPeriodEnd : null);
+  const scheduledDowngrade = record(subscription.scheduled_downgrade ?? root.scheduled_downgrade);
+  const scheduledPlan = normalizeAnthropicPlan(stringValue(scheduledDowngrade.plan_type));
+  const cancelled = cancelAtPeriodEnd || willRenew === false || subscriptionExpires !== null;
+  const renewalPlan = cancelled ? null : scheduledPlan;
   const interval = normalizeBillingInterval(subscription.billing_interval ?? subscription.billingInterval ?? subscription.interval
     ?? root.billing_interval ?? root.billingInterval ?? root.interval);
   const dateOnly = (value: unknown): boolean => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.trim());
   return {
+    ...(renewalPlan !== undefined || cancelled ? { renewalPlan: renewalPlan ?? null } : {}),
     ...(interval ? { billingInterval: interval } : {}),
     ...(renewal ? { subscriptionRenewsAt: renewal } : {}),
     ...(subscriptionExpires ? { subscriptionExpires } : {}),
     ...(renewal && dateOnly(subscriptionRenewsAt ? renewalValue : periodEndValue) ? { subscriptionRenewsAtIsDateOnly: true } : {}),
     ...(subscriptionExpires && dateOnly(explicitExpiry ? expiryValue : periodEndValue) ? { subscriptionExpiresIsDateOnly: true } : {}),
   };
+}
+
+function normalizeAnthropicPlan(value: string | null | undefined): string | undefined {
+  const plan = value?.trim().toLowerCase();
+  if (!plan) return undefined;
+  return plan.replace(/_(?:monthly|month|yearly|annual|year)$/, "");
 }
 
 export function mergeAnthropicUsageMetadata(
@@ -639,15 +660,25 @@ export function mergeAnthropicUsageMetadata(
   const billingInterval = metadata.billingInterval ?? credential.billingInterval ?? usage.billingInterval;
   const subscriptionRenewsAt = metadata.subscriptionRenewsAt ?? credential.subscriptionRenewsAt ?? usage.subscriptionRenewsAt;
   const subscriptionExpiresAt = metadata.subscriptionExpires ?? credential.subscriptionExpires ?? usage.subscriptionExpiresAt;
+  const subscriptionRenewsAtIsDateOnly = metadata.subscriptionRenewsAtIsDateOnly ?? usage.subscriptionRenewsAtIsDateOnly;
+  const subscriptionExpiresAtIsDateOnly = metadata.subscriptionExpiresIsDateOnly ?? usage.subscriptionExpiresAtIsDateOnly;
   const tier = metadata.rateLimitTier;
   const multiplier = planMultiplierFromTier(tier);
+  const renewalPlan = metadata.renewalPlan !== undefined
+    ? metadata.renewalPlan
+    : subscriptionRenewsAt !== undefined && subscriptionRenewsAt !== null && !subscriptionExpiresAt
+      ? normalizeAnthropicPlan(metadata.subscriptionType ?? credential.subscriptionType ?? usage.plan ?? undefined) ?? null
+      : undefined;
   return {
     ...usage,
     ...(tier ? { planTier: tier, planMultiplier: multiplier } : {}),
     plan: metadata.subscriptionType ?? credential.subscriptionType ?? usage.plan,
+    ...(renewalPlan !== undefined ? { renewalPlan } : {}),
     ...(billingInterval !== undefined ? { billingInterval } : {}),
     ...(subscriptionRenewsAt !== undefined ? { subscriptionRenewsAt } : {}),
     ...(subscriptionExpiresAt !== undefined ? { subscriptionExpiresAt } : {}),
+    ...(subscriptionRenewsAtIsDateOnly !== undefined ? { subscriptionRenewsAtIsDateOnly } : {}),
+    ...(subscriptionExpiresAtIsDateOnly !== undefined ? { subscriptionExpiresAtIsDateOnly } : {}),
   };
 }
 
