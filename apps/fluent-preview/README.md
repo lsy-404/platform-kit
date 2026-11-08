@@ -15,7 +15,7 @@ The showcase is one `FluentTheme` around a title bar, a two-level `FluentNavigat
 
 - **Customize** holds every preference as a real control: theme and accent (swatches and a custom color); speed, curve and reduced motion; selection indicator, toggle, check, dropdown, progress ring and indeterminate bar motion and the page transition; emphasis and corners. It is docked from 1180px and opens as a drawer below that.
 - **Overview** has presets that set several preferences and an accent at once, and a tile for each preference.
-- **Motion**: curves and speed (scaled durations, a race of every curve), selection motion, and control motion, where every toggle, check, dropdown, progress ring and progress bar motion value sits in its own nested `FluentTheme` row for comparison.
+- **Motion**: curves and speed (scaled durations, a curve demo that animates a pager, buttons, a toast, a drawer, an accordion and real Fluent controls with any curve, and a race of every curve), selection motion, and control motion, where every toggle, check, dropdown, progress ring and progress bar motion value sits in its own nested `FluentTheme` row for comparison.
 - **Appearance**: the accent on every control type, emphasis styles and corners.
 - **Page transitions** picks the app's own transition and holds the shared-element mini app.
 - **Controls**, **Sliders** and **Feedback** compose every export into forms, actions and overlays, sound and display panels, an equalizer of vertical sliders, upload progress, progress rings, live gauges, activity, and a comparison of how colour and surface move the visual centre of an icon.

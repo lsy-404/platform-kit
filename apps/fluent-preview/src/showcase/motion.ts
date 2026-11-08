@@ -4,6 +4,7 @@ import { card } from "../card.js";
 import { CornersCard, CurvesCard, EmphasisCard, MotionCard, useMotionDurations } from "../preference-cards.js";
 import { preferenceLabel, preferences } from "../preferences.js";
 import { TransitionsCard } from "../transition-card.js";
+import { CurveDemoCard } from "./curve-demo.js";
 import { pageFrame } from "./frame.js";
 import { navigate, pageLabel, pageOrder } from "./state.js";
 import { arrowGlyph } from "./icons.js";
@@ -54,7 +55,7 @@ const CurveRace = defineComponent({
 export const CurvesPage = defineComponent({
   setup: () => () => pageFrame("motion-curves", "Durations come from the speed preference and easing from the curve preference. Everything here re-reads them live.", () => [
     h(DurationStats),
-    h("div", { class: "showcase-stack" }, [h(CurveRace), h(CurvesCard)]),
+    h("div", { class: "showcase-stack" }, [h(CurveDemoCard), h(CurveRace), h(CurvesCard)]),
   ]),
 });
 

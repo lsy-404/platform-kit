@@ -186,3 +186,43 @@
 .weight-scale{display:flex;align-items:center;gap:10px}
 .motion-picker{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
 .weight-strength{flex:1 1 220px;max-width:320px}
+.curve-demo-toolbar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 20px}
+.curve-demo-toolbar .fluent-select{display:grid;gap:6px;min-width:220px}
+.curve-demo{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:14px;background:transparent}
+.curve-stage{display:grid;align-content:start;gap:12px;min-width:0;padding:14px;background:var(--fluent-bg);border:1px solid var(--fluent-border);border-radius:var(--fluent-panel-radius)}
+.curve-stage h4{margin:0;font-size:.9rem}
+.curve-pager{overflow:hidden;border-radius:var(--fluent-panel-radius)}
+.curve-pager__track{display:flex;transition:transform calc(var(--fluent-normal) * 2) var(--fluent-ease)}
+.curve-pager__page{display:grid;align-content:end;gap:4px;flex:0 0 100%;height:150px;padding:16px;color:#fff;font-size:.9rem}
+.curve-pager__page strong{font-size:1.3rem}
+.curve-pager__controls{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:1.2rem}
+.curve-pager__dots{display:flex;gap:8px}
+.curve-pager__dot{flex:none;width:8px;height:8px;min-width:0;min-height:0;padding:0;background:var(--fluent-control-strong);border:0;border-radius:4px;cursor:pointer;transition:width calc(var(--fluent-normal) * 2) var(--fluent-ease),background-color var(--fluent-fast) linear}
+.curve-pager__dot.is-active{width:24px;background:var(--fluent-accent)}
+.curve-cart{position:relative;display:inline-flex;align-items:center;justify-content:center;min-width:132px;height:36px;padding:0 16px;overflow:hidden;color:var(--fluent-accent-text);font:inherit;font-weight:600;background:var(--fluent-accent);border:0;border-radius:18px;cursor:pointer;transition:min-width calc(var(--fluent-normal) * 2) var(--fluent-ease),background-color var(--fluent-normal) linear}
+.curve-cart.is-added{min-width:176px;background:#107c10;color:#fff}
+.curve-cart__label{transition:transform calc(var(--fluent-normal) * 2) var(--fluent-ease)}
+.curve-cart.is-added .curve-cart__label{transform:translateX(-10px)}
+.curve-cart__check{position:absolute;right:16px;transform:scale(0);transition:transform calc(var(--fluent-normal) * 2) var(--fluent-ease)}
+.curve-cart.is-added .curve-cart__check{transform:scale(1)}
+.curve-like{width:36px;height:36px;padding:0;color:var(--fluent-muted);font-size:1.1rem;background:var(--fluent-control);border:1px solid var(--fluent-border);border-radius:50%;cursor:pointer;transition:transform calc(var(--fluent-normal) * 2) var(--fluent-ease),color var(--fluent-fast) linear}
+.curve-like.is-liked{color:#e81123;transform:scale(1.25)}
+.curve-nav{max-width:200px}
+.curve-meter{height:8px;overflow:hidden;background:var(--fluent-control-alt);border:1px solid var(--fluent-border);border-radius:4px}
+.curve-meter span{display:block;height:100%;background:var(--fluent-accent);transform-origin:left;transition:transform calc(var(--fluent-normal) * 2) var(--fluent-ease)}
+.curve-meter span:dir(rtl){transform-origin:right}
+.curve-app{position:relative;height:230px;overflow:hidden;background:var(--fluent-surface);border:1px solid var(--fluent-border);border-radius:var(--fluent-panel-radius)}
+.curve-app__body{display:grid;align-content:start;justify-items:start;gap:8px;padding:12px}
+.curve-accordion__head{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:6px 8px;color:var(--fluent-text);font:inherit;background:var(--fluent-control);border:1px solid var(--fluent-border);border-radius:var(--fluent-radius);cursor:pointer}
+.curve-accordion__chevron{transition:transform calc(var(--fluent-normal) * 2) var(--fluent-ease)}
+.curve-accordion__head[aria-expanded="true"] .curve-accordion__chevron{transform:rotate(180deg)}
+.curve-accordion{display:grid;grid-template-rows:0fr;width:100%;transition:grid-template-rows calc(var(--fluent-normal) * 2) var(--fluent-ease)}
+.curve-accordion.is-open{grid-template-rows:1fr}
+.curve-accordion__inner{min-height:0;overflow:hidden;font-size:.85rem}
+.curve-accordion__inner p{margin:6px 8px}
+.curve-drawer{position:absolute;inset-block:0;inset-inline-end:0;display:grid;align-content:start;gap:6px;width:150px;padding:12px;font-size:.85rem;background:var(--fluent-acrylic);border-inline-start:1px solid var(--fluent-border);box-shadow:var(--fluent-shadow);transform:translateX(105%);visibility:hidden;transition:transform calc(var(--fluent-normal) * 2) var(--fluent-ease),visibility 0s linear calc(var(--fluent-normal) * 2)}
+.curve-drawer:dir(rtl){transform:translateX(-105%)}
+.curve-drawer.is-open{transform:none;visibility:visible;transition:transform calc(var(--fluent-normal) * 2) var(--fluent-ease),visibility 0s}
+.curve-toasts{position:absolute;inset-inline:12px;bottom:12px;display:grid;gap:6px;pointer-events:none}
+.curve-toast{padding:8px 12px;font-size:.85rem;background:var(--fluent-surface);border:1px solid var(--fluent-border);border-radius:var(--fluent-radius);box-shadow:var(--fluent-shadow);animation:curve-toast-in calc(var(--fluent-normal) * 2) var(--fluent-ease)}
+@keyframes curve-toast-in{from{opacity:0;transform:translateY(24px)}}
