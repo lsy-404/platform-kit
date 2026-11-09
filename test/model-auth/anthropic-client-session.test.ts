@@ -40,7 +40,8 @@ describe("Anthropic client session", () => {
     let sent: RequestInit | undefined, telemetryHeaders: Headers | undefined, events: Array<{ event_name: string; device_id: string; session_id: string; auth: { account_uuid: string }; model: string; env: { version: string } }> = [];
     const response = new Response("unread", { headers: { "request-id": "req-a" } });
     const environment = { platform: "linux", arch: "x64" };
-    const session = createAnthropicClientSession({ ...options, parentSessionId: "parent_a", telemetry: { enabled: true, environment, fetchImpl: async (_input, init) => { telemetryHeaders = new Headers(init?.headers); events = JSON.parse(String(init?.body)).events.map((row: { event_data: unknown }) => row.event_data); return new Response(null, { status: 204 }); } } });
+    const { sdkVersion: _sdkVersion, ...cliOptions } = options;
+    const session = createAnthropicClientSession({ ...cliOptions, clientApp: "iris", parentSessionId: "parent_a", telemetry: { enabled: true, environment, fetchImpl: async (_input, init) => { telemetryHeaders = new Headers(init?.headers); events = JSON.parse(String(init?.body)).events.map((row: { event_data: unknown }) => row.event_data); return new Response(null, { status: 204 }); } } });
     environment.platform = "other";
     const observer = session.request({ fetchImpl: async (_input, init) => { sent = init; return response; }, promptId: "prompt_a", requestClass: "main", agentType: "worker" });
     expect(await observer.fetch(url, request())).toBe(response);
@@ -52,7 +53,7 @@ describe("Anthropic client session", () => {
     expect(headers.get("x-claude-code-request-class")).toBe("main");
     expect(headers.get("x-claude-code-prompt-id")).toBe("prompt_a");
     expect(headers.get("x-claude-code-agent-type")).toBe("worker");
-    expect(headers.get("user-agent")).toBe("claude-cli/2.1.316 (external, sdk-ts, agent-sdk/0.3.316)");
+    expect(headers.get("user-agent")).toBe("claude-cli/2.1.316 (external, cli, client-app/iris)");
     expect(body.metadata.retained).toBe(true);
     expect(JSON.parse(body.metadata.user_id)).toEqual({ device_id: "device_a", account_uuid: "account_a", session_id: "session_a", parent_session_id: "parent_a" });
     observer.onResponseMessage({ type: "message", role: "assistant", id: "msg", model: "model", content: [], stop_reason: "end_turn", usage: { input_tokens: 3, output_tokens: 2 } });
@@ -62,6 +63,7 @@ describe("Anthropic client session", () => {
     expect(telemetryHeaders?.get("x-claude-code-session-id")).toBeNull();
     expect(telemetryHeaders?.get("x-claude-code-prompt-id")).toBeNull();
     expect(events[1]).toMatchObject({ device_id: "device_a", session_id: "session_a", is_interactive: false, user_type: "external", auth: { account_uuid: "account_a", organization_uuid: "org_a" }, model: "model-a", env: { version: "2.1.316", platform: "linux", arch: "x64" } });
+    expect(events[1]).not.toHaveProperty("agent_sdk_version");
   });
 
   it("keeps prompt identity across tool-loop requests and isolates separate sessions", async () => {

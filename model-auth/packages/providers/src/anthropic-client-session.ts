@@ -6,7 +6,7 @@ import type { AnthropicTelemetryRequest } from "./anthropic-telemetry-request.js
 
 export type AnthropicRequestClass = "main" | "subagent" | "workflow" | "compaction" | "auxiliary" | "side_reply";
 export type AnthropicClientSessionOptions = { readonly enabled?: false } | {
-  readonly enabled: true; readonly clientVersion: string; readonly sdkVersion: string; readonly deviceId: string;
+  readonly enabled: true; readonly clientVersion: string; readonly sdkVersion?: string; readonly deviceId: string;
   readonly sessionId?: string; readonly parentSessionId?: string; readonly accountUuid?: string; readonly organizationUuid?: string;
   readonly entrypoint?: string; readonly clientApp?: string; readonly bodyPolicy?: AnthropicRequestPolicy;
   readonly telemetry?: { readonly enabled: true; readonly fetchImpl: typeof fetch; readonly signal?: AbortSignal; readonly storage?: AnthropicTelemetryStorage; readonly privacyEnv?: AnthropicTelemetryPrivacyEnv; readonly eligible?: () => boolean; readonly environment?: Omit<NonNullable<AnthropicTelemetryContext["environment"]>, "version"> };
@@ -39,9 +39,9 @@ export function createAnthropicClientSession(options: AnthropicClientSessionOpti
     return { fetch: fetchImpl, onStreamEvent() {}, onResponseMessage() {}, onError() {} };
   }, flush: async () => true, close: async () => { closed = true; return true; } };
   const { clientVersion, sdkVersion, deviceId, accountUuid, organizationUuid, clientApp, parentSessionId } = options;
-  const sessionId = options.sessionId ?? randomUUID(), entrypoint = options.entrypoint ?? "sdk-ts";
+  const sessionId = options.sessionId ?? randomUUID(), entrypoint = options.entrypoint ?? "cli";
   if (![sessionId, deviceId, ...(parentSessionId !== undefined ? [parentSessionId] : []), ...(accountUuid !== undefined ? [accountUuid] : []), ...(organizationUuid !== undefined ? [organizationUuid] : [])].every(value => IDENTIFIER.test(value))) throw new TypeError("Invalid Anthropic session identity.");
-  const clientHeaders = anthropicIdentityHeaders({ clientVersion, sdkVersion, entrypoint, ...(clientApp ? { clientApp } : {}) });
+  const clientHeaders = anthropicIdentityHeaders({ clientVersion, ...(sdkVersion !== undefined ? { sdkVersion } : {}), entrypoint, ...(clientApp ? { clientApp } : {}) });
   const telemetryFetch = options.telemetry?.fetchImpl;
   const telemetry: AnthropicTelemetry = options.telemetry?.enabled
     ? createAnthropicTelemetry({ enabled: true, sessionId, fetchImpl: (input, init) => {
@@ -49,8 +49,8 @@ export function createAnthropicClientSession(options: AnthropicClientSessionOpti
       headers.set("user-agent", `claude-code/${clientVersion}`);
       return telemetryFetch!(input, { ...init, headers });
     },
-      context: { deviceId, ...(accountUuid ? { accountUuid } : {}), ...(organizationUuid ? { organizationUuid } : {}), entrypoint, agentSdkVersion: sdkVersion, ...(parentSessionId ? { parentSessionId } : {}),
-        ...(entrypoint === "sdk-ts" ? { isInteractive: false, userType: "external" as const } : {}), environment: { ...options.telemetry.environment, version: clientVersion } },
+      context: { deviceId, ...(accountUuid ? { accountUuid } : {}), ...(organizationUuid ? { organizationUuid } : {}), entrypoint, ...(sdkVersion !== undefined ? { agentSdkVersion: sdkVersion } : {}), ...(parentSessionId ? { parentSessionId } : {}),
+        isInteractive: false, userType: "external" as const, environment: { ...options.telemetry.environment, version: clientVersion } },
       ...(options.telemetry.signal ? { signal: options.telemetry.signal } : {}),
       ...(options.telemetry.storage ? { storage: options.telemetry.storage } : {}),
       ...(options.telemetry.privacyEnv ? { privacyEnv: options.telemetry.privacyEnv } : {}), ...(options.telemetry.eligible ? { eligible: options.telemetry.eligible } : {}) })
