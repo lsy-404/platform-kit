@@ -13,10 +13,10 @@ describe("public package surface", () => {
     expect(MODEL_AUTH_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
   });
 
-  it("exports the Ollama account usage API from the root and subpath", () => {
-    expect(providers.queryOllamaAccountUsage).toBe(ollama.queryOllamaAccountUsage);
-    expect(typeof providers.authorizeOllamaWeb).toBe("function");
-    expect(typeof providers.queryOllamaUsage).toBe("function");
+  it("exports the Ollama key balance API from the root and subpath", () => {
+    expect(providers.queryOllamaKeyUsage).toBe(ollama.queryOllamaKeyUsage);
+    expect(providers.parseOllamaBalance).toBe(ollama.parseOllamaBalance);
+    expect(providers.OLLAMA_BALANCE_URL).toBe("https://ollama.com/api/balance");
   });
 
   it("exports the Claude prepaid credits query from the root and the usage subpath", () => {
@@ -24,11 +24,11 @@ describe("public package surface", () => {
     expect(providers.queryClaudePrepaidCredits).toBe(usage.queryClaudePrepaidCredits);
   });
 
-  it("exports the OpenCode Go usage API from the root and subpath, and no longer the Ollama key endpoint", () => {
+  it("exports the OpenCode Go usage API from the root and subpath, and no longer the Ollama web session", () => {
     expect(providers.queryOpencodeGoKeyUsage).toBe(opencode.queryOpencodeGoKeyUsage);
     expect(providers.parseOpencodeGoUsage).toBe(opencode.parseOpencodeGoUsage);
     expect(providers.OPENCODE_GO_USAGE_URL).toBe("https://opencode.ai/zen/go/v1/usage");
-    for (const removed of ["queryOllamaKeyUsage", "parseOllamaKeyUsage", "OLLAMA_USAGE_URL"]) expect(providers).not.toHaveProperty(removed);
+    for (const removed of ["authorizeOllamaWeb", "queryOllamaUsage", "queryOllamaAccountUsage", "parseOllamaSettings", "OLLAMA_USAGE_URL"]) expect(providers).not.toHaveProperty(removed);
   });
 
   it("derives remaining percentages and readiness", () => {

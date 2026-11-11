@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createUsageGate, mergeUsageReading } from "../../model-auth/packages/core/src/index.js";
 import { queryClaudePrepaidCredits, queryCodexUsage, queryProviderUsage, UsageRequestError, usageErrorSnapshot, usageSnapshot } from "../../model-auth/packages/providers/src/usage.js";
-import { queryOllamaUsage } from "../../model-auth/packages/providers/src/ollama.js";
+import { queryOllamaKeyUsage } from "../../model-auth/packages/providers/src/ollama.js";
 import { queryOpencodeGoKeyUsage } from "../../model-auth/packages/providers/src/opencode.js";
 
 const credential = { access: "synthetic-access" };
@@ -72,7 +72,7 @@ describe("usage failure snapshots carry Retry-After", () => {
     const throttled = (headers: Record<string, string>) => async () => new Response("{}", { status: 429, headers });
     const fetchImpl = (path: string, headers: Record<string, string>) => (async (input: string | URL | Request) =>
       new URL(String(input)).pathname === path ? new Response("{}", { status: 429, headers }) : new Response("{}", { status: 200 })) as typeof fetch;
-    expect(await queryOllamaUsage({ cookie: "wos-session=v", fetchImpl: throttled({ "Retry-After": "300" }) as unknown as typeof fetch }))
+    expect(await queryOllamaKeyUsage("ollama-key-123", { fetchImpl: throttled({ "Retry-After": "300" }) as unknown as typeof fetch }))
       .toMatchObject({ errorCode: "rate-limited", retryAfterMs: 300_000 });
     expect(await queryClaudePrepaidCredits({ fetchImpl: fetchImpl("/api/organizations", { "Retry-After": "120" }) }))
       .toMatchObject({ errorCode: "rate-limited", retryAfterMs: 120_000 });

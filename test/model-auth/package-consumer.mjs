@@ -73,7 +73,7 @@ void [codec, rootCodec];
 import { authorizeAnthropicInBrowser, type AnthropicBrowserAuthorization, type AnthropicSessionCookie } from "@model-auth/providers/anthropic-browser";
 import { authorizeTrae, refreshTrae, listTraeModels, streamTrae } from "@model-auth/providers/trae";
 import { authorizeGrok, queryGrokUsage } from "@model-auth/providers/grok";
-import { authorizeOllamaWeb, queryOllamaUsage, parseOllamaSettings } from "@model-auth/providers/ollama";
+import { queryOllamaKeyUsage, parseOllamaBalance } from "@model-auth/providers/ollama";
 import { queryOpencodeGoKeyUsage, parseOpencodeGoUsage } from "@model-auth/providers/opencode";
 import { queryProviderUsage, queryClaudePrepaidCredits, parseAnthropicUsage } from "@model-auth/providers/usage";
 import type { ProviderUsageExtraUsage, ProviderUsageSnapshot } from "@model-auth/core";
@@ -106,7 +106,7 @@ const browserCookies: readonly AnthropicSessionCookie[] = [];
 const browserAuthorization: Promise<AnthropicBrowserAuthorization> = authorizeAnthropicInBrowser({ executablePath: "chrome", browserArgs: [], signal: new AbortController().signal });
 void [browserCookies, browserAuthorization];
 void [decision, cancelledCount, scheduledRead];
-void [gate, retryAfter, throttled, credential, providers, router, ModelAuthDialog, registerModelAuthElement, authorizeWorkBuddy, refreshWorkBuddy, authorizeTrae, refreshTrae, listTraeModels, streamTrae, authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic, authorizeGrok, queryGrokUsage, authorizeOllamaWeb, queryOllamaUsage, parseOllamaSettings, queryOpencodeGoKeyUsage, parseOpencodeGoUsage, queryProviderUsage, queryClaudePrepaidCredits, extraUsage, listOpenAICodexModels, CLIENT_VERSION_FLOORS, pending, models];
+void [gate, retryAfter, throttled, credential, providers, router, ModelAuthDialog, registerModelAuthElement, authorizeWorkBuddy, refreshWorkBuddy, authorizeTrae, refreshTrae, listTraeModels, streamTrae, authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic, authorizeGrok, queryGrokUsage, queryOllamaKeyUsage, parseOllamaBalance, queryOpencodeGoKeyUsage, parseOpencodeGoUsage, queryProviderUsage, queryClaudePrepaidCredits, extraUsage, listOpenAICodexModels, CLIENT_VERSION_FLOORS, pending, models];
 `);
 execFileSync(process.execPath, [join(root, "node_modules/typescript/bin/tsc"), "--noEmit", "--strict", "--skipLibCheck", "--moduleResolution", "bundler", "--module", "esnext", "--target", "es2023", join(consumer, "entry.ts")], { stdio: "pipe", cwd: consumer });
 execFileSync(process.execPath, [join(root, "node_modules/typescript/bin/tsc"), "--noEmit", "--strict", "--skipLibCheck", "--moduleResolution", "node", "--module", "commonjs", "--target", "es2023", join(consumer, "entry.ts")], { stdio: "pipe", cwd: consumer });
@@ -121,11 +121,11 @@ import { anthropicTelemetryPrivacyAllowed } from "@model-auth/providers/anthropi
 if (anthropicTelemetryPrivacyAllowed({ DO_NOT_TRACK: "1" })) throw new Error("Installed telemetry privacy policy unavailable");
 import { authorizeAnthropicInBrowser } from "@model-auth/providers/anthropic-browser";
 import { authorizeGrok, queryGrokUsage } from "@model-auth/providers/grok";
-import { authorizeOllamaWeb, queryOllamaUsage, parseOllamaSettings } from "@model-auth/providers/ollama";
+import { queryOllamaKeyUsage, parseOllamaBalance } from "@model-auth/providers/ollama";
 import { queryOpencodeGoKeyUsage, parseOpencodeGoUsage } from "@model-auth/providers/opencode";
 import { queryClaudePrepaidCredits, parseAnthropicUsage } from "@model-auth/providers/usage";
-const ollama = parseOllamaSettings("<span>Cloud Usage</span><span>Pro</span><div>Weekly usage</div><span>25% used</span>");
-if (ollama.plan !== "Pro" || ollama.windows[0]?.remainingPercent !== 75) throw new Error("Installed Ollama settings parser unavailable");
+const ollama = parseOllamaBalance({ included: { weekly: { remaining_percent: 75, resets_at: "2030-01-07T00:00:00Z" } }, purchased: { balance_usd: 0 } });
+if (ollama.windows[0]?.remainingPercent !== 75) throw new Error("Installed Ollama balance parser unavailable");
 const opencode = await queryOpencodeGoKeyUsage("consumer-key", { fetchImpl: async () => Response.json({ usage: { rolling: { percent: 10 }, weekly: { percent: 25 } } }) });
 if (opencode.plan !== "Go" || opencode.windows[1]?.remainingPercent !== 75) throw new Error("Installed OpenCode Go usage unavailable");
 const extra = parseAnthropicUsage({ spend: { enabled: true, used: { amount_minor: 235, currency: "USD", exponent: 2 }, limit: { amount_minor: 2000, currency: "USD", exponent: 2 } } }).extraUsage;
@@ -151,7 +151,7 @@ if (requestUsage?.cacheWrite1h !== 3 || requestUsage.cacheWrite !== undefined) t
 const prepaid = await queryClaudePrepaidCredits({ fetchImpl: async url => Response.json(String(url).endsWith("/api/organizations") ? [{ uuid: "org-1" }] : { amount: 1234, currency: "USD" }) });
 if (prepaid.balance?.amount !== 12.34) throw new Error("Installed Claude prepaid credits unavailable");
 if (typeof authorizeWorkBuddy !== "function" || typeof refreshWorkBuddy !== "function") throw new Error("Installed providers unavailable");
-for (const provider of [authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic, authorizeGrok, queryGrokUsage, authorizeOllamaWeb, queryOllamaUsage, parseOllamaSettings, queryOpencodeGoKeyUsage, parseOpencodeGoUsage]) {
+for (const provider of [authorizeOpenAI, refreshOpenAI, authorizeAnthropic, refreshAnthropic, authorizeGrok, queryGrokUsage, queryOllamaKeyUsage, parseOllamaBalance, queryOpencodeGoKeyUsage, parseOpencodeGoUsage]) {
   if (typeof provider !== "function") throw new Error("Installed browser OAuth unavailable");
 }
 if (typeof authorizeAnthropicInBrowser !== "function") throw new Error("Installed Anthropic browser authorization unavailable");

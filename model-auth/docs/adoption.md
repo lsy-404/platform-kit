@@ -4,12 +4,12 @@
 
 Move provider discovery and credential selection into the shared flow:
 
-1. Call the provider package authorization function in a trusted host process with a system-browser opener and an `AbortSignal`: `authorizeOpenAI`, `authorizeAnthropic`, `authorizeWorkBuddy`, `authorizeTrae`, `authorizeGrok`, or `authorizeOllamaWeb`.
+1. Call the provider package authorization function in a trusted host process with a system-browser opener and an `AbortSignal`: `authorizeOpenAI`, `authorizeAnthropic`, `authorizeWorkBuddy`, `authorizeTrae`, or `authorizeGrok`.
 2. Keep API-key validation, refresh scheduling, revocation, and secure storage in the host. Call the matching shared refresh function for token renewal.
 3. Convert stored entries to `CredentialMetadata` with opaque IDs and no secrets.
 4. Use `setEnabled`, `setOrder`, and `setExtend` independently when restoring preferences. `extend` is for non-sensitive per-credential context only.
 5. Route requests through `CredentialRouter` and the host request/stream callbacks, then report classified success or errors.
-6. Query non-secret provider usage through `queryClaudePrepaidCredits` (with a host-provided claude.ai session fetch), `queryGrokUsage`, `queryOllamaUsage`, `queryOpencodeGoKeyUsage`, `queryProviderUsage`, or a host adapter's `queryUsage` callback.
+6. Query non-secret provider usage through `queryClaudePrepaidCredits` (with a host-provided claude.ai session fetch), `queryGrokUsage`, `queryOllamaKeyUsage`, `queryOpencodeGoKeyUsage`, `queryProviderUsage`, or a host adapter's `queryUsage` callback.
 
 `createOpenAIAdapter`, `createAnthropicAdapter`, `createWorkBuddyAdapter` and `createTraeAdapter` remain metadata-only validation boundaries. Keep secret storage in the host and verify its adapter before release.
 
