@@ -1,5 +1,5 @@
 import { anthropicClientHeaders } from "./anthropic.js";
-import { describeOAuthCredential, normalizeCodexPlan, planMultiplierFromTier } from "@model-auth/core";
+import { describeOAuthCredential, normalizeAnthropicPlan as normalizeAnthropicTierPlan, normalizeCodexPlan } from "@model-auth/core";
 import type {
   ProviderUsageBalance, ProviderUsageErrorCode, ProviderUsageEstimate, ProviderUsageEstimateSource, ProviderUsageEstimateUnit,
   ProviderUsageExtraUsage, ProviderUsageSnapshot, ProviderUsageStatus, ProviderUsageWindow, ProviderUsageWindowKind,
@@ -652,7 +652,8 @@ export function mergeAnthropicUsageMetadata(
   const subscriptionRenewsAtIsDateOnly = metadata.subscriptionRenewsAtIsDateOnly ?? usage.subscriptionRenewsAtIsDateOnly;
   const subscriptionExpiresAtIsDateOnly = metadata.subscriptionExpiresIsDateOnly ?? usage.subscriptionExpiresAtIsDateOnly;
   const tier = metadata.rateLimitTier;
-  const multiplier = planMultiplierFromTier(tier);
+  const reported = metadata.subscriptionType ?? credential.subscriptionType ?? usage.plan;
+  const normalizedPlan = normalizeAnthropicTierPlan(reported, tier);
   const renewalPlan = metadata.renewalPlan !== undefined
     ? metadata.renewalPlan
     : subscriptionRenewsAt !== undefined && subscriptionRenewsAt !== null && !subscriptionExpiresAt
@@ -660,8 +661,8 @@ export function mergeAnthropicUsageMetadata(
       : undefined;
   return {
     ...usage,
-    ...(tier ? { planTier: tier, planMultiplier: multiplier } : {}),
-    plan: metadata.subscriptionType ?? credential.subscriptionType ?? usage.plan,
+    ...(tier ? { planTier: tier, planMultiplier: normalizedPlan.multiplier } : {}),
+    plan: normalizedPlan.plan ?? reported,
     ...(renewalPlan !== undefined ? { renewalPlan } : {}),
     ...(billingInterval !== undefined ? { billingInterval } : {}),
     ...(subscriptionRenewsAt !== undefined ? { subscriptionRenewsAt } : {}),

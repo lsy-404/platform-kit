@@ -134,7 +134,7 @@ describe("describeOAuthCredential", () => {
       subscriptionType: "max", rateLimitTier: "default_claude_max_20x", scope: "user:profile user:inference", lastRefreshAt: "2030-01-01T11:00:00Z", unknownField: "x",
     }, NOW);
     expect(view).toEqual({
-      account: "user@example.test", organization: "org-9", plan: "max", planMultiplier: 20, tokenExpiresAt: NOW - 1000,
+      account: "user@example.test", organization: "org-9", plan: "ultra", planMultiplier: 10, tokenExpiresAt: NOW - 1000,
       scopes: ["user:profile", "user:inference"], lastRefreshAt: Date.parse("2030-01-01T11:00:00Z"), status: "refresh-needed",
     });
   });

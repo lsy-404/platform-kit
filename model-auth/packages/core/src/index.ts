@@ -1500,6 +1500,13 @@ export function planMultiplierFromTier(tier: unknown): number | null {
   return match ? Number(match[1]) : null;
 }
 
+/** Anthropic reports Ultra (formerly Max 20x) as subscriptionType "max" with the max_20x tier; Ultra is 10x Pro weekly usage. */
+export function normalizeAnthropicPlan(subscriptionType: unknown, tier: unknown): { plan: string | null; multiplier: number | null } {
+  const plan = typeof subscriptionType === "string" && subscriptionType.trim() ? subscriptionType.trim() : null;
+  if (plan?.toLowerCase() === "max" && typeof tier === "string" && /(?:^|_)max_20x$/i.test(tier.trim())) return { plan: "ultra", multiplier: 10 };
+  return { plan, multiplier: planMultiplierFromTier(tier) };
+}
+
 const CODEX_PLAN_ALIASES: Readonly<Record<string, { plan: string; multiplier: number | null }>> = {
   prolite: { plan: "pro", multiplier: 5 },
   pro_lite: { plan: "pro", multiplier: 5 },
@@ -1631,7 +1638,11 @@ export function describeOAuthCredential(provider: string, credential: unknown, n
     if (normalized.multiplier !== null) planMultiplier = normalized.multiplier;
   }
   const tier = pick(fields.tier) as string | undefined;
-  if (planMultiplier === undefined && tier) {
+  if (provider === "anthropic") {
+    const normalized = normalizeAnthropicPlan(plan, tier);
+    plan = normalized.plan ?? undefined;
+    if (normalized.multiplier !== null) planMultiplier = normalized.multiplier;
+  } else if (planMultiplier === undefined && tier) {
     const fromTier = planMultiplierFromTier(tier);
     if (fromTier !== null) planMultiplier = fromTier;
   }

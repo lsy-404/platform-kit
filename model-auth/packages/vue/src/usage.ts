@@ -19,7 +19,7 @@ export function formatExactTimestamp(timestamp: number | null | undefined, local
 
 export function usagePlanLabel(usage: Pick<CredentialUsage, "plan" | "planMultiplier">): string | null {
   if (!usage.plan) return null;
-  const names: Record<string, string> = { free: "Free", go: "Go", plus: "Plus", pro: "Pro", business: "Business", enterprise: "Enterprise", edu: "Edu" };
+  const names: Record<string, string> = { free: "Free", go: "Go", plus: "Plus", pro: "Pro", max: "Max", ultra: "Ultra", team: "Team", business: "Business", enterprise: "Enterprise", edu: "Edu" };
   const plan = names[usage.plan] ?? usage.plan;
   return typeof usage.planMultiplier === "number" && usage.planMultiplier > 1 ? `${plan} ${usage.planMultiplier}x` : plan;
 }
