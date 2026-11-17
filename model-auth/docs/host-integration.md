@@ -91,6 +91,8 @@ const runtimeProviders = bindRuntimeProviders(snapshot.catalog!, [
 
 WorkBuddy and TraeCode are adapter capabilities, not fabricated `models.dev` providers. Use their exported factories when the host supplies the matching callback contract.
 
+`access.webSearch` marks subscriptions whose provider runs a server-side web search. `webSearchToolFor(api, "subscription" | "api-key")` returns the tool definition for a wire API (`anthropic-messages`, `openai-responses`, `openai-codex-responses`); append `spec.tool` to the request's `tools` array and read the answer text, whose links come from the provider's results. It returns `null` where the provider has no server-side search for that kind of credential.
+
 ## 4. Route credentials
 
 ```ts
