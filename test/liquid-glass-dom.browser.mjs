@@ -104,7 +104,8 @@ try {
       const filter = document.querySelector(late.style.getPropertyValue("--pk-lens").slice(4, -1));
       return {
         blur: filter.querySelector("feGaussianBlur")?.getAttribute("stdDeviation"),
-        merged: filter.querySelectorAll("feMergeNode").length,
+        // The last merge lays the blurred rim over the bent page; an earlier one may assemble a sliced map.
+        merged: filter.lastElementChild.querySelectorAll("feMergeNode").length,
         scale: Number(filter.querySelector("feDisplacementMap").getAttribute("scale")),
         backdrop: getComputedStyle(late).backdropFilter,
         filters: document.querySelectorAll("svg[data-pk-liquid-glass] filter").length,
