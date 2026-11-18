@@ -68,7 +68,7 @@ Dark tokens are the default; `prefers-color-scheme: light` switches `:root` unle
 | `--pk-glass-highlight` | Rim light strength, 0–1 |
 | `--pk-glass-refraction` | Rim bend as a multiple of the demo's (0 flat, 1 demo); read by the lens |
 | `--pk-glass-rim-width` | Refracting band width as a multiple of the demo's; read by the lens |
-| `--pk-glass-edge-blur` | Blur inside the refracting band, in pixels; read by the lens |
+| `--pk-glass-edge-blur` | Blur inside the refracting band, in pixels; read by the lens, and left out where the surface's own blur already hides it |
 | `--pk-glass-stroke`, `--pk-glass-stroke-hover` | Surface border |
 | `--pk-glass-rim` | Rim light gradient |
 | `--pk-glass-edge`, `--pk-glass-shadow` | Inset edge light and outer shadow |

@@ -5,6 +5,8 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 const REFIT_MS = 100;
 /** Drawn maps kept for reuse, most recent last. */
 const MAP_CACHE = 64;
+/** Rim blur that adds less than this to the element's own frost, in pixels, cannot be seen and is left out. */
+const EDGE_BLUR_VISIBLE = 0.5;
 /** Where a lens would hurt legibility or the person asked for less transparency, surfaces stay flat. */
 export const LIQUID_GLASS_DISABLED_QUERY = "(forced-colors: active), (prefers-contrast: more), (prefers-reduced-transparency: reduce)";
 /** The custom property a lensed element receives: `url(#…)`, ready to lead its `backdrop-filter`. */
@@ -13,6 +15,8 @@ export const LIQUID_GLASS_LENS_PROPERTY = "--pk-lens";
  * Per-element tuning, read from inherited custom properties whenever a lens is fitted (set them on :root or any
  * container, then call refreshLiquidGlass() to refit what is already on screen): `--pk-glass-refraction` and
  * `--pk-glass-rim-width` scale the demo's bend and rim band, `--pk-glass-edge-blur` blurs the rim band in pixels.
+ * The rim blur is dropped where the element's own `backdrop-filter` blur already hides it, so a lens fitted before
+ * that frost changes needs refreshLiquidGlass() too.
  */
 export const LIQUID_GLASS_TUNING_PROPERTIES = ["--pk-glass-refraction", "--pk-glass-rim-width", "--pk-glass-edge-blur"] as const;
 /** Elements the default `liquidGlass()` watch refracts. */
@@ -41,11 +45,21 @@ function tuningValue(style: CSSStyleDeclaration, property: string, fallback: num
   return Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
+/** The standard deviation of every `blur()` the element's backdrop filter applies after its lens. */
+function frostBlur(style: CSSStyleDeclaration): number {
+  let variance = 0;
+  for (const [, px] of style.backdropFilter.matchAll(/blur\(([\d.]+)px\)/g)) variance += Number(px) ** 2;
+  return Math.sqrt(variance);
+}
+
 function readTuning(style: CSSStyleDeclaration): Tuning {
+  const frost = frostBlur(style);
+  const edgeBlur = tuningValue(style, "--pk-glass-edge-blur", 0);
   return {
     refraction: tuningValue(style, "--pk-glass-refraction", 1),
     rimWidth: tuningValue(style, "--pk-glass-rim-width", 1),
-    edgeBlur: tuningValue(style, "--pk-glass-edge-blur", 0),
+    // Blurs stack in quadrature; the rim blur's branch costs several full-size passes per frame for each element.
+    edgeBlur: Math.hypot(edgeBlur, frost) - frost < EDGE_BLUR_VISIBLE ? 0 : edgeBlur,
   };
 }
 
