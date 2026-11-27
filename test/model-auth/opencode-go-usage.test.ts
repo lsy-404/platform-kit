@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { OPENCODE_GO_USAGE_URL, parseOpencodeGoUsage, queryOpencodeGoKeyUsage } from "../../model-auth/packages/providers/src/opencode.js";
 
-// Verbatim 200 body of https://opencode.ai/zen/go/v1/usage, taken from the token-monitor reference tests.
+// Verbatim 200 body of https://opencode.ai/inference/go/v1/usage, taken from the token-monitor reference tests.
 const LIVE_PAYLOAD = {
   usage: {
     rolling: { status: "ok", percent: 0, resetsAt: "2026-08-13T15:11:49.412Z" },
@@ -61,7 +61,7 @@ describe("OpenCode Go usage request", () => {
       calls.push({ url: String(url), headers: new Headers(init?.headers), redirect: init?.redirect, signal: init?.signal });
       return Response.json(LIVE_PAYLOAD);
     } });
-    expect(OPENCODE_GO_USAGE_URL).toBe("https://opencode.ai/zen/go/v1/usage");
+    expect(OPENCODE_GO_USAGE_URL).toBe("https://opencode.ai/inference/go/v1/usage");
     expect(calls).toHaveLength(1);
     expect(calls[0]!.url).toBe(OPENCODE_GO_USAGE_URL);
     expect(calls[0]!.headers.get("authorization")).toBe("Bearer go-key-123");

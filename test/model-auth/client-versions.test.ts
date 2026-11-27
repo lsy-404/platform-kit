@@ -16,15 +16,15 @@ describe("latest client versions", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     const { latestClientVersion } = await load();
     const requests: string[] = [];
-    let release = "2.1.293";
+    let release = "2.1.340";
     const fetchImpl: typeof fetch = async url => {
       requests.push(String(url));
       return new Response(JSON.stringify({ version: release }));
     };
     expect(await Promise.all([latestClientVersion("claude", { fetchImpl }), latestClientVersion("claude", { fetchImpl })])).toEqual([release, release]);
     expect(requests).toEqual(["https://registry.npmjs.org/@anthropic-ai/claude-code/latest"]);
-    release = "2.1.294";
-    expect(await latestClientVersion("claude", { fetchImpl })).toBe("2.1.293");
+    release = "2.1.341";
+    expect(await latestClientVersion("claude", { fetchImpl })).toBe("2.1.340");
     vi.setSystemTime(Date.now() + 6 * 60 * 60 * 1000 + 1);
     expect(await latestClientVersion("claude", { fetchImpl })).toBe(release);
     vi.setSystemTime(Date.now() + 6 * 60 * 60 * 1000 + 1);
@@ -33,12 +33,12 @@ describe("latest client versions", () => {
 
   it("returns a newer published version and never goes below the floor", async () => {
     const { latestClientVersion, CLIENT_VERSION_FLOORS } = await load();
-    expect(await latestClientVersion("codex", { fetchImpl: async () => npm("0.160.0") })).toBe("0.160.0");
+    expect(await latestClientVersion("codex", { fetchImpl: async () => npm("0.172.0") })).toBe("0.172.0");
     expect(await latestClientVersion("grok", { fetchImpl: async () => new Response("1.0.46\n") })).toBe("1.0.46");
     vi.resetModules();
     const fresh = await load();
     expect(await fresh.latestClientVersion("codex", { fetchImpl: async () => npm("0.100.0") })).toBe(CLIENT_VERSION_FLOORS.codex);
-    expect(CLIENT_VERSION_FLOORS.codex).toBe("0.160.0");
+    expect(CLIENT_VERSION_FLOORS.codex).toBe("0.172.0");
   });
 
   it("rejects targets that are not own keys of the floor table", async () => {
@@ -59,25 +59,25 @@ describe("latest client versions", () => {
     let calls = 0;
     const failing: typeof fetch = async () => { calls++; throw new Error("offline"); };
     expect(await latestClientVersion("codex", { fetchImpl: failing })).toBe(CLIENT_VERSION_FLOORS.codex);
-    expect(await latestClientVersion("codex", { fetchImpl: async () => { calls++; return npm("0.160.0"); } })).toBe(CLIENT_VERSION_FLOORS.codex);
+    expect(await latestClientVersion("codex", { fetchImpl: async () => { calls++; return npm("0.172.0"); } })).toBe(CLIENT_VERSION_FLOORS.codex);
     expect(calls).toBe(1);
     vi.setSystemTime(Date.now() + 5 * 60 * 1000 + 1);
     expect(await latestClientVersion("codex", { fetchImpl: async () => { calls++; return new Response("nope", { status: 503 }); } })).toBe(CLIENT_VERSION_FLOORS.codex);
     vi.setSystemTime(Date.now() + 5 * 60 * 1000 + 1);
-    expect(await latestClientVersion("codex", { fetchImpl: async () => { calls++; return npm("0.160.0"); } })).toBe("0.160.0");
+    expect(await latestClientVersion("codex", { fetchImpl: async () => { calls++; return npm("0.172.0"); } })).toBe("0.172.0");
     expect(calls).toBe(3);
   });
 
   it("keeps the last known version when a refresh after the TTL fails", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     const { latestClientVersion } = await load();
-    expect(await latestClientVersion("codex", { fetchImpl: async () => npm("0.160.0") })).toBe("0.160.0");
+    expect(await latestClientVersion("codex", { fetchImpl: async () => npm("0.172.0") })).toBe("0.172.0");
     vi.setSystemTime(Date.now() + 6 * 60 * 60 * 1000 + 1);
-    expect(await latestClientVersion("codex", { fetchImpl: async () => { throw new Error("offline"); } })).toBe("0.160.0");
+    expect(await latestClientVersion("codex", { fetchImpl: async () => { throw new Error("offline"); } })).toBe("0.172.0");
     const controller = new AbortController();
     controller.abort();
     vi.setSystemTime(Date.now() + 5 * 60 * 1000 + 1);
-    expect(await latestClientVersion("codex", { fetchImpl: async () => npm("0.170.0"), signal: controller.signal })).toBe("0.160.0");
+    expect(await latestClientVersion("codex", { fetchImpl: async () => npm("0.173.0"), signal: controller.signal })).toBe("0.172.0");
   });
 
   it("falls back to the grok mirror when the primary source fails", async () => {
@@ -101,14 +101,14 @@ describe("latest client versions", () => {
   it("caches successful lookups until the TTL expires", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     const { latestClientVersion } = await load();
-    let calls = 0, version = "0.160.0";
+    let calls = 0, version = "0.172.0";
     const fetchImpl: typeof fetch = async () => { calls++; return npm(version); };
-    expect(await latestClientVersion("codex", { fetchImpl })).toBe("0.160.0");
-    version = "0.170.0";
-    expect(await latestClientVersion("codex", { fetchImpl })).toBe("0.160.0");
+    expect(await latestClientVersion("codex", { fetchImpl })).toBe("0.172.0");
+    version = "0.173.0";
+    expect(await latestClientVersion("codex", { fetchImpl })).toBe("0.172.0");
     expect(calls).toBe(1);
     vi.setSystemTime(Date.now() + 6 * 60 * 60 * 1000 + 1);
-    expect(await latestClientVersion("codex", { fetchImpl })).toBe("0.170.0");
+    expect(await latestClientVersion("codex", { fetchImpl })).toBe("0.173.0");
     expect(calls).toBe(2);
   });
 
@@ -116,10 +116,10 @@ describe("latest client versions", () => {
     const { latestClientVersion } = await load();
     let calls = 0, release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });
-    const fetchImpl: typeof fetch = async () => { calls++; await gate; return npm("0.160.0"); };
+    const fetchImpl: typeof fetch = async () => { calls++; await gate; return npm("0.172.0"); };
     const results = [latestClientVersion("codex", { fetchImpl }), latestClientVersion("codex", { fetchImpl }), latestClientVersion("codex", { fetchImpl })];
     release();
-    expect(await Promise.all(results)).toEqual(["0.160.0", "0.160.0", "0.160.0"]);
+    expect(await Promise.all(results)).toEqual(["0.172.0", "0.172.0", "0.172.0"]);
     expect(calls).toBe(1);
   });
 
@@ -127,14 +127,14 @@ describe("latest client versions", () => {
     const { latestClientVersion, CLIENT_VERSION_FLOORS } = await load();
     let release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });
-    const fetchImpl: typeof fetch = async () => { await gate; return npm("0.160.0"); };
+    const fetchImpl: typeof fetch = async () => { await gate; return npm("0.172.0"); };
     const controller = new AbortController();
     const cancelled = latestClientVersion("codex", { fetchImpl, signal: controller.signal });
     const other = latestClientVersion("codex", { fetchImpl });
     controller.abort();
     expect(await cancelled).toBe(CLIENT_VERSION_FLOORS.codex);
     release();
-    expect(await other).toBe("0.160.0");
+    expect(await other).toBe("0.172.0");
   });
 
   it("reads Trae app and build versions from the international regions only", async () => {

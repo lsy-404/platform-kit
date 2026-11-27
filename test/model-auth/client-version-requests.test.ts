@@ -20,7 +20,7 @@ describe("default client versions", () => {
     try {
       await expect(authorizeAnthropic({
         timeoutMs: 600_000, signal: controller.signal,
-        fetchImpl: async () => { controller.abort(); return new Response(JSON.stringify({ version: "2.1.293" })); },
+        fetchImpl: async () => { controller.abort(); return new Response(JSON.stringify({ version: "2.1.340" })); },
         openExternal: () => { throw new Error("unexpected browser"); },
       })).rejects.toMatchObject({ code: "aborted" });
       expect(timeout).toHaveBeenCalledWith(5_000);
@@ -31,7 +31,7 @@ describe("default client versions", () => {
   it("keeps Claude token, usage, profile and inference headers on the same latest release", async () => {
     const seen: Array<{ url: string; headers: Headers }> = [];
     const fetchImpl: typeof fetch = async (url, init) => {
-      if (String(url).startsWith("https://registry.npmjs.org/")) return new Response(JSON.stringify({ version: "2.1.293" }));
+      if (String(url).startsWith("https://registry.npmjs.org/")) return new Response(JSON.stringify({ version: "2.1.340" }));
       seen.push({ url: String(url), headers: new Headers(init?.headers) });
       if (String(url).endsWith("/token")) return new Response(JSON.stringify({ access_token: "renewed", refresh_token: "renewed-refresh", expires_in: 3600 }));
       if (String(url).endsWith("/profile")) return new Response(JSON.stringify({ organization_id: "org", organization_type: "anthropic_max" }));
@@ -40,7 +40,7 @@ describe("default client versions", () => {
     const credential = await refreshAnthropic({ type: "oauth", access: "old", refresh: "refresh", expires: 0 }, { fetchImpl });
     await queryAnthropicUsage(credential, { fetchImpl });
     const headers = await anthropicClientHeaders({ fetchImpl });
-    expect(headers).toEqual({ "user-agent": "claude-cli/2.1.293 (external, cli)", "x-app": "cli" });
+    expect(headers).toEqual({ "user-agent": "claude-cli/2.1.340 (external, cli)", "x-app": "cli" });
     expect(seen.map(item => item.url)).toEqual([
       "https://platform.claude.com/v1/oauth/token", "https://api.anthropic.com/api/oauth/usage",
       "https://api.anthropic.com/api/oauth/profile",
@@ -64,9 +64,9 @@ describe("default client versions", () => {
     const requests: string[] = [];
     await listOpenAICodexModels({ access: "token" }, { fetchImpl: async url => {
       requests.push(String(url));
-      return String(url).startsWith("https://registry.npmjs.org/") ? new Response(JSON.stringify({ version: "0.161.2" })) : new Response(JSON.stringify({ models: [] }));
+      return String(url).startsWith("https://registry.npmjs.org/") ? new Response(JSON.stringify({ version: "0.173.2" })) : new Response(JSON.stringify({ models: [] }));
     } });
-    expect(requests).toEqual(["https://registry.npmjs.org/@openai/codex/latest", "https://chatgpt.com/backend-api/codex/models?client_version=0.161.2"]);
+    expect(requests).toEqual(["https://registry.npmjs.org/@openai/codex/latest", "https://chatgpt.com/backend-api/codex/models?client_version=0.173.2"]);
   });
 
   it("sends the latest Grok version on usage requests and honors an explicit override", async () => {

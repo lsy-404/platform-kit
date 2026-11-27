@@ -2,7 +2,7 @@ export type ClientVersionTarget = "claude" | "codex" | "grok" | "trae-app" | "tr
 export interface ClientVersionOptions { readonly fetchImpl?: typeof fetch; readonly signal?: AbortSignal; readonly timeoutMs?: number; }
 
 /** Oldest versions known to be accepted; lookups never resolve below these. */
-export const CLIENT_VERSION_FLOORS: Readonly<Record<ClientVersionTarget, string>> = Object.freeze({ claude: "2.1.290", codex: "0.160.0", grok: "1.0.46", "trae-app": "3.5.104", "trae-build": "2.3.88407" });
+export const CLIENT_VERSION_FLOORS: Readonly<Record<ClientVersionTarget, string>> = Object.freeze({ claude: "2.1.332", codex: "0.172.0", grok: "1.0.46", "trae-app": "3.5.104", "trae-build": "2.3.88407" });
 
 type Feed = "claude" | "codex" | "grok" | "trae";
 type Versions = Partial<Record<ClientVersionTarget, string>>;

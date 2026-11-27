@@ -1,7 +1,7 @@
 import { parseRetryAfter } from "@model-auth/core";
 import { quotaWindow, usageSnapshot, type ProviderUsageData, type ProviderUsageRequestOptions, type ProviderUsageSnapshot, type ProviderUsageWindow } from "./usage.js";
 
-export const OPENCODE_GO_USAGE_URL = "https://opencode.ai/zen/go/v1/usage";
+export const OPENCODE_GO_USAGE_URL = "https://opencode.ai/inference/go/v1/usage";
 
 export function opencodeGoRequestHeaders(options: { userAgent: string; sessionId: string }): Record<string, string> {
   const userAgent = typeof options.userAgent === "string" ? options.userAgent.trim() : "";

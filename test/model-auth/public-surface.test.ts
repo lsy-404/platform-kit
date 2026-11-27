@@ -27,7 +27,7 @@ describe("public package surface", () => {
   it("exports the OpenCode Go usage API from the root and subpath, and no longer the Ollama web session", () => {
     expect(providers.queryOpencodeGoKeyUsage).toBe(opencode.queryOpencodeGoKeyUsage);
     expect(providers.parseOpencodeGoUsage).toBe(opencode.parseOpencodeGoUsage);
-    expect(providers.OPENCODE_GO_USAGE_URL).toBe("https://opencode.ai/zen/go/v1/usage");
+    expect(providers.OPENCODE_GO_USAGE_URL).toBe("https://opencode.ai/inference/go/v1/usage");
     for (const removed of ["authorizeOllamaWeb", "queryOllamaUsage", "queryOllamaAccountUsage", "parseOllamaSettings", "OLLAMA_USAGE_URL"]) expect(providers).not.toHaveProperty(removed);
   });
 

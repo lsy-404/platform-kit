@@ -23,7 +23,7 @@ describe("model-auth provider capabilities", () => {
     });
     expect(modelAuthProviderCapability("opencode-go")).toMatchObject({
       authorization: { kind: "api-key", renewable: false, multiAccount: false },
-      access: { inference: false, modelCatalog: false, usage: true },
+      access: { inference: true, modelCatalog: true, usage: true },
     });
     expect(modelAuthProviderCapability("missing")).toBeNull();
     expect(modelAuthProviderCapability("kimi-coding")?.catalogProviderId).toBe("kimi-code-plan-cn");
