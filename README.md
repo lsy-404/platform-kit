@@ -14,7 +14,7 @@ Apache-2.0 theme and public AI access packages, distributed directly through thi
 | `@platform-kit/appearance-check` | Development-time appearance checks with stable IDs, optional DESIGN.md token baselines, CLI and Vite build warnings; [usage](tooling/appearance-check/README.md) |
 | `@platform-kit/ffmpeg-lgpl` | LGPL-2.1-or-later FFmpeg executable for audio decoding and AAC encoding on five desktop targets; [usage](tooling/ffmpeg-lgpl/README.md) |
 | `@model-auth/core` | Framework-neutral provider access, credential routing, authentication interaction and usage contracts |
-| `@model-auth/providers` | Host-side provider authentication, requests, streams and usage queries for OpenAI, Anthropic, WorkBuddy, Trae, Grok, Ollama and OpenCode Go |
+| `@model-auth/providers` | Host-side provider authentication, requests, streams and usage queries for OpenAI, Anthropic, WorkBuddy, Trae, Grok, Gemini API, Ollama and OpenCode Go |
 | `model-auth-native` | Rust browser authentication for OpenAI and Anthropic; host-owned credential storage |
 | `@model-auth/vue` | Vue provider connection, dynamic authentication and usage interface/custom element |
 
@@ -27,7 +27,7 @@ Use public release archive URLs in `package.json`. No private registry token or 
   "dependencies": {
     "@lsypkg/fluent": "https://github.com/lsy-404/platform-kit/releases/download/fluent-v0.3.3/platform-kit-fluent-0.3.3.tgz",
     "@model-auth/core": "https://github.com/lsy-404/platform-kit/releases/download/model-auth-core-v0.12.0/model-auth-core-0.12.0.tgz",
-    "@model-auth/providers": "https://github.com/lsy-404/platform-kit/releases/download/model-auth-providers-v0.24.3/model-auth-providers-0.24.3.tgz",
+    "@model-auth/providers": "https://github.com/lsy-404/platform-kit/releases/download/model-auth-providers-v0.28.0/model-auth-providers-0.28.0.tgz",
     "@model-auth/vue": "https://github.com/lsy-404/platform-kit/releases/download/model-auth-vue-v0.14.2/model-auth-vue-0.14.2.tgz"
   }
 }

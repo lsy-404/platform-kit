@@ -1,6 +1,6 @@
 {
   "name": "@model-auth/providers",
-  "version": "0.27.0",
+  "version": "0.28.0",
   "description": "Host-side AI provider access, authentication, requests and usage queries.",
   "type": "module",
   "main": "./dist/index.js",
@@ -45,6 +45,9 @@
       ],
       "antigravity": [
         "dist/antigravity.d.ts"
+      ],
+      "gemini": [
+        "dist/gemini.d.ts"
       ]
     }
   },
@@ -115,6 +118,10 @@
     "./antigravity": {
       "types": "./dist/antigravity.d.ts",
       "import": "./dist/antigravity.js"
+    },
+    "./gemini": {
+      "types": "./dist/gemini.d.ts",
+      "import": "./dist/gemini.js"
     }
   },
   "scripts": {

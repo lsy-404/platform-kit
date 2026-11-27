@@ -145,6 +145,10 @@ The host opens the browser and securely stores the whole credential, including i
 
 Model discovery returns the account's actual service metadata. `streamTrae` and `completeTrae` currently support text and reasoning with usage when supplied by the service. Structured tool definitions and tool messages are rejected because that wire contract has not been verified. Authentication and inference preserve server account and entitlement checks.
 
+## Gemini API key access
+
+`listGeminiModels(apiKey, { fetchImpl, signal })` from `@model-auth/providers/gemini` reads `GET https://generativelanguage.googleapis.com/v1beta/models` with the key in the `x-goog-api-key` header, follows `nextPageToken`, and returns the models that support `generateContent` as `{ id, displayName, inputTokenLimit, outputTokenLimit, thinking }`. A successful listing also verifies the key. Failures throw `GeminiError` with `code` `signed-out` (401, 403 or an invalid key), `rate-limited` (429, with `retryAfterMs`), `http`, `response`, `transport` or `aborted`; messages never contain the key or response bodies, and redirects are not followed. Capability id `google` supports several keys per host, and `webSearchToolFor("google-generative-ai", "api-key")` returns the `googleSearch` tool.
+
 ## Grok access and usage
 
 `authorizeGrok` and `refreshGrok` provide the browser authentication lifecycle. `grokHeaders` binds a trusted-host request to the returned access token, and `queryGrokUsage` reads non-secret credit windows and balances from the provider billing surface. All usage snapshots preserve source precision and may carry a host-owned token/request estimate.

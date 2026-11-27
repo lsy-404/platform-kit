@@ -1,4 +1,4 @@
-export type ModelAuthProviderId = "anthropic" | "openai-codex" | "workbuddy" | "traecode" | "antigravity" | "grok" | "ollama-cloud" | "opencode-go" | "github-copilot" | "kimi-coding" | "openrouter" | "xai" | "meta" | "radius";
+export type ModelAuthProviderId = "anthropic" | "openai-codex" | "workbuddy" | "traecode" | "antigravity" | "grok" | "google" | "ollama-cloud" | "opencode-go" | "github-copilot" | "kimi-coding" | "openrouter" | "xai" | "meta" | "radius";
 export type ProviderAuthorizationKind = "browser-oauth" | "browser-web-session" | "runtime-oauth" | "api-key";
 
 export interface ModelAuthProviderCapability {
@@ -29,6 +29,7 @@ export const MODEL_AUTH_PROVIDER_CAPABILITIES: readonly ModelAuthProviderCapabil
   { id: "traecode", displayName: "TRAE", authorization: { kind: "browser-oauth", renewable: true, multiAccount: false }, access: { inference: true, modelCatalog: true, usage: false, webSearch: false }, catalogProviderIds: [], catalogProviderId: null },
   { id: "antigravity", displayName: "Antigravity", authorization: { kind: "browser-oauth", renewable: true, multiAccount: true }, access: { inference: true, modelCatalog: true, usage: false, webSearch: false }, catalogProviderIds: [], catalogProviderId: null },
   { id: "grok", displayName: "Grok", authorization: { kind: "browser-oauth", renewable: true, multiAccount: true }, access: { inference: true, modelCatalog: true, usage: true, webSearch: false }, catalogProviderIds: ["xai"], catalogProviderId: "xai" },
+  { id: "google", displayName: "Gemini API", authorization: { kind: "api-key", renewable: false, multiAccount: true }, access: { inference: true, modelCatalog: true, usage: false, webSearch: true }, catalogProviderIds: ["google"], catalogProviderId: "google" },
   { id: "ollama-cloud", displayName: "Ollama", authorization: { kind: "api-key", renewable: false, multiAccount: false }, access: { inference: false, modelCatalog: false, usage: true, webSearch: false }, catalogProviderIds: ["ollama"], catalogProviderId: "ollama" },
   { id: "opencode-go", displayName: "OpenCode Go", authorization: { kind: "api-key", renewable: false, multiAccount: false }, access: { inference: false, modelCatalog: false, usage: true, webSearch: false }, catalogProviderIds: ["opencode-go"], catalogProviderId: "opencode-go" },
   { id: "github-copilot", displayName: "GitHub Copilot", authorization: { kind: "runtime-oauth", renewable: true, multiAccount: true }, access: { inference: true, modelCatalog: true, usage: false, webSearch: false }, catalogProviderIds: ["github-copilot"], catalogProviderId: "github-copilot" },
@@ -49,8 +50,8 @@ export type ServerToolAuth = "subscription" | "api-key";
 
 export interface WebSearchToolSpec {
   /** Wire API the tool definition belongs to, named as pi-ai names its APIs. */
-  readonly api: "anthropic-messages" | "openai-responses" | "openai-codex-responses";
-  /** Tool definition appended to the request's `tools` array. */
+  readonly api: "anthropic-messages" | "openai-responses" | "openai-codex-responses" | "google-generative-ai";
+  /** Tool definition appended to the request's `tools` array; for google-generative-ai it joins the generateContent `tools` array (`config.tools` in @google/genai params). */
   readonly tool: Readonly<Record<string, unknown>>;
   readonly auth: readonly ServerToolAuth[];
 }
@@ -59,6 +60,7 @@ export const WEB_SEARCH_TOOLS: readonly WebSearchToolSpec[] = Object.freeze([
   { api: "anthropic-messages", tool: Object.freeze({ type: "web_search_20250305", name: "web_search", max_uses: 3 }), auth: ["subscription", "api-key"] },
   { api: "openai-responses", tool: Object.freeze({ type: "web_search" }), auth: ["api-key"] },
   { api: "openai-codex-responses", tool: Object.freeze({ type: "web_search", external_web_access: true }), auth: ["subscription"] },
+  { api: "google-generative-ai", tool: Object.freeze({ googleSearch: {} }), auth: ["api-key"] },
 ]);
 
 /** The server-side web search tool for a wire API under the given kind of credential, or null when there is none. */

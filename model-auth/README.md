@@ -16,14 +16,14 @@ pnpm --dir model-auth test:packages
 The pack command writes local artifacts to `model-auth/release/`:
 
 - `model-auth-core-0.12.0.tgz`
-- `model-auth-providers-0.27.0.tgz`
+- `model-auth-providers-0.28.0.tgz`
 - `model-auth-vue-0.15.0.tgz`
 
 The package-consumer test installs those archives into a temporary consumer and verifies exports, declarations, styles, runtime behavior, and included notices.
 
 ## Boundaries
 
-The toolkit does not contain credentials or provider binaries. The providers package implements trusted-host authentication and provider access for OpenAI, Anthropic, WorkBuddy, Trae, Grok, Ollama and OpenCode Go. Hosts own secure credential persistence, browser opening, provider availability and request transport. See `docs/` and package READMEs for API contracts.
+The toolkit does not contain credentials or provider binaries. The providers package implements trusted-host authentication and provider access for OpenAI, Anthropic, WorkBuddy, Trae, Grok, Gemini API, Ollama and OpenCode Go. Hosts own secure credential persistence, browser opening, provider availability and request transport. See `docs/` and package READMEs for API contracts.
 
 ## License
 

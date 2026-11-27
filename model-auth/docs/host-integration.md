@@ -25,7 +25,7 @@ The example contains no credential material. A host may keep displaying the prev
 
 The UI calls host-owned actions. The providers package performs actual authorization in that trusted process; neither Vue nor a core adapter factory is a credential vault.
 
-Use `@model-auth/providers/openai` (`authorizeOpenAI`, `refreshOpenAI`), `@model-auth/providers/anthropic` (`authorizeAnthropic`, `refreshAnthropic`), `@model-auth/providers/workbuddy`, `@model-auth/providers/trae`, `@model-auth/providers/grok`, `@model-auth/providers/ollama`, or `@model-auth/providers/opencode`. The Codex model catalog, Grok usage and Trae authorization requests use the latest official client version automatically (`@model-auth/providers/client-versions`). OpenAI runtime credentials use provider ID `openai-codex`; Anthropic uses `anthropic`. Their metadata adapters receive the same `ProviderAdapterHost` contract shown below.
+Use `@model-auth/providers/openai` (`authorizeOpenAI`, `refreshOpenAI`), `@model-auth/providers/anthropic` (`authorizeAnthropic`, `refreshAnthropic`), `@model-auth/providers/workbuddy`, `@model-auth/providers/trae`, `@model-auth/providers/grok`, `@model-auth/providers/gemini`, `@model-auth/providers/ollama`, or `@model-auth/providers/opencode`. The Codex model catalog, Grok usage and Trae authorization requests use the latest official client version automatically (`@model-auth/providers/client-versions`). OpenAI runtime credentials use provider ID `openai-codex`; Anthropic uses `anthropic`. Their metadata adapters receive the same `ProviderAdapterHost` contract shown below.
 
 For one Anthropic login that also acquires the web session required by prepaid credits, use `authorizeAnthropicInBrowser` from `@model-auth/providers/anthropic-browser`. Pass the installed Chrome or Edge `executablePath`, the host's proxy-only `browserArgs`, `fetchImpl` for OAuth transport, and `signal`. The provider owns a temporary browser profile and returns `{ credential, cookies }` after OAuth succeeds; closing the login page cancels the attempt and removes its temporary profile. It never reads an existing browser profile or persists either returned secret.
 
@@ -91,7 +91,7 @@ const runtimeProviders = bindRuntimeProviders(snapshot.catalog!, [
 
 WorkBuddy and TraeCode are adapter capabilities, not fabricated `models.dev` providers. Use their exported factories when the host supplies the matching callback contract.
 
-`access.webSearch` marks subscriptions whose provider runs a server-side web search. `webSearchToolFor(api, "subscription" | "api-key")` returns the tool definition for a wire API (`anthropic-messages`, `openai-responses`, `openai-codex-responses`); append `spec.tool` to the request's `tools` array and read the answer text, whose links come from the provider's results. It returns `null` where the provider has no server-side search for that kind of credential.
+`access.webSearch` marks subscriptions whose provider runs a server-side web search. `webSearchToolFor(api, "subscription" | "api-key")` returns the tool definition for a wire API (`anthropic-messages`, `openai-responses`, `openai-codex-responses`, `google-generative-ai`); append `spec.tool` to the request's `tools` array (for `google-generative-ai`, the generateContent `tools`, which is `config.tools` in @google/genai params) and read the answer text, whose links come from the provider's results. It returns `null` where the provider has no server-side search for that kind of credential.
 
 ## 4. Route credentials
 
