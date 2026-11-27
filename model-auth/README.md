@@ -16,7 +16,7 @@ pnpm --dir model-auth test:packages
 The pack command writes local artifacts to `model-auth/release/`:
 
 - `model-auth-core-0.12.0.tgz`
-- `model-auth-providers-0.29.0.tgz`
+- `model-auth-providers-0.29.1.tgz`
 - `model-auth-vue-0.15.0.tgz`
 
 The package-consumer test installs those archives into a temporary consumer and verifies exports, declarations, styles, runtime behavior, and included notices.

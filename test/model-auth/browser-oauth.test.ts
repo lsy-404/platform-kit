@@ -74,7 +74,7 @@ describe("official browser OAuth providers", () => {
 
   it("rejects incomplete tokens and sanitized remote failures", async () => {
     await expect(authorizeOpenAI({ fetchImpl: async () => new Response(JSON.stringify({ access_token: "private-access", refresh_token: "private-refresh" })), openExternal: async url => { await requestCallback(callback(url)); } })).rejects.toMatchObject({ code: "response", message: "OAuth token response is incomplete." });
-    await expect(authorizeAnthropic({ fetchImpl: async () => new Response("private remote failure", { status: 401 }), openExternal: async url => { await requestCallback(callback(url)); } })).rejects.toMatchObject({ code: "transport", message: "OAuth token request was rejected." });
+    await expect(authorizeAnthropic({ fetchImpl: async () => new Response("private remote failure", { status: 401 }), openExternal: async url => { await requestCallback(callback(url)); } })).rejects.toMatchObject({ code: "transport", message: "OAuth token request was rejected (401)." });
   });
 
   it("refreshes using each wire encoding and preserves omitted renewable/account fields", async () => {

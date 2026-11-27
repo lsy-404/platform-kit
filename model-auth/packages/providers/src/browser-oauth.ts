@@ -27,7 +27,7 @@ export interface BrowserOAuthRefreshOptions {
 export type BrowserOAuthErrorCode = "aborted" | "address-in-use" | "browser" | "callback" | "response" | "timeout" | "transport";
 
 export class BrowserOAuthError extends Error {
-  constructor(public readonly code: BrowserOAuthErrorCode, message: string) {
+  constructor(public readonly code: BrowserOAuthErrorCode, message: string, public readonly status?: number) {
     super(message);
     this.name = "BrowserOAuthError";
   }
@@ -133,7 +133,8 @@ async function requestToken(
       throw new BrowserOAuthError("transport", "OAuth token request could not be completed.");
     }
     ensureNotAborted(signal, timeoutSignal, tokenTimeout.signal);
-    if (!response.ok || response.redirected) throw new BrowserOAuthError("transport", "OAuth token request was rejected.");
+    if (response.redirected) throw new BrowserOAuthError("transport", "OAuth token request was rejected.");
+    if (!response.ok) throw new BrowserOAuthError("transport", `OAuth token request was rejected (${response.status}${await oauthErrorCode(response)}).`, response.status);
     let payload: unknown;
     try {
       const body = await response.text();
@@ -144,6 +145,17 @@ async function requestToken(
     return credentialFrom(payload, config.accountIdFromAccess, previousRefresh, previousAccountId);
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/** The RFC 6749 `error` code of a rejected token response, such as invalid_grant; nothing else from the body is kept. */
+async function oauthErrorCode(response: Response): Promise<string> {
+  try {
+    const body = await response.text();
+    const code = body.length <= 131_072 ? record(JSON.parse(body))?.error : undefined;
+    return typeof code === "string" && /^[a-z_]{1,64}$/.test(code) ? ` ${code}` : "";
+  } catch {
+    return "";
   }
 }
 
